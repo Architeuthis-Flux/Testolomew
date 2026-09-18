@@ -1,0 +1,423 @@
+# Console log of the second row-mode run (two-half numbering; R still only moved the origin). Two magnets: the first as before,
+# then a weaker one (from about the R30 anchor on). Note the brief 'row: no fix' dropouts while the fix was otherwise good.
+
+  i  identify: show the strongest sensor (toggle)
+  b  bus check: pull-ups, and what answers with each sensor powered alone
+  d  stream probe fixes as CSV (toggle)
+  l  latest probe fix
+  o  orientation check: hold a magnet 1-2 cm over the array first
+  k  learn this magnet's strength and hold the fit to it
+  K  forget the magnet strength (fit it freely)
+  r  row mode: which breadboard row the probe is over (toggle)
+  h  hold-still test: 2 s of fixes -> row, scatter, step since the last test
+  R  the probe is on row <number> now, hole next to the channel (R1<Enter>): places the breadboard
+  T  ...and now on a far row, either half (T60<Enter>): measures row direction and pitch
+  v  cycle the 3D view camera (sway / fixed / spin / top)
+row mode on: rows 1-30 over 31-60. Rows 1 and 31 are level with x -10.0 y 22.0 mm (the channel), counting up along (1.000, 0.000), 2.540 mm apart.
+h = hold-still test. R<row> / T<far row> with the probe in that row's hole next to the channel = place the breadboard.
+row: no fix
+row   4   this fix   4.38 (+0.38) hole 0  +/-2.17 rows   18 % sure   x -1.4 y 40.4 z 49.9 mm  misfit 20 %  seen by 3+5 faint
+row: no fix
+row   2   this fix   2.19 (+0.19) hole 3  +/-0.78 rows   46 % sure   x -7.0 y 30.6 z 31.1 mm  misfit 11 %  seen by 5+3 faint
+row: no fix
+row   1   this fix   1.11 (+0.11) hole 2  +/-0.39 rows   79 % sure   x -9.7 y 27.9 z 19.5 mm  misfit 7 %  seen by 5+3 faint
+row: no fix
+row   2   this fix   2.08 (+0.08) hole 2  +/-0.36 rows   83 % sure   x -7.3 y 27.7 z 18.9 mm  misfit 7 %  seen by 6+2 faint
+row: no fix
+row   3   this fix   2.39 (+0.39) hole 2  +/-0.38 rows   60 % sure   x -6.5 y 27.7 z 16.5 mm  misfit 7 %  seen by 6+2 faint
+row   2   this fix   1.66 (-0.34) hole 2  +/-0.35 rows   66 % sure   x -8.3 y 27.1 z 20.4 mm  misfit 8 %  seen by 5+3 faint
+row: no fix
+row: no fix
+row   1   this fix  -0.36 (-0.36) hole 3  +/-1.27 rows   29 % sure   x -13.5 y 30.1 z 29.3 mm  misfit 26 %  seen by 1+3 faint
+row: no fix
+row: no fix
+row   1   this fix   0.88 (-0.12) hole 2  +/-0.33 rows   84 % sure   x -10.3 y 28.8 z 19.7 mm  misfit 11 %  seen by 4+4 faint
+row: no fix
+row   1   this fix   0.92 (-0.08) hole 2  +/-0.24 rows   95 % sure   x -10.2 y 28.3 z 17.5 mm  misfit 9 %  seen by 4+4 faint
+row: no fix
+row   1   this fix   1.02 (+0.02) hole 2  +/-0.17 rows  100 % sure   x -9.9 y 27.2 z 16.0 mm  misfit 5 %  seen by 4+3 faint
+row: no fix
+row   1   this fix   1.07 (+0.07) hole 2  +/-0.17 rows   99 % sure   x -9.8 y 27.2 z 15.4 mm  misfit 7 %  seen by 4+4 faint
+row   1   this fix   0.95 (-0.05) hole 1  +/-0.18 rows   99 % sure   x -10.1 y 26.1 z 15.4 mm  misfit 8 %  seen by 4+4 faint
+row: no fix
+row   1   this fix  31.11 (+0.11) hole 0  +/-0.20 rows   77 % sure   x -9.7 y 21.7 z 16.9 mm  misfit 9 %  seen by 4+4 faint
+row   1   this fix   1.02 (+0.02) hole 0  +/-0.20 rows   74 % sure   x -10.0 y 22.2 z 17.8 mm  misfit 9 %  seen by 4+4 faint
+row  31   this fix  30.65 (-0.35) hole 2  +/-0.22 rows   76 % sure   x -10.9 y 16.8 z 18.9 mm  misfit 8 %  seen by 4+4 faint
+row  31   this fix  30.84 (-0.16) hole 2  +/-0.24 rows   92 % sure   x -10.4 y 15.8 z 18.8 mm  misfit 8 %  seen by 5+3 faint
+row: no fix
+row  31   this fix  30.81 (-0.19) hole 2  +/-0.23 rows   91 % sure   x -10.5 y 15.5 z 18.2 mm  misfit 8 %  seen by 5+3 faint
+row  31   this fix  30.86 (-0.14) hole 2  +/-0.19 rows   97 % sure   x -10.4 y 15.7 z 18.4 mm  misfit 7 %  seen by 5+3 faint
+row: no fix
+row  32   this fix  32.47 (+0.47) hole 2  +/-0.24 rows   55 % sure   x -6.3 y 15.7 z 17.5 mm  misfit 9 %  seen by 5+3 faint
+row: no fix
+row: no fix
+row  34   this fix  34.56 (-0.44) hole 1  +/-0.20 rows   63 % sure   x -1.0 y 17.5 z 17.7 mm  misfit 9 %  seen by 6+2 faint
+row  43   this fix  43.93 (-0.07) hole 1  +/-0.32 rows   87 % sure   x 22.8 y 18.3 z 22.9 mm  misfit 16 %  seen by 8+0 faint
+row: no fix
+row  58   this fix  57.84 (-0.16) hole 2  +/-0.29 rows   87 % sure   x 58.2 y 16.6 z 17.5 mm  misfit 9 %  seen by 6+2 faint
+row: no fix
+row  59   this fix  59.10 (+0.10) hole 2  +/-0.29 rows   89 % sure   x 61.4 y 16.6 z 17.2 mm  misfit 7 %  seen by 5+3 faint
+row  60   this fix  59.80 (-0.20) hole 2  +/-0.28 rows   85 % sure   x 63.2 y 16.0 z 16.6 mm  misfit 6 %  seen by 5+3 faint
+row  60   this fix  59.83 (-0.17) hole 2  +/-0.29 rows   87 % sure   x 63.2 y 16.0 z 16.5 mm  misfit 6 %  seen by 5+3 faint
+row: no fix
+row  56   this fix  56.46 (+0.46) hole 2  +/-0.20 rows   58 % sure   x 54.7 y 16.0 z 18.7 mm  misfit 6 %  seen by 6+2 faint
+row  47   this fix  46.79 (-0.21) hole 2  +/-0.07 rows  100 % sure   x 30.1 y 16.4 z 17.1 mm  misfit 4 %  seen by 8+0 faint
+row  41   this fix  41.24 (+0.24) hole 2  +/-0.07 rows  100 % sure   x 16.0 y 16.1 z 16.4 mm  misfit 3 %  seen by 8+0 faint
+row  37   this fix  36.74 (-0.26) hole 2  +/-0.13 rows   97 % sure   x 4.6 y 16.5 z 16.7 mm  misfit 7 %  seen by 7+1 faint
+row: no fix
+row  35   this fix  34.56 (-0.44) hole 1  +/-0.16 rows   65 % sure   x -0.9 y 17.1 z 16.8 mm  misfit 8 %  seen by 5+3 faint
+row  32   this fix  32.25 (+0.25) hole 1  +/-0.22 rows   87 % sure   x -6.8 y 16.9 z 16.4 mm  misfit 9 %  seen by 5+3 faint
+row: no fix
+row  31   this fix  30.11 (+0.11) hole 2  +/-0.20 rows   97 % sure   x -12.3 y 16.7 z 17.8 mm  misfit 6 %  seen by 5+3 faint
+row: no fix
+row  31   this fix  30.93 (-0.07) hole 2  +/-0.30 rows   89 % sure   x -10.2 y 16.3 z 17.7 mm  misfit 11 %  seen by 5+3 faint
+row  31   this fix  31.01 (+0.01) hole 2  +/-0.38 rows   81 % sure   x -10.0 y 16.3 z 17.4 mm  misfit 14 %  seen by 5+2 faint
+row  31   this fix  30.62 (-0.38) hole 2  +/-0.28 rows   66 % sure   x -11.0 y 16.0 z 18.6 mm  misfit 10 %  seen by 5+3 faint
+row  31   this fix  29.92 (-0.08) hole 2  +/-0.27 rows   93 % sure   x -12.7 y 16.0 z 18.4 mm  misfit 9 %  seen by 5+3 faint
+row  31   this fix  29.59 (-0.41) hole 2  +/-0.25 rows   64 % sure   x -13.6 y 16.5 z 17.4 mm  misfit 9 %  seen by 4+4 faint
+row  32   this fix  32.16 (+0.16) hole 2  +/-0.26 rows   90 % sure   x -7.1 y 16.0 z 18.4 mm  misfit 10 %  seen by 5+3 faint
+row: no fix
+row  46   this fix  45.80 (-0.20) hole 1  +/-0.41 rows   72 % sure   x 27.6 y 18.6 z 25.2 mm  misfit 18 %  seen by 8+0 faint
+row off   this fix  61.79 (-0.21) hole 2  +/-0.24 rows   89 % sure   x 68.2 y 14.8 z 14.8 mm  misfit 5 %  seen by 5+3 faint
+row  60   this fix  61.14 (+0.14) hole 2  +/-0.29 rows   88 % sure   x 66.5 y 15.1 z 13.5 mm  misfit 6 %  seen by 5+3 faint
+row: no fix
+row  28   this fix  28.11 (+0.11) hole 0  +/-0.21 rows   97 % sure   x 58.8 y 37.4 z 17.5 mm  misfit 4 %  seen by 5+3 faint
+row  29   this fix  29.60 (-0.40) hole 3  +/-0.30 rows   63 % sure   x 62.6 y 32.0 z 17.1 mm  misfit 5 %  seen by 5+3 faint
+row: no fix
+row  27   this fix  26.71 (-0.29) hole 3  +/-0.16 rows   91 % sure   x 55.3 y 31.5 z 17.4 mm  misfit 5 %  seen by 6+2 faint
+row  20   this fix  19.58 (-0.42) hole 3  +/-0.07 rows   86 % sure   x 37.2 y 30.4 z 16.5 mm  misfit 5 %  seen by 8+0 faint
+row: no fix
+row: no fix
+row  13   this fix  12.92 (-0.08) hole 2  +/-0.07 rows  100 % sure   x 20.3 y 29.5 z 17.0 mm  misfit 4 %  seen by 8+0 faint
+row: no fix
+row   7   this fix   7.08 (+0.08) hole 3  +/-0.08 rows  100 % sure   x 5.4 y 30.3 z 17.0 mm  misfit 5 %  seen by 7+1 faint
+row: no fix
+row   5   this fix   5.13 (+0.13) hole 3  +/-0.08 rows  100 % sure   x 0.5 y 30.6 z 16.6 mm  misfit 4 %  seen by 6+2 faint
+row: no fix
+row   8   this fix   8.42 (+0.42) hole 3  +/-0.07 rows   87 % sure   x 8.8 y 30.0 z 17.0 mm  misfit 5 %  seen by 7+1 faint
+row: no fix
+row: no fix
+row  12   this fix  12.34 (+0.34) hole 3  +/-0.12 rows   91 % sure   x 18.8 y 29.7 z 17.2 mm  misfit 7 %  seen by 8+0 faint
+row: no fix
+row  19   this fix  19.48 (+0.48) hole 3  +/-0.12 rows   58 % sure   x 36.9 y 30.0 z 17.5 mm  misfit 7 %  seen by 8+0 faint
+row: no fix
+row  17   this fix  16.44 (+0.44) hole 3  +/-0.06 rows   81 % sure   x 29.2 y 30.5 z 16.7 mm  misfit 4 %  seen by 8+0 faint
+row  15   this fix  14.90 (-0.10) hole 3  +/-0.05 rows  100 % sure   x 25.3 y 30.6 z 16.6 mm  misfit 3 %  seen by 8+0 faint
+row  13   this fix  13.08 (+0.08) hole 3  +/-0.25 rows   94 % sure   x 20.7 y 30.2 z 28.6 mm  misfit 8 %  seen by 5+3 faint
+row  14   this fix  14.01 (+0.01) hole 4  +/-0.05 rows  100 % sure   x 23.1 y 33.9 z 18.0 mm  misfit 4 %  seen by 7+1 faint
+row: no fix
+row  12   this fix  11.30 (+0.30) hole 3  +/-0.10 rows   97 % sure   x 16.2 y 31.8 z 17.5 mm  misfit 7 %  seen by 8+0 faint
+row   5   this fix   4.42 (+0.42) hole 3  +/-0.10 rows   79 % sure   x -1.3 y 31.2 z 17.0 mm  misfit 5 %  seen by 6+2 faint
+row   3   this fix   3.07 (+0.07) hole 3  +/-0.16 rows  100 % sure   x -4.7 y 31.3 z 16.4 mm  misfit 6 %  seen by 5+3 faint
+row   2   this fix   1.97 (-0.03) hole 3  +/-0.19 rows   99 % sure   x -7.5 y 31.8 z 17.3 mm  misfit 6 %  seen by 5+3 faint
+row   1   this fix   1.04 (+0.04) hole 3  +/-0.23 rows   97 % sure   x -9.9 y 31.2 z 17.6 mm  misfit 7 %  seen by 5+3 faint
+row   1   this fix   0.99 (-0.01) hole 3  +/-0.23 rows   97 % sure   x -10.0 y 31.3 z 17.2 mm  misfit 7 %  seen by 5+3 faint
+row  10   this fix  10.71 (-0.29) hole 5  +/-0.12 rows   96 % sure   x 14.7 y 36.4 z 23.2 mm  misfit 7 %  seen by 7+1 faint
+row: no fix
+row off   this fix  34.22 (+0.22) hole 4  +/-2.49 rows   16 % sure   x 74.4 y 33.5 z 62.2 mm  misfit 22 %  seen by 4+4 faint
+row off   this fix  64.56 (-0.44) hole 0  +/-1.08 rows   25 % sure   x 75.2 y 21.0 z 46.8 mm  misfit 12 %  seen by 6+2 faint
+row: no fix
+row off   this fix  64.34 (+0.34) hole 0  +/-0.84 rows   40 % sure   x 74.7 y 20.1 z 41.5 mm  misfit 10 %  seen by 6+2 faint
+row: no fix
+row: no fix
+row off   this fix  65.29 (+0.29) hole 1  +/-0.88 rows   41 % sure   x 77.1 y 18.9 z 42.6 mm  misfit 10 %  seen by 6+2 faint
+row off   this fix  62.52 (-0.48) hole 1  +/-0.85 rows   39 % sure   x 70.1 y 18.1 z 42.6 mm  misfit 12 %  seen by 8+0 faint
+row  58   this fix  57.47 (+0.47) hole 1  +/-0.57 rows   48 % sure   x 57.2 y 17.5 z 46.3 mm  misfit 10 %  seen by 8+0 faint
+row: no fix
+row  59   this fix  59.13 (+0.13) hole 0  +/-0.88 rows   23 % sure   x 61.5 y 21.8 z 55.1 mm  misfit 13 %  seen by 8+0 faint
+row off   this fix  61.93 (-0.07) hole 1  +/-0.85 rows   44 % sure   x 68.6 y 18.3 z 49.3 mm  misfit 12 %  seen by 8+0 faint
+row: no fix
+row off   this fix  61.93 (-0.07) hole 0  +/-0.67 rows   53 % sure   x 68.6 y 19.7 z 45.9 mm  misfit 10 %  seen by 8+0 faint
+row  58   this fix  57.90 (-0.10) hole 0  +/-0.66 rows   34 % sure   x 58.3 y 21.6 z 50.3 mm  misfit 11 %  seen by 8+0 faint
+row  37   this fix  36.82 (-0.18) hole 1  +/-0.76 rows   48 % sure   x 4.8 y 17.6 z 47.1 mm  misfit 12 %  seen by 8+0 faint
+row: no fix
+row  35   this fix  34.87 (-0.13) hole 1  +/-0.54 rows   63 % sure   x -0.2 y 17.2 z 39.9 mm  misfit 9 %  seen by 8+0 faint
+row  35   this fix  34.81 (-0.19) hole 2  +/-0.55 rows   61 % sure   x -0.3 y 16.8 z 40.3 mm  misfit 10 %  seen by 8+0 faint
+row  35   this fix  34.84 (-0.16) hole 1  +/-0.47 rows   68 % sure   x -0.3 y 16.9 z 40.4 mm  misfit 8 %  seen by 8+0 faint
+row: no fix
+row  35   this fix  34.44 (+0.44) hole 1  +/-0.51 rows   52 % sure   x -1.3 y 18.4 z 41.3 mm  misfit 8 %  seen by 8+0 faint
+row: no fix
+row  34   this fix  34.46 (+0.46) hole 0  +/-0.64 rows   27 % sure   x -1.2 y 21.7 z 46.9 mm  misfit 9 %  seen by 8+0 faint
+row   4   this fix   3.46 (+0.46) hole 4  +/-0.61 rows   47 % sure   x -3.7 y 34.5 z 43.7 mm  misfit 6 %  seen by 8+0 faint
+row: no fix
+row   1   this fix   0.53 (-0.47) hole 4  +/-1.46 rows   26 % sure   x -11.2 y 33.7 z 47.6 mm  misfit 10 %  seen by 8+0 faint
+row: no fix
+row   4   this fix   4.16 (+0.16) hole 1  +/-1.10 rows   34 % sure   x -2.0 y 26.3 z 49.4 mm  misfit 12 %  seen by 6+2 faint
+row: no fix
+row   3   this fix   2.47 (+0.47) hole 2  +/-0.13 rows   58 % sure   x -6.3 y 27.3 z 27.6 mm  misfit 3 %  seen by 8+0 faint
+row   2   this fix   2.27 (+0.27) hole 2  +/-0.11 rows   98 % sure   x -6.8 y 28.5 z 19.8 mm  misfit 4 %  seen by 8+0 faint
+row: no fix
+row   2   this fix   1.70 (-0.30) hole 2  +/-0.11 rows   97 % sure   x -8.2 y 28.5 z 20.3 mm  misfit 4 %  seen by 8+0 faint
+row: no fix
+row   1   this fix   1.11 (+0.11) hole 2  +/-0.13 rows  100 % sure   x -9.7 y 28.8 z 20.8 mm  misfit 5 %  seen by 8+0 faint
+row  31   this fix  30.17 (+0.17) hole 1  +/-0.83 rows   44 % sure   x -12.1 y 18.6 z 47.7 mm  misfit 14 %  seen by 7+1 faint
+row: no fix
+row   1   this fix   0.93 (-0.07) hole 3  +/-1.86 rows   21 % sure   x -10.2 y 30.0 z 33.0 mm  misfit 26 %  seen by 1+4 faint
+row: no fix
+row   1   this fix   1.70 (-0.30) hole 2  +/-1.10 rows   34 % sure   x -8.2 y 28.4 z 27.9 mm  misfit 19 %  seen by 2+3 faint
+row   1   this fix   1.15 (+0.15) hole 2  +/-1.34 rows   29 % sure   x -9.6 y 28.3 z 27.3 mm  misfit 23 %  seen by 2+4 faint
+row   1   this fix   1.09 (+0.09) hole 2  +/-1.22 rows   32 % sure   x -9.8 y 28.9 z 25.8 mm  misfit 21 %  seen by 2+3 faint
+row: no fix
+row: no fix
+row off   this fix  33.78 (-0.22) hole 3  +/-2.54 rows   15 % sure   x 73.3 y 32.0 z 22.5 mm  misfit 30 %  seen by 1+2 faint
+row off   this fix  32.29 (+0.29) hole 2  +/-1.70 rows   23 % sure   x 69.5 y 28.6 z 22.8 mm  misfit 21 %  seen by 1+3 faint
+row: no fix
+row off   this fix  32.63 (-0.37) hole 2  +/-1.66 rows   23 % sure   x 70.3 y 28.3 z 20.0 mm  misfit 23 %  seen by 1+2 faint
+row off   this fix  31.70 (-0.30) hole 2  +/-1.58 rows   24 % sure   x 68.0 y 28.2 z 23.8 mm  misfit 22 %  seen by 3+0 faint
+row: no fix
+row: no fix
+row  30   this fix  30.02 (+0.02) hole 2  +/-1.51 rows   26 % sure   x 63.7 y 29.4 z 23.7 mm  misfit 25 %  seen by 2+2 faint
+row  30   this fix  31.74 (-0.26) hole 2  +/-2.58 rows   15 % sure   x 68.1 y 29.6 z 25.9 mm  misfit 35 %  seen by 1+4 faint
+row: no fix
+row  30   this fix  30.79 (-0.21) hole 4  +/-3.54 rows   11 % sure   x 65.7 y 32.7 z 31.3 mm  misfit 35 %  seen by 2+3 faint
+row: no fix
+row  30   this fix  30.17 (+0.17) hole 4  +/-1.13 rows   34 % sure   x 64.1 y 33.2 z 25.0 mm  misfit 14 %  seen by 3+3 faint
+row: no fix
+row  29   this fix  28.89 (-0.11) hole 5  +/-1.10 rows   35 % sure   x 60.8 y 35.1 z 24.7 mm  misfit 14 %  seen by 3+2 faint
+row: no fix
+row  29   this fix  29.29 (+0.29) hole 4  +/-1.11 rows   34 % sure   x 61.9 y 33.6 z 23.1 mm  misfit 15 %  seen by 3+3 faint
+row  29   this fix  29.16 (+0.16) hole 5  +/-1.21 rows   32 % sure   x 61.5 y 35.2 z 23.1 mm  misfit 16 %  seen by 3+3 faint
+row: no fix
+row  28   this fix  27.67 (-0.33) hole 4  +/-0.83 rows   42 % sure   x 57.8 y 32.8 z 26.8 mm  misfit 12 %  seen by 3+3 faint
+row: no fix
+row: no fix
+row  36   this fix  36.06 (+0.06) hole 3  +/-2.03 rows   19 % sure   x 2.9 y 14.4 z 38.7 mm  misfit 30 %  seen by 2+4 faint
+row: no fix
+row   5   this fix   4.78 (-0.22) hole 2  +/-0.59 rows   57 % sure   x -0.4 y 29.6 z 21.1 mm  misfit 13 %  seen by 5+1 faint
+row   3   this fix   3.26 (+0.26) hole 3  +/-0.48 rows   63 % sure   x -4.3 y 29.9 z 19.5 mm  misfit 10 %  seen by 4+2 faint
+row: no fix
+row   3   this fix   3.34 (+0.34) hole 3  +/-0.67 rows   49 % sure   x -4.1 y 30.2 z 18.7 mm  misfit 13 %  seen by 4+3 faint
+row: no fix
+row   4   this fix   3.84 (-0.16) hole 3  +/-0.80 rows   46 % sure   x -2.8 y 30.1 z 19.1 mm  misfit 15 %  seen by 4+2 faint
+row: no fix
+row   4   this fix   3.65 (-0.35) hole 3  +/-0.75 rows   45 % sure   x -3.3 y 31.4 z 20.0 mm  misfit 14 %  seen by 4+2 faint
+row   3   this fix   2.41 (+0.41) hole 0  +/-0.61 rows   49 % sure   x -6.4 y 38.4 z 24.4 mm  misfit 11 %  seen by 2+3 faint
+row off   this fix  -1.12 (-0.12) hole 0  +/-1.68 rows   23 % sure   x -15.4 y 47.9 z 32.8 mm  misfit 27 %  seen by 1+4 faint
+row: no fix
+row off   this fix  -5.93 (+0.07) hole 0  +/-3.30 rows   12 % sure   x -27.6 y 62.7 z 31.5 mm  misfit 35 %  seen by 1+3 faint
+row: no fix
+row off   this fix  -1.20 (-0.20) hole 0  +/-1.57 rows   25 % sure   x -15.6 y 49.9 z 30.9 mm  misfit 24 %  seen by 1+3 faint
+row: no fix
+row: no fix
+row off   this fix  -0.74 (+0.26) hole 0  +/-1.14 rows   33 % sure   x -14.4 y 45.4 z 28.3 mm  misfit 19 %  seen by 2+3 faint
+row: no fix
+row off   this fix  -3.81 (+0.19) hole 0  +/-2.84 rows   14 % sure   x -22.2 y 60.9 z 33.6 mm  misfit 33 %  seen by 1+4 faint
+row off   this fix  -2.66 (+0.34) hole 0  +/-2.01 rows   19 % sure   x -19.3 y 54.9 z 26.2 mm  misfit 27 %  seen by 1+3 faint
+row off   this fix  -1.38 (-0.38) hole 0  +/-1.50 rows   25 % sure   x -16.0 y 52.2 z 27.4 mm  misfit 22 %  seen by 1+3 faint
+row: no fix
+row   1   this fix  -0.20 (-0.20) hole 0  +/-1.15 rows   33 % sure   x -13.0 y 48.2 z 25.6 mm  misfit 19 %  seen by 1+4 faint
+row: no fix
+row   1   this fix  -0.36 (-0.36) hole 0  +/-0.87 rows   40 % sure   x -13.5 y 45.8 z 26.9 mm  misfit 14 %  seen by 2+2 faint
+row: no fix
+row: no fix
+row   1   this fix  -0.08 (-0.08) hole 0  +/-0.90 rows   42 % sure   x -12.8 y 46.9 z 29.2 mm  misfit 13 %  seen by 2+1 faint
+row: no fix
+row: no fix
+row   3   this fix   3.11 (+0.11) hole 0  +/-1.19 rows   33 % sure   x -4.7 y 38.5 z 39.3 mm  misfit 24 %  seen by 2+3 faint
+row: no fix
+row   2   this fix   1.98 (-0.02) hole 5  +/-1.16 rows   33 % sure   x -7.5 y 35.2 z 35.4 mm  misfit 24 %  seen by 2+3 faint
+row   3   this fix   3.40 (+0.40) hole 4  +/-0.88 rows   39 % sure   x -3.9 y 34.7 z 33.2 mm  misfit 21 %  seen by 2+4 faint
+row   3   this fix   3.26 (+0.26) hole 4  +/-0.82 rows   44 % sure   x -4.3 y 34.3 z 32.5 mm  misfit 19 %  seen by 2+4 faint
+row   2   this fix   1.54 (-0.46) hole 3  +/-1.46 rows   24 % sure   x -8.6 y 30.6 z 32.2 mm  misfit 9 %  seen by 2+1 faint
+row: no fix
+row   5   this fix   4.64 (-0.36) hole 5  +/-0.71 rows   47 % sure   x -0.7 y 35.5 z 33.1 mm  misfit 18 %  seen by 2+4 faint
+row: no fix
+row: no fix
+row  34   this fix  33.78 (-0.22) hole 0  +/-1.02 rows   31 % sure   x -2.9 y 20.7 z 19.9 mm  misfit 33 %  seen by 3+2 faint
+row: no fix
+row  34   this fix  33.71 (-0.29) hole 0  +/-0.92 rows   37 % sure   x -3.1 y 20.2 z 17.0 mm  misfit 34 %  seen by 3+4 faint
+row: no fix
+row  33   this fix  33.02 (+0.02) hole 0  +/-1.23 rows   29 % sure   x -4.9 y 19.8 z 17.2 mm  misfit 40 %  seen by 3+5 faint
+row: no fix
+row   3   this fix   2.79 (-0.21) hole 0  +/-1.18 rows   31 % sure   x -5.4 y 23.9 z 13.7 mm  misfit 35 %  seen by 3+4 faint
+row   3   this fix   2.76 (-0.24) hole 1  +/-1.29 rows   29 % sure   x -5.5 y 24.8 z 12.4 mm  misfit 33 %  seen by 2+5 faint
+row: no fix
+row: no fix
+row   2   this fix   1.70 (-0.30) hole 0  +/-1.77 rows   12 % sure   x -8.2 y 22.4 z 35.9 mm  misfit 30 %  seen by 2+5 faint
+row   3   this fix   3.10 (+0.10) hole 2  +/-0.69 rows   53 % sure   x -4.7 y 27.7 z 23.6 mm  misfit 17 %  seen by 4+4 faint
+row   3   this fix   2.51 (-0.49) hole 3  +/-0.47 rows   49 % sure   x -6.2 y 30.6 z 20.3 mm  misfit 12 %  seen by 4+4 faint
+row: no fix
+row   3   this fix   2.75 (-0.25) hole 2  +/-0.49 rows   63 % sure   x -5.5 y 29.2 z 19.5 mm  misfit 13 %  seen by 3+5 faint
+row: no fix
+row   1   this fix   1.24 (+0.24) hole 2  +/-1.60 rows   24 % sure   x -9.4 y 28.6 z 41.0 mm  misfit 23 %  seen by 1+4 faint
+row   1   this fix   0.92 (-0.08) hole 3  +/-0.87 rows   43 % sure   x -10.2 y 29.9 z 27.7 mm  misfit 18 %  seen by 2+5 faint
+row: no fix
+row   1   this fix   0.80 (-0.20) hole 2  +/-0.65 rows   54 % sure   x -10.5 y 27.3 z 25.6 mm  misfit 14 %  seen by 3+4 faint
+row   1   this fix   1.12 (+0.12) hole 0  +/-0.80 rows   28 % sure   x -9.7 y 22.7 z 20.3 mm  misfit 9 %  seen by 2+1 faint
+row: no fix
+row: no fix
+row  28   this fix  27.90 (-0.10) hole 4  +/-2.32 rows   17 % sure   x 58.3 y 33.6 z 51.2 mm  misfit 28 %  seen by 2+5 faint
+row: no fix
+row  30   this fix  31.22 (+0.22) hole 3  +/-0.60 rows   56 % sure   x 66.8 y 31.7 z 22.8 mm  misfit 10 %  seen by 3+3 faint
+row: no fix
+row off   this fix  31.83 (-0.17) hole 3  +/-0.59 rows   58 % sure   x 68.3 y 31.9 z 17.9 mm  misfit 10 %  seen by 3+3 faint
+row off   this fix  31.62 (-0.38) hole 3  +/-0.67 rows   48 % sure   x 67.8 y 30.6 z 17.7 mm  misfit 12 %  seen by 3+4 faint
+row  30   this fix  30.75 (-0.25) hole 3  +/-0.57 rows   57 % sure   x 65.6 y 30.6 z 18.9 mm  misfit 10 %  seen by 3+3 faint
+row  30   this fix  31.14 (+0.14) hole 3  +/-0.56 rows   61 % sure   x 66.6 y 32.0 z 19.5 mm  misfit 10 %  seen by 3+3 faint
+row off   this fix  31.46 (+0.46) hole 3  +/-0.56 rows   49 % sure   x 67.4 y 30.8 z 21.7 mm  misfit 10 %  seen by 3+3 faint
+row off   this fix  31.99 (-0.01) hole 3  +/-0.56 rows   63 % sure   x 68.7 y 30.5 z 20.8 mm  misfit 10 %  seen by 3+3 faint
+row: no fix
+row  30   this fix  31.49 (+0.49) hole 3  +/-0.45 rows   49 % sure   x 67.5 y 31.2 z 18.6 mm  misfit 8 %  seen by 3+3 faint
+row: no fix
+row off   this fix  31.81 (-0.19) hole 4  +/-0.45 rows   69 % sure   x 68.3 y 32.2 z 17.8 mm  misfit 8 %  seen by 3+3 faint
+row off   this fix  31.96 (-0.04) hole 3  +/-0.60 rows   60 % sure   x 68.6 y 31.5 z 19.0 mm  misfit 11 %  seen by 3+3 faint
+row off   this fix  32.43 (+0.43) hole 4  +/-0.43 rows   55 % sure   x 69.8 y 33.6 z 18.7 mm  misfit 7 %  seen by 3+2 faint
+row: no fix
+row off   this fix  31.61 (-0.39) hole 0  +/-0.42 rows   59 % sure   x 67.8 y 37.4 z 17.1 mm  misfit 7 %  seen by 3+3 faint
+row: no fix
+row  30   this fix  31.56 (-0.44) hole 0  +/-0.36 rows   56 % sure   x 67.6 y 37.7 z 17.1 mm  misfit 6 %  seen by 3+3 faint
+row: no fix
+row off   this fix  31.55 (-0.45) hole 5  +/-0.28 rows   58 % sure   x 67.6 y 36.3 z 17.8 mm  misfit 5 %  seen by 2+4 faint
+row  30   this fix  31.51 (-0.49) hole 0  +/-0.93 rows   36 % sure   x 67.5 y 37.7 z 28.1 mm  misfit 14 %  seen by 2+4 faint
+row: no fix
+row: no fix
+row number, then Enter: 30
+hold it still...
+row off   this fix  37.66 (-0.34) hole 1  +/-1.50 rows   23 % sure   x 83.1 y 26.0 z 11.0 mm  misfit 25 %  seen by 1+3 faint
+row off   this fix  32.32 (+0.32) hole 2  +/-0.86 rows   41 % sure   x 69.6 y 28.2 z 17.1 mm  misfit 11 %  seen by 3+4 faint
+row: no fix
+row off   this fix  31.77 (-0.23) hole 2  +/-0.76 rows   47 % sure   x 68.1 y 28.2 z 17.8 mm  misfit 10 %  seen by 3+5 faint
+row off   this fix  32.53 (-0.47) hole 2  +/-0.77 rows   41 % sure   x 70.1 y 27.8 z 17.1 mm  misfit 10 %  seen by 3+4 faint
+row: no fix
+row  30   this fix  31.43 (+0.43) hole 2  +/-0.79 rows   42 % sure   x 67.3 y 27.2 z 18.6 mm  misfit 11 %  seen by 4+2 faint
+row: no fix
+row 30 (hole next to the channel) is at x 69.32 y 28.00 mm, scatter while holding 0.77 rows. Rows 1 and 31 are now level with x -4.34 y 24.19.
+For the pitch and direction too: a far row, either half, hole next to the channel, and T<its number>.
+row  29   this fix  29.48 (+0.48) hole 1  +/-0.89 rows   37 % sure   x 68.0 y 28.2 z 17.9 mm  misfit 12 %  seen by 3+5 faint
+row  30   this fix  29.67 (-0.33) hole 1  +/-0.82 rows   43 % sure   x 68.5 y 28.1 z 17.8 mm  misfit 11 %  seen by 4+3 faint
+row  30   this fix  30.43 (+0.43) hole 1  +/-0.86 rows   39 % sure   x 70.4 y 28.2 z 15.8 mm  misfit 12 %  seen by 3+3 faint
+row: no fix
+row: no fix
+row  30   this fix  30.07 (+0.07) hole 1  +/-0.86 rows   44 % sure   x 69.5 y 28.1 z 17.0 mm  misfit 11 %  seen by 3+4 faint
+row: no fix
+row  30   this fix  30.37 (+0.37) hole 1  +/-0.81 rows   42 % sure   x 70.3 y 28.6 z 17.0 mm  misfit 10 %  seen by 3+3 faint
+row  16   this fix  14.08 (+0.08) hole 1  +/-1.79 rows   18 % sure   x 28.9 y 28.0 z 39.3 mm  misfit 33 %  seen by 3+5 faint
+row: no fix
+row off   this fix  -3.28 (-0.28) hole 2  +/-0.83 rows   43 % sure   x -15.2 y 30.7 z 19.5 mm  misfit 10 %  seen by 3+3 faint
+row off   this fix  -2.92 (+0.08) hole 1  +/-0.81 rows   46 % sure   x -14.3 y 29.1 z 18.2 mm  misfit 11 %  seen by 3+3 faint
+row: no fix
+row: no fix
+row off   this fix  -1.84 (+0.16) hole 1  +/-0.73 rows   49 % sure   x -11.6 y 28.4 z 18.4 mm  misfit 10 %  seen by 4+3 faint
+row: no fix
+row off   this fix  -1.74 (+0.26) hole 1  +/-0.67 rows   51 % sure   x -11.3 y 28.1 z 17.2 mm  misfit 9 %  seen by 4+2 faint
+row   1   this fix  -0.11 (-0.11) hole 1  +/-0.50 rows   67 % sure   x -7.2 y 28.8 z 18.0 mm  misfit 7 %  seen by 4+2 faint
+row   1   this fix   0.35 (+0.35) hole 1  +/-0.50 rows   57 % sure   x -6.0 y 28.9 z 18.1 mm  misfit 8 %  seen by 4+3 faint
+row: no fix
+row off   this fix  -1.19 (-0.19) hole 2  +/-0.52 rows   63 % sure   x -9.9 y 29.5 z 18.1 mm  misfit 8 %  seen by 4+2 faint
+row off   this fix  -2.34 (-0.34) hole 2  +/-0.64 rows   51 % sure   x -12.8 y 30.0 z 18.3 mm  misfit 10 %  seen by 3+3 faint
+row: no fix
+row off   this fix  -2.59 (+0.41) hole 1  +/-0.69 rows   46 % sure   x -13.5 y 29.2 z 17.1 mm  misfit 10 %  seen by 4+1 faint
+row off   this fix  -2.92 (+0.08) hole 2  +/-0.63 rows   57 % sure   x -14.3 y 29.3 z 17.1 mm  misfit 8 %  seen by 4+3 faint
+row: no fix
+row off   this fix  -3.26 (-0.26) hole 2  +/-0.67 rows   51 % sure   x -15.2 y 30.3 z 17.2 mm  misfit 8 %  seen by 3+3 faint
+row: no fix
+row off   this fix  -1.98 (+0.02) hole 2  +/-0.58 rows   61 % sure   x -11.9 y 30.3 z 17.5 mm  misfit 9 %  seen by 3+4 faint
+row off   this fix  -1.53 (+0.47) hole 2  +/-0.64 rows   45 % sure   x -10.8 y 31.1 z 17.6 mm  misfit 10 %  seen by 4+3 faint
+row: no fix
+row off   this fix  -2.15 (-0.15) hole 2  +/-0.60 rows   58 % sure   x -12.3 y 30.1 z 18.0 mm  misfit 9 %  seen by 3+3 faint
+row: no fix
+row off   this fix  -1.98 (+0.02) hole 2  +/-0.65 rows   56 % sure   x -11.9 y 29.6 z 18.3 mm  misfit 10 %  seen by 4+3 faint
+row number, then Enter: 1
+hold it still...
+row off   this fix  -2.12 (-0.12) hole 2  +/-0.74 rows   50 % sure   x -12.3 y 30.2 z 18.6 mm  misfit 10 %  seen by 4+3 faint
+row off   this fix  -3.44 (-0.44) hole 1  +/-0.82 rows   40 % sure   x -15.6 y 28.9 z 18.1 mm  misfit 10 %  seen by 4+2 faint
+row: no fix
+row off   this fix  -3.34 (-0.34) hole 1  +/-0.81 rows   43 % sure   x -15.4 y 28.7 z 18.0 mm  misfit 10 %  seen by 3+3 faint
+row: no fix
+row off   this fix  -3.33 (-0.33) hole 1  +/-0.95 rows   38 % sure   x -15.3 y 28.4 z 18.1 mm  misfit 12 %  seen by 4+3 faint
+row: no fix
+row off   this fix  -4.27 (-0.27) hole 1  +/-0.73 rows   48 % sure   x -17.7 y 27.5 z 15.9 mm  misfit 10 %  seen by 4+2 faint
+row 1 (hole next to the channel) is at x -16.39 y 28.40 mm, scatter while holding 0.54 rows. Rows 1 and 31 are now level with x -16.39 y 24.59.
+For the pitch and direction too: a far row, either half, hole next to the channel, and T<its number>.
+row   1   this fix   0.72 (-0.28) hole 1  +/-0.86 rows   42 % sure   x -17.1 y 27.6 z 16.3 mm  misfit 11 %  seen by 4+2 faint
+row   1   this fix   1.09 (+0.09) hole 1  +/-0.86 rows   44 % sure   x -16.2 y 28.4 z 16.8 mm  misfit 11 %  seen by 4+2 faint
+row   1   this fix   0.90 (-0.10) hole 1  +/-0.85 rows   44 % sure   x -16.6 y 28.4 z 16.8 mm  misfit 11 %  seen by 4+3 faint
+row: no fix
+row   1   this fix   1.14 (+0.14) hole 1  +/-0.84 rows   44 % sure   x -16.0 y 28.9 z 17.6 mm  misfit 11 %  seen by 3+3 faint
+row: no fix
+row   1   this fix   1.38 (+0.38) hole 1  +/-0.80 rows   42 % sure   x -15.4 y 29.2 z 18.7 mm  misfit 10 %  seen by 4+2 faint
+row   1   this fix   1.07 (+0.07) hole 1  +/-0.78 rows   47 % sure   x -16.2 y 28.6 z 17.2 mm  misfit 9 %  seen by 4+2 faint
+row: no fix
+row   1   this fix   1.28 (+0.28) hole 1  +/-0.86 rows   42 % sure   x -15.7 y 29.0 z 17.4 mm  misfit 11 %  seen by 4+2 faint
+row: no fix
+row   1   this fix   1.39 (+0.39) hole 1  +/-0.79 rows   43 % sure   x -15.4 y 28.3 z 17.3 mm  misfit 9 %  seen by 3+3 faint
+row: no fix
+row   1   this fix   1.28 (+0.28) hole 1  +/-0.86 rows   42 % sure   x -15.7 y 27.8 z 17.5 mm  misfit 12 %  seen by 4+2 faint
+row   2   this fix   1.58 (-0.42) hole 1  +/-0.91 rows   38 % sure   x -14.9 y 28.2 z 17.6 mm  misfit 13 %  seen by 3+3 faint
+row   1   this fix   0.46 (+0.46) hole 2  +/-0.83 rows   40 % sure   x -17.8 y 30.0 z 17.6 mm  misfit 8 %  seen by 3+3 faint
+row   1   this fix   0.88 (-0.12) hole 1  +/-0.75 rows   49 % sure   x -16.7 y 29.6 z 16.8 mm  misfit 8 %  seen by 3+3 faint
+row   1   this fix   1.34 (+0.34) hole 1  +/-0.76 rows   45 % sure   x -15.5 y 29.1 z 18.4 mm  misfit 10 %  seen by 4+2 faint
+row: no fix
+row   8   this fix   7.80 (-0.20) hole 1  +/-1.89 rows   16 % sure   x 0.9 y 27.4 z 35.0 mm  misfit 33 %  seen by 3+5 faint
+row: no fix
+row off   this fix  34.07 (+0.07) hole 2  +/-0.50 rows   68 % sure   x 67.6 y 32.0 z 18.1 mm  misfit 9 %  seen by 3+3 faint
+row: no fix
+row off   this fix  34.47 (+0.47) hole 2  +/-0.54 rows   48 % sure   x 68.6 y 32.0 z 17.9 mm  misfit 6 %  seen by 3+2 faint
+row: no fix
+row off   this fix  33.61 (-0.39) hole 2  +/-0.61 rows   50 % sure   x 66.4 y 30.7 z 18.2 mm  misfit 10 %  seen by 3+4 faint
+row: no fix
+row off   this fix  31.97 (-0.03) hole 2  +/-0.50 rows   68 % sure   x 62.3 y 31.1 z 17.6 mm  misfit 9 %  seen by 3+4 faint
+row  30   this fix  31.44 (+0.44) hole 2  +/-0.47 rows   53 % sure   x 60.9 y 30.9 z 17.4 mm  misfit 9 %  seen by 3+3 faint
+row: no fix
+row  30   this fix  31.24 (+0.24) hole 2  +/-0.49 rows   64 % sure   x 60.4 y 30.4 z 17.3 mm  misfit 9 %  seen by 3+4 faint
+row: no fix
+row off   this fix  32.35 (+0.35) hole 2  +/-0.86 rows   41 % sure   x 63.2 y 29.8 z 20.3 mm  misfit 16 %  seen by 2+2 faint
+row: no fix
+row  42   this fix  42.41 (+0.41) hole 5  +/-1.23 rows   30 % sure   x 12.6 y 10.4 z 39.3 mm  misfit 17 %  seen by 3+4 faint
+row: no fix
+row  34   this fix  34.50 (-0.50) hole 3  +/-0.79 rows   40 % sure   x -7.5 y 15.2 z 21.5 mm  misfit 16 %  seen by 3+3 faint
+row  34   this fix  33.39 (+0.39) hole 4  +/-0.78 rows   43 % sure   x -10.3 y 13.6 z 19.2 mm  misfit 15 %  seen by 3+3 faint
+row  33   this fix  33.20 (+0.20) hole 4  +/-0.68 rows   52 % sure   x -10.8 y 12.7 z 20.5 mm  misfit 13 %  seen by 3+3 faint
+row: no fix
+row  33   this fix  33.54 (-0.46) hole 4  +/-0.71 rows   44 % sure   x -9.9 y 13.6 z 19.5 mm  misfit 14 %  seen by 3+4 faint
+row  33   this fix  32.89 (-0.11) hole 4  +/-0.59 rows   59 % sure   x -11.6 y 13.1 z 18.6 mm  misfit 10 %  seen by 3+2 faint
+row: no fix
+row  33   this fix  32.83 (-0.17) hole 4  +/-0.59 rows   59 % sure   x -11.7 y 13.1 z 17.5 mm  misfit 10 %  seen by 3+2 faint
+row  33   this fix  33.47 (+0.47) hole 3  +/-1.48 rows   25 % sure   x -10.1 y 14.8 z 27.8 mm  misfit 20 %  seen by 2+3 faint
+row: no fix
+row off   this fix  64.45 (+0.45) hole 3  +/-2.54 rows   15 % sure   x 68.6 y 15.3 z 31.3 mm  misfit 19 %  seen by 2+5 faint
+row: no fix
+row off   this fix  63.36 (+0.36) hole 4  +/-0.69 rows   47 % sure   x 65.8 y 12.0 z 16.9 mm  misfit 11 %  seen by 3+4 faint
+row: no fix
+row off   this fix  63.34 (+0.34) hole 4  +/-0.50 rows   58 % sure   x 65.7 y 12.4 z 16.5 mm  misfit 8 %  seen by 3+3 faint
+row off   this fix  63.25 (+0.25) hole 4  +/-0.63 rows   54 % sure   x 65.5 y 12.4 z 16.4 mm  misfit 11 %  seen by 3+4 faint
+row off   this fix  63.68 (-0.32) hole 4  +/-0.52 rows   58 % sure   x 66.6 y 12.9 z 16.5 mm  misfit 9 %  seen by 3+2 faint
+row off   this fix  64.01 (+0.01) hole 4  +/-0.53 rows   66 % sure   x 67.4 y 12.3 z 15.7 mm  misfit 8 %  seen by 3+3 faint
+row: no fix
+row off   this fix  64.06 (+0.06) hole 4  +/-0.55 rows   63 % sure   x 67.6 y 12.2 z 15.7 mm  misfit 9 %  seen by 4+2 faint
+row: no fix
+row off   this fix  63.24 (+0.24) hole 4  +/-0.51 rows   62 % sure   x 65.5 y 12.7 z 16.7 mm  misfit 9 %  seen by 3+3 faint
+row off   this fix  63.40 (+0.40) hole 4  +/-0.47 rows   55 % sure   x 65.9 y 12.1 z 16.3 mm  misfit 8 %  seen by 3+3 faint
+row: no fix
+row off   this fix  64.34 (+0.34) hole 5  +/-1.01 rows   36 % sure   x 68.3 y 11.9 z 20.9 mm  misfit 13 %  seen by 3+3 faint
+row off   this fix  65.67 (-0.33) hole 1  +/-1.79 rows   22 % sure   x 71.7 y 20.0 z 19.9 mm  misfit 19 %  seen by 2+4 faint
+row: no fix
+row: no fix
+row off   this fix  34.91 (-0.09) hole 1  +/-1.31 rows   28 % sure   x 69.7 y 28.3 z 31.9 mm  misfit 17 %  seen by 1+5 faint
+row: no fix
+row off   this fix  33.54 (-0.46) hole 2  +/-0.32 rows   54 % sure   x 66.3 y 31.4 z 20.2 mm  misfit 8 %  seen by 4+3 faint
+row off   this fix  32.87 (-0.13) hole 2  +/-0.19 rows   97 % sure   x 64.6 y 30.0 z 17.2 mm  misfit 6 %  seen by 5+3 faint
+row: no fix
+row off   this fix  33.01 (+0.01) hole 1  +/-0.19 rows   99 % sure   x 64.9 y 28.9 z 16.5 mm  misfit 4 %  seen by 5+3 faint
+row off   this fix  33.18 (+0.18) hole 2  +/-0.20 rows   94 % sure   x 65.4 y 31.9 z 16.8 mm  misfit 5 %  seen by 5+3 faint
+row off   this fix  33.79 (-0.21) hole 2  +/-0.20 rows   92 % sure   x 66.9 y 31.4 z 16.2 mm  misfit 6 %  seen by 5+3 faint
+row: no fix
+row off   this fix  33.02 (+0.02) hole 0  +/-0.22 rows   98 % sure   x 64.9 y 26.5 z 17.4 mm  misfit 9 %  seen by 5+3 faint
+row off   this fix  32.19 (+0.19) hole 0  +/-0.15 rows   98 % sure   x 62.8 y 26.3 z 16.7 mm  misfit 6 %  seen by 5+3 faint
+row: no fix
+row off   this fix  31.39 (+0.39) hole 0  +/-0.14 rows   78 % sure   x 60.8 y 25.5 z 16.8 mm  misfit 7 %  seen by 5+3 faint
+row  30   this fix  29.90 (-0.10) hole 0  +/-0.12 rows  100 % sure   x 57.0 y 26.2 z 16.3 mm  misfit 6 %  seen by 5+3 faint
+row: no fix
+row   4   this fix   3.61 (-0.39) hole 0  +/-1.22 rows   17 % sure   x -9.8 y 25.0 z 25.0 mm  misfit 24 %  seen by 4+4 faint
+row   4   this fix   3.99 (-0.01) hole 0  +/-0.38 rows   74 % sure   x -8.8 y 25.3 z 17.7 mm  misfit 9 %  seen by 5+3 faint
+row: no fix
+row   4   this fix   3.98 (-0.02) hole 0  +/-0.39 rows   63 % sure   x -8.8 y 25.0 z 17.1 mm  misfit 10 %  seen by 6+2 faint
+row: no fix
+row   4   this fix   4.12 (+0.12) hole 0  +/-0.37 rows   72 % sure   x -8.5 y 25.3 z 17.5 mm  misfit 9 %  seen by 6+2 faint
+row: no fix
+row   6   this fix   5.76 (-0.24) hole 0  +/-0.95 rows   22 % sure   x -4.3 y 24.9 z 21.6 mm  misfit 27 %  seen by 3+5 faint
+row: no fix
+averaged |B| per sensor (mT):  0: 0.010  1: 0.006  2: 0.003  3: 0.007  4: 0.004  5: 0.005  6: 0.002  7: 0.004
+only 0 sensors read above 0.04 mT. The check compares sensors with each other, so it needs at least four
+seeing the magnet - hold it higher and nearer the middle, or use a stronger one - and press o again.
+learning this magnet: move it slowly over the array, 1.5-3 cm
