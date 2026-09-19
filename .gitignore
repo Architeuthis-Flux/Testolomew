@@ -19,3 +19,7 @@ tools/hostsim/sim
 tools/hostsim/soak
 tools/hostsim/pencil
 tools/hostsim/navtest
+
+# python caches (tools/)
+__pycache__/
+*.pyc

@@ -263,3 +263,42 @@
     0.1 strip: SPI1: 1041 frames of 400 LEDs (4800 bytes, 12.3 ms on the wire), 0 shows refused (wire busy), 2687 skipped (nothing changed); gap between frames 20.0 ms last, ; last 0 mA of 1900 budget, 0 fra
     0.1 dump: 0 done, max 22 us a tick; the last dump's row build 0 us, print 0 us (since boot 0 / 0)
     0.1 }
+# The held-nav-left leak on the board, in the Draw app (its brush would step on a leaked left; the saved POV camera would not have shown a pan):
+    0.0 :key a
+    0.0 ok{key a tap}
+    0.0 :ui go draw
+    0.0 ok{go Draw}
+    0.0 :screen
+    0.0 screen{
+    0.0 app: Draw
+    0.0 panes: -
+    0.0 held: 0x000 swallow: 0x000 joy armed
+    0.0 sim: -
+    0.0 play: paint hue 355 sat 1.00 bright 0.90 brush 2 draw
+    0.0 probe: none
+    0.0 camera: POV target 27.1 22.4 8.0 yaw -25 el 32 zoom 1.93
+    0.0 }
+    0.0 :key a
+    0.0 ok{key a tap}
+    0.0 :ui go settings
+    0.0 ok{go Settings}
+    0.0 :key left down
+    0.0 ok{key left down}
+    0.0 :key b
+    0.0 ok{key b tap}
+    0.0 :key left up
+    0.0 ok{key left up}
+    0.0 :screen
+    0.0 screen{
+    0.0 app: Draw
+    0.0 panes: -
+    0.0 held: 0x000 swallow: 0x000 joy armed
+    0.0 sim: -
+    0.0 play: paint hue 355 sat 1.00 bright 0.90 brush 2 draw
+    0.0 probe: none
+    0.0 camera: POV target 27.1 22.4 8.0 yaw -25 el 32 zoom 1.93
+    0.0 }
+    0.0 :key a
+    0.0 ok{key a tap}
+    0.0 :ui go view
+    0.0 ok{go View}
