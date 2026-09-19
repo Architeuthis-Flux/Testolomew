@@ -39,6 +39,22 @@
 #define MAGFIT_Z_MAX 150.0f
 #define MAGFIT_XY_MARGIN 100.0f // how far outside the sensor footprint
 
+// The lattice search (magFitCoarse, and the start of every cold start): a
+// lattice of trial positions this far apart, this far outside the sensor
+// footprint and over this range of heights, then 3x3x3 lattices of half the
+// step round the best, down to the final step. About 250 trial positions.
+#define MAGFIT_COARSE_STEP_MM 25.0f
+#define MAGFIT_COARSE_MARGIN_MM 45.0f
+#define MAGFIT_COARSE_Z_MIN_MM 4.0f
+#define MAGFIT_COARSE_Z_MAX_MM 110.0f
+#define MAGFIT_COARSE_FINAL_MM 3.0f
+// A cold start refined from the lattice's best point that fits this well
+// (as a fraction of the misfit limit, in cost) is taken; worse, and the old
+// seeds are tried too.
+#define MAGFIT_COARSE_GOOD_ENOUGH 0.25f
+// ...and one that came out lower than this always is (false minima live there).
+#define MAGFIT_COARSE_LOW_MM 12.0f
+
 struct MagFitResult {
     bool valid;     // the fit converged and explains the readings
     Vec3 position;  // magnet centre, mm, board frame
@@ -97,6 +113,15 @@ bool magFitSolve( const Vec3* sensors, const Vec3* fields, const bool* use, int 
 // fits. result->strength comes back as what the fit settled on.
 bool magFitSolveKnownStrength( const Vec3* sensors, const Vec3* fields, const bool* use, int count,
                                float maxMisfit, float strength, MagFitResult* result );
+
+// Roughly where is the magnet, without iterating: the point of a coarse
+// lattice (MAGFIT_COARSE_*) that explains the readings best, with the moment
+// solved at each point. It cannot get stuck and cannot fail to answer, so it
+// is what to ask when the fit above will not converge - a probe far away in
+// a weak field, or seen by too few sensors - and its sigma says how rough the
+// answer is. It is also the first thing every cold start does. Fills in the
+// same fields as magFitSolve; result->valid only says there were readings.
+bool magFitCoarse( const Vec3* sensors, const Vec3* fields, const bool* use, int count, MagFitResult* result );
 
 // Solve the n x n system a x = b in place, n <= MAGFIT_MAX_PARAMS (Gaussian
 // elimination, partial pivoting; the answer is left in b). false if singular.

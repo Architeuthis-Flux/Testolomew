@@ -66,7 +66,7 @@ class MagArray : public Service {
     MagArray& operator=( const MagArray& ) = delete;
 
     // Power-up addressing of every sensor. Returns how many answered.
-    int begin( );
+    int begin( bool zero = true ); // zero = take a new baseline (a run-time power-cycle keeps the one in use)
 
     ServiceStatus service( ) override;
     const char* getName( ) const override { return "MagArray"; }
@@ -76,6 +76,7 @@ class MagArray : public Service {
     // ---- what consumers read ----
     int sensorCount( ) const { return MAG_SENSOR_COUNT; }
     int sensorsOk( ) const;
+    uint32_t busResetCount( ) const { return busResets; } // times the I2C block had to be re-initialised
     const MagSensorState& sensor( int i ) const { return sensors[ i ]; }
 
     // The latest baseline-removed reading of sensor i back in the sensor's
@@ -91,14 +92,33 @@ class MagArray : public Service {
     uint32_t frameCount = 0;                        // bumps once per completed frame
     uint8_t busPeripheral = 0;                      // which I2C block the pins resolved to (0 = not a valid pair)
     bool baselineReady( ) const { return baselineLeft == 0; }
+    Vec3 baselineOf( int i ) const { return baseline[ i ]; } // what is being subtracted, mT, board frame
+    uint32_t baselineCount = 0;                              // bumps each time a baseline is finished
+    // The baseline as last zeroed (z, or boot), before the slow drift
+    // tracking moved it: what the settings keep, so a reboot with the probe
+    // lying on the board does not zero the magnet into the baseline. zeroedAt
+    // bumps with each new one. restoreBaseline() installs a saved one (and
+    // ends any zeroing under way); shiftBaseline() subtracts a field from a
+    // sensor's baseline (a magnet that was there while it zeroed, MagLocator's Y).
+    Vec3 zeroed[ MAG_SENSOR_COUNT ];
+    uint32_t zeroedAt = 0;
+    bool baselineRestored = false; // the baseline in use came from the settings (not to be retaken as "polluted": it was checked when taken)
+    void restoreBaseline( const Vec3* list, int count, const char* origin = "the saved zero" );
+    void shiftBaseline( int i, Vec3 by );
 
     void startBaseline( );
+    // Move the baseline a fraction of the way to the latest raw readings (the
+    // locator calls this while it sees nothing, to track slow drift).
+    void driftBaseline( float fraction );
     void printStatus( Stream* out ) const;
 
     // Bench diagnostic for "no sensor answers": are there pull-ups on the bus,
     // and with each sensor powered alone, what acknowledges? Stops sampling
     // while it runs and re-addresses everything afterwards.
     void printBusCheck( Stream* out );
+    // The other core's sampler off the bus while this core uses it, and back.
+    void pauseSampler( );
+    void resumeSampler( );
 
     bool streaming = false;   // CSV frames to the console
     bool identifying = false; // print the strongest sensor
@@ -109,12 +129,32 @@ class MagArray : public Service {
     MagSensorState sensors[ MAG_SENSOR_COUNT ];
     Vec3 baseline[ MAG_SENSOR_COUNT ];
     Vec3 baselineSum[ MAG_SENSOR_COUNT ];
+    int baselineFrames[ MAG_SENSOR_COUNT ] = { 0 }; // frames each sensor contributed to the baseline being taken
     int baselineLeft = 0;
     uint32_t nextRecoveryMs = 0;
     const char* recoveryNote = "not needed yet"; // what recoverLostSensors() last did
     uint32_t recoveryRuns = 0;
+    // The other core's sampler (MagSampler.h): on, and per sensor the
+    // sequence and conversion count last taken, and the counters last seen.
+    bool samplerOn = false;
+    uint32_t samplerSeq[ MAG_SENSOR_COUNT ];
+    int samplerSetCount[ MAG_SENSOR_COUNT ];
+    uint32_t samplerFailsSeen[ MAG_SENSOR_COUNT ];
+    uint32_t samplerReadsSeen[ MAG_SENSOR_COUNT ];
+    uint32_t samplerLastReadMs[ MAG_SENSOR_COUNT ];
+    uint32_t samplerDuplicates = 0;
+    mutable uint32_t samplerPassesSeen = 0, samplerPassesSeenMs = 0; // the status line reports the pass rate since it last looked
+    void startSampler( );
+    void takeReading( int i, const TMAG5273Reading& reading );
+    void takeSamplerReadings( );
     uint32_t busResets = 0; // times the I2C block had to be re-initialised
+    uint32_t busWedges = 0; // of those, caught by busWedged() before a read (cheap) rather than by a timeout (10 ms)
+    uint32_t stopClears = 0; // a STOP left pending on an idle block, cleared before a read (busWedged())
+    uint32_t lastBusResetMs = 0, previousBusResetMs = 0;
+    uint16_t stuckStar1 = 0, stuckStar2 = 0, stuckCtlr1 = 0; // the block's registers at the last timed-out read
+    int stuckScl = -1, stuckSda = -1;                       // and the lines
     void resetBus( );
+    bool busWedged( );
     uint32_t lastIdentifyMs = 0;
 
     void addressSensors( const bool* which );

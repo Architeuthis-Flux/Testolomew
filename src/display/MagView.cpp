@@ -3,9 +3,15 @@
 
 #include <Adafruit_GFX.h>
 #include <math.h>
+#if __has_include( <ch32h4_itcm.h> )
+#include <ch32h4_itcm.h> // __itcm_func: a function copied to the zero-wait ITCM
+#else
+#define __itcm_func
+#endif
 
 #include "BoardPins.h"
 #include "Console.h"
+#include "FastDraw.h"
 #include "MagArray.h"
 #include "MagLocator.h"
 #include "ST7789.h"
@@ -13,10 +19,21 @@
 #if MODULE_ROW_COUNT
 #include "RowCounter.h"
 #endif
+#if MODULE_PROBE_LEDS
+#include "ProbeLedService.h"
+#endif
+#if MODULE_PLAY
+#include "Play.h"
+#endif
+#if MODULE_UI
+#include "Ui.h"
+#include "UiStream.h"
+#endif
 
 #define COLOR_BACKGROUND RGB565( 0, 0, 0 )
 #define COLOR_GRID RGB565( 30, 40, 60 )
 #define COLOR_BOARD RGB565( 70, 100, 150 )
+#define COLOR_SURFACE RGB565( 60, 140, 90 ) // the breadboard's surface, magLocator.boardZ above the sensors
 #define COLOR_SENSOR_OK RGB565( 60, 220, 90 )
 #define COLOR_SENSOR_LOST RGB565( 230, 50, 50 )
 #define COLOR_FIELD RGB565( 0, 200, 230 )
@@ -52,21 +69,52 @@ static void onCamera( Stream* out ) {
 }
 
 void MagView::nextCamera( ) {
-    camera = (MagViewCamera)( ( camera + 1 ) % MAGVIEW_CAMERA_COUNT );
+    cameraNextMode( &cam );
+}
+
+static void onScreen( Stream* out ) {
+    magView.nextScreen( );
+    static const char* names[ MAGVIEW_SCREEN_COUNT ] = { "3D scene", "the breadboard's LEDs", "the log", "the draw screen" };
+    char line[ 160 ];
+    snprintf( line, sizeof( line ), "screen: %s  (%.0f frames/s on the last one)", names[ magView.screen ], magView.fps( ) );
+    out->println( line );
+    // The cost of each screen, so a slow one is seen for what it is: the
+    // loop stops for a draw, and the LEDs after it wait.
+    snprintf( line, sizeof( line ), "draw ms scene %.1f/%.1f  LEDs %.1f/%.1f  log %.1f/%.1f  draw %.1f/%.1f (avg/max)  clear %lu+%lu us  %lu yields to the LEDs",
+              magView.drawAvgUs[ 0 ] * 1e-3f, magView.drawMaxUs[ 0 ] * 1e-3f, magView.drawAvgUs[ 1 ] * 1e-3f, magView.drawMaxUs[ 1 ] * 1e-3f,
+              magView.drawAvgUs[ 2 ] * 1e-3f, magView.drawMaxUs[ 2 ] * 1e-3f, magView.drawAvgUs[ 3 ] * 1e-3f, magView.drawMaxUs[ 3 ] * 1e-3f,
+              (unsigned long)magView.clearUs[ 0 ], (unsigned long)magView.clearUs[ 1 ], (unsigned long)magView.yields );
+    out->println( line );
+}
+
+void MagView::nextScreen( ) {
+    screen = (MagViewScreen)( ( screen + 1 ) % MAGVIEW_SCREEN_COUNT );
 }
 
 bool MagView::begin( ) {
-    consoleAddCommand( 'v', "cycle the 3D view camera (sway / fixed / spin / top)", onCamera );
+    consoleAddCommand( 'v', "next camera mode (fixed / sway / spin / top / follow / POV)", onCamera );
+    consoleAddCommand( 'e', "next screen: 3D scene / breadboard LEDs / log", onScreen );
 
     if ( !st7789Begin( ) ) {
         return false;
     }
     canvas = new GFXcanvas16( LCD_WIDTH, LCD_HEIGHT );
-    if ( canvas == nullptr || canvas->getBuffer( ) == nullptr ) {
+    shown = new GFXcanvas16( LCD_WIDTH, LCD_HEIGHT );
+    if ( canvas == nullptr || canvas->getBuffer( ) == nullptr || shown == nullptr || shown->getBuffer( ) == nullptr ) {
         canvas = nullptr;
         return false;
     }
     canvas->setTextWrap( false );
+    shown->setTextWrap( false );
+    // Which memory the two landed in shows in how long a clear takes (the
+    // heap is DTCM first, then the shared SRAM with its wait states).
+    uint32_t t0 = micros( );
+    canvas->fillScreen( COLOR_BACKGROUND );
+    clearUs[ 0 ] = micros( ) - t0;
+    t0 = micros( );
+    shown->fillScreen( COLOR_BACKGROUND );
+    clearUs[ 1 ] = micros( ) - t0;
+    benchmark( );
 
     // Look at the middle of the array, a little above the board, zoomed so the
     // board outline fills most of the panel's width.
@@ -82,43 +130,121 @@ bool MagView::begin( ) {
         if ( p.y > yMax )
             yMax = p.y;
     }
-    target = { 0.5f * ( xMin + xMax ), 0.5f * ( yMin + yMax ), 8.0f };
+    Vec3 middle = { 0.5f * ( xMin + xMax ), 0.5f * ( yMin + yMax ), 8.0f };
     float span = ( xMax - xMin ) > ( yMax - yMin ) ? ( xMax - xMin ) : ( yMax - yMin );
     span += 2.0f * BOARD_MARGIN_MM + 40.0f;
-    zoom = LCD_WIDTH / span;
-    cameraDistance = 4.0f * span;
+    cameraInit( &cam, middle, MAGVIEW_YAW_DEG, MAGVIEW_ELEVATION_DEG, 4.0f * span, LCD_WIDTH / span );
     return true;
+}
+
+// What the drawing primitives cost on this chip, printed once at boot: the
+// scene is a few thousand line pixels and a few hundred characters, and
+// which of those is the time decides what is worth rewriting.
+// Two copies of what GFXcanvas16::drawPixel does, one in flash next to this
+// code and one in ITCM, to tell an address effect from a library one.
+static void __attribute__( ( noinline ) ) pixelFlash( uint16_t* buffer, int16_t x, int16_t y, uint16_t color ) {
+    if ( ( x < 0 ) || ( y < 0 ) || ( x >= LCD_WIDTH ) || ( y >= LCD_HEIGHT ) )
+        return;
+    buffer[ x + y * LCD_WIDTH ] = color;
+}
+static __itcm_func void pixelItcm( uint16_t* buffer, int16_t x, int16_t y, uint16_t color ) {
+    if ( ( x < 0 ) || ( y < 0 ) || ( x >= LCD_WIDTH ) || ( y >= LCD_HEIGHT ) )
+        return;
+    buffer[ x + y * LCD_WIDTH ] = color;
+}
+
+void MagView::benchmark( ) {
+    Stream* out = console.port( );
+    if ( out == nullptr ) {
+        return;
+    }
+    uint16_t* buffer = canvas->getBuffer( );
+    uint32_t t0 = micros( );
+    for ( int i = 0; i < 10000; i++ ) {
+        canvas->drawPixel( i % 240, ( i / 240 ) % 240, 0x1234 );
+    }
+    uint32_t pixelUs = micros( ) - t0;
+    t0 = micros( );
+    for ( int i = 0; i < 10000; i++ ) {
+        pixelFlash( buffer, i % 240, ( i / 240 ) % 240, 0x1234 );
+    }
+    uint32_t flashUs = micros( ) - t0;
+    t0 = micros( );
+    for ( int i = 0; i < 10000; i++ ) {
+        pixelItcm( buffer, i % 240, ( i / 240 ) % 240, 0x1234 );
+    }
+    uint32_t itcmUs = micros( ) - t0;
+    t0 = micros( );
+    for ( int i = 0; i < 100; i++ ) {
+        memset( buffer + i * 240, i, 480 ); // libc, 240 pixels
+    }
+    uint32_t memsetUs = micros( ) - t0;
+    t0 = micros( );
+    for ( int i = 0; i < 10000; i++ ) {
+        buffer[ ( i % 240 ) + ( ( i / 240 ) % 240 ) * 240 ] = 0x1234;
+    }
+    uint32_t directUs = micros( ) - t0;
+    t0 = micros( );
+    for ( int i = 0; i < 100; i++ ) {
+        canvas->drawLine( 10, 10 + i, 110, 60 + i, 0x1234 ); // 100 pixels each
+    }
+    uint32_t lineUs = micros( ) - t0;
+    t0 = micros( );
+    for ( int i = 0; i < 100; i++ ) {
+        fastLine( canvas, 10, 10 + i, 110, 60 + i, 0x1234 );
+    }
+    uint32_t fastLineUs = micros( ) - t0;
+    t0 = micros( );
+    for ( int i = 0; i < 400; i++ ) {
+        canvas->fillRect( ( i % 30 ) * 7, ( i / 30 ) * 7, 6, 6, 0x1234 );
+    }
+    uint32_t rectUs = micros( ) - t0;
+    t0 = micros( );
+    for ( int i = 0; i < 10; i++ ) {
+        fastText( canvas, 0, i * 16, 2, 0x1234, "x12.3 y45.6 z78.9 mm" ); // 20 characters
+    }
+    uint32_t textUs = micros( ) - t0;
+    volatile float acc = 0.0f;
+    t0 = micros( );
+    for ( int i = 0; i < 1000; i++ ) {
+        acc += sinf( i * 0.001f );
+    }
+    uint32_t sinUs = micros( ) - t0;
+    canvas->fillScreen( COLOR_BACKGROUND );
+    char line[ 260 ];
+    snprintf( line, sizeof( line ),
+              "MagView: GFX drawPixel %lu ns, the same in flash here %lu ns, in ITCM %lu ns, a buffer write %lu ns, memset of 480 B %lu ns, a 100 px line %lu us (GFX) / %lu us (FastDraw), a 6x6 fillRect %.1f us, a 20-char line of size-2 text %lu us, sinf %lu ns",
+              (unsigned long)( pixelUs * 1000 / 10000 ), (unsigned long)( flashUs * 1000 / 10000 ), (unsigned long)( itcmUs * 1000 / 10000 ), (unsigned long)( directUs * 1000 / 10000 ),
+              (unsigned long)( memsetUs * 1000 / 100 ), (unsigned long)( lineUs / 100 ), (unsigned long)( fastLineUs / 100 ), rectUs / 400.0f, (unsigned long)( textUs / 10 ),
+              (unsigned long)( sinUs * 1000 / 1000 ) );
+    out->println( line );
 }
 
 // ---- camera ----------------------------------------------------------------
 
 void MagView::aimCamera( uint32_t nowMs ) {
-    float t = nowMs / 1000.0f;
-    float yaw = MAGVIEW_YAW_DEG;
-    float elevation = MAGVIEW_ELEVATION_DEG;
-    switch ( camera ) {
-    case MAGVIEW_SWAY:
-        yaw += MAGVIEW_SWAY_DEG * sinf( t * 2.0f * (float)M_PI / 6.0f );
-        break;
-    case MAGVIEW_SPIN:
-        yaw = fmodf( t * 30.0f, 360.0f );
-        break;
-    case MAGVIEW_TOP:
-        yaw = 0.0f;
-        elevation = 89.9f;
-        break;
-    default:
-        break;
-    }
-    sinYaw = sinf( yaw * VIEW_DEG_TO_RAD );
-    cosYaw = cosf( yaw * VIEW_DEG_TO_RAD );
-    sinElevation = sinf( elevation * VIEW_DEG_TO_RAD );
-    cosElevation = cosf( elevation * VIEW_DEG_TO_RAD );
+    float dtS = lastFrameMs == 0 ? 0.03f : ( nowMs - lastFrameMs ) * 0.001f;
+    lastFrameMs = nowMs;
+    // The probe for the follow / POV modes: the track when there is one, else the fix.
+    const MagTrack& track = magLocator.track;
+    const MagProbeFix& fix = magLocator.fix;
+    bool tracked = track.enabled && ( track.state == MAGTRACK_TRACKING || track.state == MAGTRACK_COASTING );
+    bool haveProbe = tracked || fix.valid;
+    Vec3 tip = tracked ? track.viewTip : fix.tip;
+    Vec3 shaft = tracked ? track.shaft : fix.shaft;
+    cameraUpdate( &cam, dtS, nowMs * 0.001f, haveProbe, tip, shaft );
+    target = cam.target;
+    zoom = cam.zoom;
+    cameraDistance = cam.distance;
+    sinYaw = sinf( cam.yawDeg * VIEW_DEG_TO_RAD );
+    cosYaw = cosf( cam.yawDeg * VIEW_DEG_TO_RAD );
+    sinElevation = sinf( cam.elevationDeg * VIEW_DEG_TO_RAD );
+    cosElevation = cosf( cam.elevationDeg * VIEW_DEG_TO_RAD );
 }
 
 // Board frame (mm) -> screen pixel. The camera sits `cameraDistance` from the
 // target, `elevation` above the board plane, swung `yaw` around the vertical.
-void MagView::project( Vec3 world, int* sx, int* sy ) const {
+bool MagView::project( Vec3 world, int* sx, int* sy ) const {
     float dx = world.x - target.x;
     float dy = world.y - target.y;
     float dz = world.z - target.z;
@@ -129,7 +255,10 @@ void MagView::project( Vec3 world, int* sx, int* sy ) const {
     float up = y1 * sinElevation + dz * cosElevation;    // screen up
     float depth = y1 * cosElevation - dz * sinElevation; // away from the camera
 
+    // Behind the camera (which the POV camera, sitting at the probe's point,
+    // has plenty of): not drawn, else it would appear mirrored.
     float range = cameraDistance + depth;
+    bool inFront = range > 5.0f;
     if ( range < 20.0f ) {
         range = 20.0f;
     }
@@ -148,13 +277,17 @@ void MagView::project( Vec3 world, int* sx, int* sy ) const {
         fy = 2000.0f;
     *sx = (int)fx;
     *sy = (int)fy;
+    return inFront;
 }
 
 void MagView::line3d( Vec3 a, Vec3 b, uint16_t color ) {
     int ax, ay, bx, by;
-    project( a, &ax, &ay );
-    project( b, &bx, &by );
-    canvas->drawLine( ax, ay, bx, by, color );
+    bool aFront = project( a, &ax, &ay );
+    bool bFront = project( b, &bx, &by );
+    if ( !aFront || !bFront ) {
+        return; // no clipping, just culling: a line with an end behind the camera is left out
+    }
+    fastLine( canvas, ax, ay, bx, by, color );
 }
 
 // ---- the scene -------------------------------------------------------------
@@ -195,6 +328,18 @@ void MagView::drawBoard( ) {
     line3d( { xMax, yMin, 0 }, { xMax, yMax, 0 }, COLOR_BOARD );
     line3d( { xMax, yMax, 0 }, { xMin, yMax, 0 }, COLOR_BOARD );
     line3d( { xMin, yMax, 0 }, { xMin, yMin, 0 }, COLOR_BOARD );
+    // The breadboard's surface, where the pointer lands and below which the
+    // point cannot be: the same outline that many mm up, tied to the sensor
+    // plane at the corners so the height reads in 3D.
+    float zs = magLocator.boardZ;
+    line3d( { xMin, yMin, zs }, { xMax, yMin, zs }, COLOR_SURFACE );
+    line3d( { xMax, yMin, zs }, { xMax, yMax, zs }, COLOR_SURFACE );
+    line3d( { xMax, yMax, zs }, { xMin, yMax, zs }, COLOR_SURFACE );
+    line3d( { xMin, yMax, zs }, { xMin, yMin, zs }, COLOR_SURFACE );
+    line3d( { xMin, yMin, 0 }, { xMin, yMin, zs }, COLOR_SURFACE );
+    line3d( { xMax, yMin, 0 }, { xMax, yMin, zs }, COLOR_SURFACE );
+    line3d( { xMax, yMax, 0 }, { xMax, yMax, zs }, COLOR_SURFACE );
+    line3d( { xMin, yMax, 0 }, { xMin, yMax, zs }, COLOR_SURFACE );
 }
 
 // Row mode: instead of the 10 mm grid, the breadboard - a line along every
@@ -214,15 +359,20 @@ void MagView::drawRows( ) {
         if ( rowCounter.reading.valid && row == rowCounter.reading.row && !rowCounter.calibrating( ) ) {
             color = COLOR_ROW_CURRENT;
         }
-        line3d( rowGridToBoard( &grid, along, side * inner ), rowGridToBoard( &grid, along, side * outer ), color );
+        Vec3 a = rowGridToBoard( &grid, along, side * inner ), b = rowGridToBoard( &grid, along, side * outer );
+        a.z = b.z = magLocator.boardZ; // the rows lie on the surface, not the sensor plane
+        line3d( a, b, color );
     }
     if ( rowCounter.calibrating( ) ) {
         int row, hole, sx, sy;
         rowCounter.calibrationTarget( &row, &hole );
         RowPlace wanted = rowGridHolePlace( row, hole );
-        project( rowGridToBoard( &grid, wanted.along, wanted.acrossMm ), &sx, &sy );
-        canvas->drawCircle( sx, sy, 5, COLOR_ROW_CURRENT );
-        canvas->drawCircle( sx, sy, 6, COLOR_ROW_CURRENT );
+        Vec3 at = rowGridToBoard( &grid, wanted.along, wanted.acrossMm );
+        at.z = magLocator.boardZ;
+        if ( project( at, &sx, &sy ) ) {
+            canvas->drawCircle( sx, sy, 5, COLOR_ROW_CURRENT );
+            canvas->drawCircle( sx, sy, 6, COLOR_ROW_CURRENT );
+        }
     }
 #endif
 }
@@ -232,8 +382,10 @@ void MagView::drawSensors( ) {
         const Vec3& p = magArray.position[ i ];
         bool ok = magArray.sensor( i ).ok;
         int sx, sy;
-        project( p, &sx, &sy );
-        canvas->fillRect( sx - 2, sy - 2, 5, 5, !ok ? COLOR_SENSOR_LOST : ( magArray.saturated[ i ] ? COLOR_WARNING : COLOR_SENSOR_OK ) );
+        if ( !project( p, &sx, &sy ) ) {
+            continue;
+        }
+        fastFillRect( canvas, sx - 2, sy - 2, 5, 5, !ok ? COLOR_SENSOR_LOST : ( magArray.saturated[ i ] ? COLOR_WARNING : COLOR_SENSOR_OK ) );
 
         if ( !ok || !magArray.baselineReady( ) ) {
             continue;
@@ -256,20 +408,30 @@ void MagView::drawMagnetBar( Vec3 centre, Vec3 axis, bool flipped, float halfLen
     Vec3 north = { centre.x + h * axis.x, centre.y + h * axis.y, centre.z + h * axis.z };
     Vec3 south = { centre.x - h * axis.x, centre.y - h * axis.y, centre.z - h * axis.z };
     int cx, cy, nx, ny, sx, sy;
-    project( centre, &cx, &cy );
-    project( north, &nx, &ny );
-    project( south, &sx, &sy );
+    if ( !project( centre, &cx, &cy ) || !project( north, &nx, &ny ) || !project( south, &sx, &sy ) ) {
+        return;
+    }
     for ( int d = -1; d <= 1; d++ ) {
-        canvas->drawLine( cx + d, cy, nx + d, ny, COLOR_NORTH );
-        canvas->drawLine( cx, cy + d, nx, ny + d, COLOR_NORTH );
-        canvas->drawLine( cx + d, cy, sx + d, sy, COLOR_SOUTH );
-        canvas->drawLine( cx, cy + d, sx, sy + d, COLOR_SOUTH );
+        fastLine( canvas, cx + d, cy, nx + d, ny, COLOR_NORTH );
+        fastLine( canvas, cx, cy + d, nx, ny + d, COLOR_NORTH );
+        fastLine( canvas, cx + d, cy, sx + d, sy, COLOR_SOUTH );
+        fastLine( canvas, cx, cy + d, sx, sy + d, COLOR_SOUTH );
     }
     canvas->drawCircle( cx, cy, halfLengthMm > 3.0f ? 4 : 2, COLOR_TEXT );
 }
 
+// A circle on a horizontal plane, for error bars.
+void MagView::ring( Vec3 centre, float rx, float ry, uint16_t color ) {
+    const int segments = 20;
+    for ( int k = 0; k < segments; k++ ) {
+        float a0 = k * 2.0f * (float)M_PI / segments, a1 = ( k + 1 ) * 2.0f * (float)M_PI / segments;
+        line3d( { centre.x + rx * cosf( a0 ), centre.y + ry * sinf( a0 ), centre.z }, { centre.x + rx * cosf( a1 ), centre.y + ry * sinf( a1 ), centre.z }, color );
+    }
+}
+
 void MagView::drawMagnet( ) {
     const MagProbeFix& fix = magLocator.fix;
+    const MagTrack& track = magLocator.track;
 
     // The trail, oldest first, fading in.
     for ( int n = 1; n < trailCount; n++ ) {
@@ -279,107 +441,145 @@ void MagView::drawMagnet( ) {
         line3d( trail[ older ], trail[ newer ], RGB565( level, level * 3 / 4, 0 ) );
     }
 
-    if ( !fix.valid ) {
+    // With the tracker on, what is drawn is the TRACK: the filtered magnet,
+    // its shaft, and the cursor on the surface - carried on through a gap in
+    // the fixes (dimmer), and for a far probe just a soft ring of "about here".
+    bool tracked = track.enabled && track.state != MAGTRACK_NONE;
+    if ( tracked && track.state == MAGTRACK_ROUGH ) {
+        Vec3 under = { track.position.x, track.position.y, magLocator.boardZ };
+        ring( under, track.sigma.x, track.sigma.y, COLOR_ERROR );
+        ring( under, 0.5f * track.sigma.x, 0.5f * track.sigma.y, COLOR_ERROR );
+        line3d( under, track.position, COLOR_GRID );
+        int cx, cy;
+        if ( project( track.position, &cx, &cy ) ) {
+            canvas->drawCircle( cx, cy, 3, COLOR_TEXT_DIM );
+        }
         return;
     }
-    const Vec3& m = fix.magnet;
-
-    // The error bar, drawn where it matters: a 2-sigma ellipse on the board
-    // plane around the point under the magnet, and a 2-sigma bar on the height.
-    const int segments = 20;
-    for ( int k = 0; k < segments; k++ ) {
-        float a0 = k * 2.0f * (float)M_PI / segments, a1 = ( k + 1 ) * 2.0f * (float)M_PI / segments;
-        line3d( { fix.pointer.x + 2.0f * fix.sigma.x * cosf( a0 ), fix.pointer.y + 2.0f * fix.sigma.y * sinf( a0 ), fix.pointer.z },
-                { fix.pointer.x + 2.0f * fix.sigma.x * cosf( a1 ), fix.pointer.y + 2.0f * fix.sigma.y * sinf( a1 ), fix.pointer.z }, COLOR_ERROR );
+    if ( !tracked && !fix.valid ) {
+        return;
     }
-    line3d( { m.x, m.y, m.z - 2.0f * fix.sigma.z }, { m.x, m.y, m.z + 2.0f * fix.sigma.z }, COLOR_ERROR );
+    Vec3 m = tracked ? track.viewPosition : fix.magnet;
+    Vec3 axis = tracked ? track.shaft : fix.axis;
+    Vec3 tip = tracked ? track.viewTip : fix.tip;
+    Vec3 cursor = tracked ? track.cursor : fix.pointer;
+    Vec3 sigma = tracked ? track.sigma : fix.sigma;
+    bool coasting = tracked && track.state == MAGTRACK_COASTING;
 
-    // Where it points: the shaft carried on from the point to the board's
-    // surface (dotted), a cross there, and a drop to the sensor plane if the
-    // board sits above it.
-    const Vec3& p = fix.pointer;
+    // The error bar, drawn where it matters: a 2-sigma ellipse on the surface
+    // round the cursor, and a 2-sigma bar on the height.
+    float barX = tracked ? track.cursorSigmaMm : sigma.x, barY = tracked ? track.cursorSigmaMm : sigma.y;
+    ring( cursor, 2.0f * barX, 2.0f * barY, COLOR_ERROR );
+    line3d( { m.x, m.y, m.z - 2.0f * sigma.z }, { m.x, m.y, m.z + 2.0f * sigma.z }, COLOR_ERROR );
+
+    // Where it points: the shaft carried on from the point to the surface
+    // (dotted), a cross there, and a drop to the sensor plane.
+    const Vec3& p = cursor;
     for ( float f = 0.0f; f + 0.1f < 1.0f; f += 0.2f ) {
-        line3d( { fix.tip.x + f * ( p.x - fix.tip.x ), fix.tip.y + f * ( p.y - fix.tip.y ), fix.tip.z + f * ( p.z - fix.tip.z ) },
-                { fix.tip.x + ( f + 0.1f ) * ( p.x - fix.tip.x ), fix.tip.y + ( f + 0.1f ) * ( p.y - fix.tip.y ), fix.tip.z + ( f + 0.1f ) * ( p.z - fix.tip.z ) }, COLOR_SHADOW );
+        line3d( { tip.x + f * ( p.x - tip.x ), tip.y + f * ( p.y - tip.y ), tip.z + f * ( p.z - tip.z ) },
+                { tip.x + ( f + 0.1f ) * ( p.x - tip.x ), tip.y + ( f + 0.1f ) * ( p.y - tip.y ), tip.z + ( f + 0.1f ) * ( p.z - tip.z ) }, COLOR_SHADOW );
     }
-    line3d( { p.x - 3, p.y, p.z }, { p.x + 3, p.y, p.z }, COLOR_SHADOW );
-    line3d( { p.x, p.y - 3, p.z }, { p.x, p.y + 3, p.z }, COLOR_SHADOW );
+    uint16_t cross = coasting ? COLOR_TEXT_DIM : COLOR_SHADOW;
+    line3d( { p.x - 3, p.y, p.z }, { p.x + 3, p.y, p.z }, cross );
+    line3d( { p.x, p.y - 3, p.z }, { p.x, p.y + 3, p.z }, cross );
     for ( float z = 0.0f; z + 1.0f < p.z; z += 2.0f ) {
         line3d( { p.x, p.y, z }, { p.x, p.y, z + 1.0f }, COLOR_GRID );
     }
 
     // The magnet: a bar along its axis, north half red, south half blue,
-    // three pixels thick.
-    drawMagnetBar( m, fix.axis, false, MAGNET_HALF_LENGTH_MM );
+    // three pixels thick. While coasting, a thin grey one.
+    if ( coasting ) {
+        Vec3 n = { m.x + MAGNET_HALF_LENGTH_MM * axis.x, m.y + MAGNET_HALF_LENGTH_MM * axis.y, m.z + MAGNET_HALF_LENGTH_MM * axis.z };
+        Vec3 sth = { m.x - MAGNET_HALF_LENGTH_MM * axis.x, m.y - MAGNET_HALF_LENGTH_MM * axis.y, m.z - MAGNET_HALF_LENGTH_MM * axis.z };
+        line3d( n, sth, COLOR_TEXT_DIM );
+    } else {
+        drawMagnetBar( m, fix.axis, false, MAGNET_HALF_LENGTH_MM );
+    }
 
     // The probe's point, down the shaft from the magnet.
     if ( magLocator.tipOffsetMm != 0.0f ) {
         int cx, cy, tx, ty;
-        project( m, &cx, &cy );
-        project( fix.tip, &tx, &ty );
-        canvas->drawLine( cx, cy, tx, ty, COLOR_TIP );
-        canvas->fillCircle( tx, ty, 2, COLOR_TIP );
+        if ( project( m, &cx, &cy ) && project( tip, &tx, &ty ) ) {
+            fastLine( canvas, cx, cy, tx, ty, COLOR_TIP );
+            canvas->fillCircle( tx, ty, 2, COLOR_TIP );
+        }
     }
+}
+
+// Text is drawn at MAGVIEW_TEXT (2: 12 x 16 px characters, 20 to a line on
+// this panel), the counted row at twice that. Every line is written to fit.
+static void textAt( GFXcanvas16* canvas, int x, int y, int size, uint16_t color, const char* text ) {
+    fastText( canvas, x, y, size, color, text );
 }
 
 void MagView::drawText( ) {
     const MagProbeFix& fix = magLocator.fix;
     char line[ 48 ];
+    const int T = MAGVIEW_TEXT, H = MAGVIEW_LINE_H;
 
-    canvas->setTextSize( 1 );
-    canvas->setTextColor( COLOR_TEXT );
     if ( fix.valid ) {
-        snprintf( line, sizeof( line ), "x%6.1f y%6.1f z%6.1f  +-%.1f mm", fix.magnet.x, fix.magnet.y, fix.magnet.z, fix.errorMm );
-        canvas->setCursor( 4, 4 );
-        canvas->print( line );
-        snprintf( line, sizeof( line ), "tilt %2.0f  m %5.0f%s  misfit %2.0f%%", fix.tiltDeg, fix.strength,
-                  magLocator.learning( ) ? "?" : ( magLocator.knownStrength > 0.0f ? "=" : "" ), fix.misfit * 100.0f );
-        canvas->setCursor( 4, 16 );
-        canvas->setTextColor( COLOR_TEXT_DIM );
-        canvas->print( line );
+        snprintf( line, sizeof( line ), "x%.1f y%.1f z%.1f", fix.magnet.x, fix.magnet.y, fix.magnet.z );
+        textAt( canvas, 2, 2, T, COLOR_TEXT, line );
+        snprintf( line, sizeof( line ), "+-%.1f %s%.0f %.0f%%%s", fix.errorMm, fix.rough ? "rough " : "tilt", fix.rough ? fix.errorMm : fix.tiltDeg, fix.misfit * 100.0f,
+                  magLocator.learning( ) ? " ?" : ( magLocator.knownStrength > 0.0f ? " =" : "" ) );
+        textAt( canvas, 2, 2 + H, T, COLOR_TEXT_DIM, line );
 #if MODULE_ROW_COUNT
-        // Row mode: the counted row, large, coloured by how sure this frame's
-        // fix is of its row; under it that fix's offset, error bar and chance.
+        // Row mode: the counted row, large, coloured by how sure the track (or
+        // this fix) is of it; under it the offset, error bar and chance.
         const RowReading& reading = rowCounter.reading;
         if ( rowCounter.active && reading.valid && !rowCounter.calibrating( ) ) {
-            canvas->setTextSize( 3 );
-            canvas->setTextColor( reading.confidence > 0.95f ? COLOR_SURE : ( reading.confidence > 0.68f ? COLOR_UNSURE : COLOR_WARNING ) );
+            float sure = reading.tracked ? reading.trackConfidence : reading.confidence;
+            uint16_t colour = sure > 0.95f ? COLOR_SURE : ( sure > 0.68f ? COLOR_UNSURE : COLOR_WARNING );
             if ( reading.row > 0 ) {
                 snprintf( line, sizeof( line ), "row %d", reading.row );
             } else {
                 snprintf( line, sizeof( line ), "off end" );
             }
-            canvas->setCursor( 4, 30 );
-            canvas->print( line );
-            canvas->setTextSize( 1 );
-            snprintf( line, sizeof( line ), "%+.2f hole %d  +-%.2f rows  %.0f%% sure", reading.offsetRows, reading.hole, reading.sigmaRows, reading.confidence * 100.0f );
-            canvas->setCursor( 4, 58 );
-            canvas->print( line );
+            textAt( canvas, 2, 2 + 2 * H + 2, 2 * T, colour, line );
+            float offset = reading.tracked ? reading.trackPlace.along - floorf( reading.trackPlace.along + 0.5f ) : reading.offsetRows;
+            float bar = reading.tracked ? reading.trackSigmaRows : reading.sigmaRows;
+            snprintf( line, sizeof( line ), "%+.2f +-%.2f %.0f%% h%d", offset, bar, sure * 100.0f, reading.hole );
+            textAt( canvas, 2, 2 + 4 * H + 6, T, COLOR_TEXT_DIM, line );
         }
 #endif
+    } else if ( magLocator.track.enabled && magLocator.track.state != MAGTRACK_NONE ) {
+        const MagTrack& track = magLocator.track;
+        bool rough = track.state == MAGTRACK_ROUGH;
+        snprintf( line, sizeof( line ), rough ? "about x%.0f y%.0f z%.0f" : "x%.1f y%.1f z%.1f", track.position.x, track.position.y, track.position.z );
+        textAt( canvas, 2, 2, T, rough ? COLOR_WARNING : COLOR_TEXT, line );
+        snprintf( line, sizeof( line ), "+-%.0f mm %s", track.sigma.x, rough ? "rough" : "coasting" );
+        textAt( canvas, 2, 2 + H, T, rough ? COLOR_WARNING : COLOR_TEXT_DIM, line );
     } else {
-        canvas->setCursor( 4, 4 );
+        const char* one = nullptr;
+        const char* two = nullptr;
+        uint16_t colour = COLOR_WARNING;
         if ( !boardVioIs3V3( ) ) {
-            canvas->setTextColor( COLOR_WARNING );
-            canvas->print( "VIO rail is not 3.3 V" );
+            one = "VIO rail is not";
+            two = "3.3 V";
         } else if ( magArray.sensorsOk( ) == 0 ) {
-            canvas->setTextColor( COLOR_WARNING );
-            canvas->print( "no sensors answering" );
+            one = "no sensors";
+            two = "answering";
         } else if ( !magArray.baselineReady( ) ) {
-            canvas->setTextColor( COLOR_WARNING );
-            canvas->print( "zeroing - keep the magnet away" );
+            one = "zeroing - keep";
+            two = "the magnet away";
+        } else if ( magLocator.baselinePolluted ) {
+            one = "zeroed WITH the";
+            two = "magnet: move, z";
         } else if ( fix.present && fix.seenBy + fix.faintBy < MAGLOC_MIN_SENSORS ) {
-            canvas->setTextColor( COLOR_WARNING );
-            snprintf( line, sizeof( line ), "%.2f mT, noticed by %d sensor%s: need %d", fix.peakMt, fix.seenBy + fix.faintBy, fix.seenBy + fix.faintBy == 1 ? "" : "s", MAGLOC_MIN_SENSORS );
-            canvas->print( line );
+            snprintf( line, sizeof( line ), "%.2f mT, %d sensor%s", fix.peakMt, fix.seenBy + fix.faintBy, fix.seenBy + fix.faintBy == 1 ? "" : "s" );
+            one = line;
+            two = "see it: need 3";
         } else if ( fix.present ) {
-            canvas->setTextColor( COLOR_WARNING );
-            snprintf( line, sizeof( line ), "%.2f mT, no fix (%.0f%%, +-%.0f mm)", fix.peakMt, fix.misfit * 100.0f, fix.errorMm > 99.0f ? 99.0f : fix.errorMm );
-            canvas->print( line );
+            snprintf( line, sizeof( line ), "%.2f mT no fix", fix.peakMt );
+            one = line;
+            two = "";
         } else {
-            canvas->setTextColor( COLOR_TEXT_DIM );
-            canvas->print( "no magnet" );
+            one = "no magnet";
+            two = "";
+            colour = COLOR_TEXT_DIM;
         }
+        textAt( canvas, 2, 2, T, colour, one );
+        textAt( canvas, 2, 2 + H, T, colour, two );
     }
 
 #if MODULE_ROW_COUNT
@@ -387,38 +587,55 @@ void MagView::drawText( ) {
     if ( rowCounter.calibrating( ) ) {
         int row, hole;
         rowCounter.calibrationTarget( &row, &hole );
-        canvas->fillRect( 0, 28, LCD_WIDTH, 50, COLOR_BACKGROUND );
-        canvas->setTextSize( 3 );
-        canvas->setTextColor( COLOR_ROW_CURRENT );
+        fastFillRect( canvas, 0, 2 + 2 * H, LCD_WIDTH, 4 * H, COLOR_BACKGROUND );
         snprintf( line, sizeof( line ), "tap row %d", row );
-        canvas->setCursor( 4, 30 );
-        canvas->print( line );
-        canvas->setTextSize( 1 );
-        snprintf( line, sizeof( line ), "%s   %d/%d", hole == 1 ? "hole next to the channel" : "outermost hole", rowCounter.calibrationStepNumber( ) + 1, ROWGRID_CALIBRATION_TARGETS );
-        canvas->setCursor( 4, 58 );
-        canvas->print( line );
-        canvas->drawRect( 4, 70, LCD_WIDTH - 8, 6, COLOR_TEXT_DIM );
-        canvas->fillRect( 4, 70, (int)( ( LCD_WIDTH - 8 ) * rowCounter.tapProgress( ) ), 6, COLOR_SURE );
+        textAt( canvas, 2, 2 + 2 * H + 2, 2 * T, COLOR_ROW_CURRENT, line );
+        snprintf( line, sizeof( line ), "%s hole  %d/%d", hole == 1 ? "inner" : "outer", rowCounter.calibrationStepNumber( ) + 1, ROWGRID_CALIBRATION_TARGETS );
+        textAt( canvas, 2, 2 + 4 * H + 6, T, COLOR_TEXT, line );
+        int barY = 2 + 5 * H + 8;
+        fastRect( canvas, 4, barY, LCD_WIDTH - 8, 8, COLOR_TEXT_DIM );
+        fastFillRect( canvas, 4, barY, (int)( ( LCD_WIDTH - 8 ) * rowCounter.tapProgress( ) ), 8, COLOR_SURE );
     }
 #endif
 
-    static const char* cameraNames[ MAGVIEW_CAMERA_COUNT ] = { "sway", "fixed", "spin", "top" };
-    snprintf( line, sizeof( line ), "%d/%d sensors  %2.0f fps  fit %lu us  %s", magArray.sensorsOk( ), magArray.sensorCount( ),
-              framesPerSecond, (unsigned long)fix.fitUs, cameraNames[ camera ] );
-    canvas->setTextColor( COLOR_TEXT_DIM );
-    canvas->setCursor( 4, LCD_HEIGHT - 12 );
-    canvas->print( line );
+    // Two lines at the bottom: the array and frame rate; the camera, the
+    // track's state and the cursor mode.
+    static const char* trackNames[ 4 ] = { "-", "rough", "coast", "track" };
+    snprintf( line, sizeof( line ), "%d/%d sens %2.0ffps s%.1f", magArray.sensorsOk( ), magArray.sensorCount( ), framesPerSecond, magLocator.boardZ ); // s = the surface's height
+    textAt( canvas, 2, LCD_HEIGHT - 2 * H - 2, T, COLOR_TEXT_DIM, line );
+    snprintf( line, sizeof( line ), "%s %s %s", cameraModeNames[ cam.mode ], magLocator.track.enabled ? trackNames[ magLocator.track.state ] : "raw",
+              magLocator.track.cursorMode == MAGCURSOR_UNDER ? "under" : "aim" );
+    textAt( canvas, 2, LCD_HEIGHT - H - 2, T, COLOR_TEXT_DIM, line );
 }
 
-void MagView::drawFrame( uint32_t nowMs ) {
+bool MagView::drawFrame( uint32_t nowMs ) {
     const MagProbeFix& fix = magLocator.fix;
+#if MODULE_UI
+    // The log screen is all text, which GFX draws slowly (a full screen of
+    // it measured 30 ms): only redraw it when something changed, and no more
+    // than every MAGVIEW_LOG_REDRAW_MS even then (a CSV stream into the log
+    // would otherwise hold the loop most of the time). A change of screen,
+    // of the menu or of the scroll always redraws.
+    if ( screen == MAGVIEW_SCREEN_LOG ) {
+        uint32_t stamp = uiStream.logGeneration( ) + 7919u * (uint32_t)ui.logScroll + 104729u * ui.menuEdits + ( ui.menuOpen( ) ? 1u : 0u );
+        bool sameScreen = lastDrawnScreen == (int)screen;
+        if ( sameScreen && ( stamp == lastLogStamp || nowMs - lastLogDrawMs < MAGVIEW_LOG_REDRAW_MS ) ) {
+            return false;
+        }
+        lastLogStamp = stamp;
+        lastLogDrawMs = nowMs;
+    }
+    lastDrawnScreen = (int)screen;
+#endif
 
     // Keep the trail: a point per period while there is a fix, and let it
     // drain away at the same rate once there is not.
     if ( nowMs - lastTrailMs >= MAGVIEW_TRAIL_PERIOD_MS ) {
         lastTrailMs = nowMs;
-        if ( fix.valid ) {
-            trail[ trailHead ] = fix.magnet;
+        const MagTrack& track = magLocator.track;
+        bool tracked = track.enabled && ( track.state == MAGTRACK_TRACKING || track.state == MAGTRACK_COASTING );
+        if ( tracked || fix.valid ) {
+            trail[ trailHead ] = tracked ? track.viewPosition : fix.magnet;
             trailHead = ( trailHead + 1 ) % MAGVIEW_TRAIL_POINTS;
             if ( trailCount < MAGVIEW_TRAIL_POINTS ) {
                 trailCount++;
@@ -430,10 +647,239 @@ void MagView::drawFrame( uint32_t nowMs ) {
 
     aimCamera( nowMs );
     canvas->fillScreen( COLOR_BACKGROUND );
-    drawBoard( );
-    drawSensors( );
-    drawMagnet( );
-    drawText( );
+    if ( screen == MAGVIEW_SCREEN_LEDS ) {
+        drawLedScreen( );
+    } else if ( screen == MAGVIEW_SCREEN_DRAW ) {
+        drawTraceScreen( );
+    } else if ( screen == MAGVIEW_SCREEN_LOG ) {
+#if MODULE_UI
+        ui.drawLog( canvas );
+#endif
+    } else {
+        drawBoard( );
+        drawSensors( );
+        drawMagnet( );
+        drawText( );
+    }
+#if MODULE_UI
+    if ( ui.menuOpen( ) ) {
+        ui.drawMenu( canvas );
+    }
+#endif
+    return true;
+}
+
+// The drawing over the board from above: every hole a dot, the painted
+// ones squares in their colour at their level (as the LEDs have them), the
+// brush's ring round the point as hollow squares in the paint colour, the
+// point itself a cross. The map is the LED screen's: 7 px a row.
+void MagView::drawTraceScreen( ) {
+#if MODULE_PLAY
+    const LedLayout& layout = probeLeds.layout;
+    const ProbeLedFrame& frame = probeLeds.frame;
+    const ProbeLedBrush& brush = probeLeds.brush;
+    for ( int i = 0; i < layout.count; i++ ) {
+        if ( layout.kind[ i ] != PROBELED_HOLE )
+            continue;
+        int x, y;
+        PlayService::tracePlace( layout.along[ i ], layout.acrossMm[ i ], &x, &y );
+        float painted = play.paint.level[ i ];
+        if ( painted > 0.0f ) {
+            // As lit: the paint's colour at its level (the LEDs' own gamma
+            // is theirs; the panel shows the level as it is).
+            float k = painted > 1.0f ? 1.0f : painted;
+            fastFillRect( canvas, x - 2, y - 2, 5, 5, RGB565( (uint8_t)( play.paint.r[ i ] * k ), (uint8_t)( play.paint.g[ i ] * k ), (uint8_t)( play.paint.b[ i ] * k ) ) );
+        } else {
+            fastFillRect( canvas, x, y, 1, 1, COLOR_GRID );
+        }
+        // The brush ring (what the LED renderer is showing as the cursor).
+        if ( brush.active && frame.target[ i ] > 0.0f && frame.target[ i ] != painted ) {
+            fastRect( canvas, x - 3, y - 3, 7, 7, RGB565( brush.r, brush.g, brush.b ) );
+        }
+    }
+    const ProbeLedInput& in = probeLeds.input;
+    if ( in.state != PROBELED_NONE ) {
+        int x, y;
+        PlayService::tracePlace( in.haveUnder ? in.underAlong : in.along, in.haveUnder ? in.underAcrossMm : in.acrossMm, &x, &y );
+        uint16_t c = in.heightMm < play.touchMm ? COLOR_SURE : COLOR_SHADOW;
+        fastFillRect( canvas, x - 4, y, 9, 1, c );
+        fastFillRect( canvas, x, y - 4, 1, 9, c );
+    }
+    char line[ 40 ];
+    snprintf( line, sizeof( line ), "%s: %s", playModeNames[ play.mode ], in.state == PROBELED_NONE ? "no probe" : ( in.heightMm < play.touchMm ? "touching" : "lifted" ) ); // 20 columns
+    textAt( canvas, 2, 2, MAGVIEW_TEXT, COLOR_TEXT_DIM, line );
+    if ( play.mode == PLAY_PAINT ) {
+        drawColourWheel( );
+    }
+    if ( play.mode == PLAY_TARGET ) {
+        snprintf( line, sizeof( line ), "%lu hit %.2fs %.1fmm", (unsigned long)play.hits, play.meanMs * 1e-3f, play.meanMissMm );
+        textAt( canvas, 2, LCD_HEIGHT - MAGVIEW_LINE_H - 2, MAGVIEW_TEXT, COLOR_TEXT_DIM, line );
+    }
+#else
+    textAt( canvas, 4, 4, MAGVIEW_TEXT, COLOR_TEXT_DIM, "MODULE_PLAY is off" );
+#endif
+}
+
+// The paint's colour wheel, bottom right of the draw screen: hue round it,
+// saturation out from the white centre, the marker where the paint colour
+// is (the joystick moves it), a swatch of the colour at its brightness, and
+// the brush and draw/erase state. The wheel's pixels are worked out once.
+#define WHEEL_R 26
+#define WHEEL_CX ( LCD_WIDTH - WHEEL_R - 4 )
+#define WHEEL_CY ( LCD_HEIGHT - WHEEL_R - 4 )
+#define WHEEL_PANEL_Y ( LCD_HEIGHT - 5 * MAGVIEW_LINE_H ) // the settings, five lines to the wheel's left (the map is above, PLAY_TRACE_MID_Y)
+static uint16_t wheelPixels[ ( 2 * WHEEL_R + 1 ) * ( 2 * WHEEL_R + 1 ) ];
+static bool wheelReady = false;
+
+void MagView::drawColourWheel( ) {
+#if MODULE_PLAY
+    if ( !wheelReady ) {
+        for ( int dy = -WHEEL_R; dy <= WHEEL_R; dy++ ) {
+            for ( int dx = -WHEEL_R; dx <= WHEEL_R; dx++ ) {
+                float r = sqrtf( (float)( dx * dx + dy * dy ) ) / WHEEL_R;
+                uint16_t c = 0;
+                if ( r <= 1.0f ) {
+                    float hue = atan2f( (float)-dy, (float)dx ) * ( 180.0f / 3.14159265f ); // y up
+                    uint8_t cr, cg, cb;
+                    playHsvToRgb( hue, r, &cr, &cg, &cb );
+                    c = RGB565( cr, cg, cb );
+                    if ( c == 0 )
+                        c = 1; // 0 is the "outside" mark
+                }
+                wheelPixels[ ( dy + WHEEL_R ) * ( 2 * WHEEL_R + 1 ) + dx + WHEEL_R ] = c;
+            }
+        }
+        wheelReady = true;
+    }
+    uint16_t* buffer = canvas->getBuffer( );
+    for ( int dy = -WHEEL_R; dy <= WHEEL_R; dy++ ) {
+        int y = WHEEL_CY + dy;
+        if ( y < 0 || y >= LCD_HEIGHT )
+            continue;
+        for ( int dx = -WHEEL_R; dx <= WHEEL_R; dx++ ) {
+            uint16_t c = wheelPixels[ ( dy + WHEEL_R ) * ( 2 * WHEEL_R + 1 ) + dx + WHEEL_R ];
+            int x = WHEEL_CX + dx;
+            if ( c != 0 && x >= 0 && x < LCD_WIDTH )
+                buffer[ y * LCD_WIDTH + x ] = c;
+        }
+    }
+    // The marker: a ring where the colour is.
+    float rad = play.paintHue * ( 3.14159265f / 180.0f );
+    int mx = WHEEL_CX + (int)( play.paintSat * WHEEL_R * cosf( rad ) + 0.5f );
+    int my = WHEEL_CY - (int)( play.paintSat * WHEEL_R * sinf( rad ) + 0.5f );
+    fastRect( canvas, mx - 3, my - 3, 7, 7, RGB565( 0, 0, 0 ) );
+    fastRect( canvas, mx - 2, my - 2, 5, 5, RGB565( 255, 255, 255 ) );
+    // Every setting of the play page, to the wheel's left: the colour, the
+    // brush's brightness and width, draw or erase (with the swatch: the
+    // colour as it will be painted), and how to clear. What the controls do
+    // is in the README; the joystick, its click and the nav stick are it.
+    uint8_t r, g, b;
+    play.paintColour( &r, &g, &b );
+    float k = play.erase ? 0.0f : play.paintBright;
+    char line[ 24 ];
+    int y = WHEEL_PANEL_Y;
+    snprintf( line, sizeof( line ), "hue %3d sat %.2f", (int)( play.paintHue + 0.5f ) % 360, play.paintSat );
+    textAt( canvas, 2, y, MAGVIEW_TEXT, COLOR_TEXT_DIM, line );
+    y += MAGVIEW_LINE_H;
+    snprintf( line, sizeof( line ), "bright %3d%%", (int)( play.paintBright * 100.0f + 0.5f ) );
+    textAt( canvas, 2, y, MAGVIEW_TEXT, COLOR_TEXT_DIM, line );
+    y += MAGVIEW_LINE_H;
+    snprintf( line, sizeof( line ), "brush %d", (int)( play.brushSize + 0.5f ) );
+    textAt( canvas, 2, y, MAGVIEW_TEXT, COLOR_TEXT_DIM, line );
+    int sx = 2 + 7 * MAGVIEW_CHAR_W + 8, sy = y + 2; // the swatch after "brush 1", then draw / ERASE
+    fastFillRect( canvas, sx, sy, 12, 12, RGB565( (uint8_t)( r * k ), (uint8_t)( g * k ), (uint8_t)( b * k ) ) );
+    fastRect( canvas, sx - 1, sy - 1, 14, 14, play.erase ? COLOR_SHADOW : COLOR_TEXT_DIM );
+    textAt( canvas, sx + 18, y, MAGVIEW_TEXT, play.erase ? COLOR_SHADOW : COLOR_TEXT, play.erase ? "ERASE" : "draw" );
+    y += MAGVIEW_LINE_H;
+    snprintf( line, sizeof( line ), "touch %.1f mm", play.touchMm );
+    textAt( canvas, 2, y, MAGVIEW_TEXT, COLOR_TEXT_DIM, line );
+    y += MAGVIEW_LINE_H;
+    textAt( canvas, 2, y, MAGVIEW_TEXT, COLOR_TEXT_DIM, "hold nav: clear" );
+#endif
+}
+
+// The breadboard's LEDs from above: rows along the panel, holes across it,
+// each LED a square in the colour it would be lit, as the probe cursor
+// renderer has it. Rows 1-30 at the top, 31-60 below the channel.
+void MagView::drawLedScreen( ) {
+#if MODULE_PROBE_LEDS
+    const LedLayout& layout = probeLeds.layout;
+    const ProbeLedFrame& frame = probeLeds.frame;
+    const int cell = LCD_WIDTH / ( PROBELED_ROWS + 2 ); // 7 px per row
+    const float pxPerMm = cell / 2.54f;
+    const int x0 = ( LCD_WIDTH - PROBELED_ROWS * cell ) / 2;
+    const int yMid = LCD_HEIGHT / 2 + 8;
+    for ( int i = 0; i < layout.count; i++ ) {
+        int x = x0 + (int)( ( layout.along[ i ] - 1.0f ) * cell );
+        int y = yMid - (int)( layout.acrossMm[ i ] * pxPerMm );
+        // The LCD is not an LED: no gamma, so the dim end of the bell shows.
+        float level = frame.level[ i ] > 1.0f ? 1.0f : frame.level[ i ];
+        uint8_t r = (uint8_t)( frame.r[ i ] * level ), g = (uint8_t)( frame.g[ i ] * level ), b = (uint8_t)( frame.b[ i ] * level );
+        uint16_t colour = level > 0.02f ? RGB565( r, g, b ) : ( layout.kind[ i ] == PROBELED_RAIL ? RGB565( 24, 20, 20 ) : RGB565( 28, 32, 40 ) );
+        fastFillRect( canvas, x, y - cell / 2 + 1, cell - 1, cell - 1, colour );
+    }
+    fastFillRect( canvas, x0, yMid, PROBELED_ROWS * cell, 1, COLOR_GRID );
+    textAt( canvas, x0, (int)( yMid - 8 * pxPerMm * 2.54f - 28 ), MAGVIEW_TEXT, COLOR_TEXT_DIM, "1" );
+    textAt( canvas, x0 + 28 * cell, (int)( yMid - 8 * pxPerMm * 2.54f - 28 ), MAGVIEW_TEXT, COLOR_TEXT_DIM, "30" );
+
+    char line[ 60 ];
+    const ProbeLedInput& in = probeLeds.input;
+    static const char* names[ 4 ] = { "no probe", "far away", "coasting", "tracking" };
+    if ( in.state == PROBELED_NONE ) {
+        textAt( canvas, 2, 2, MAGVIEW_TEXT, COLOR_TEXT_DIM, names[ 0 ] );
+    } else {
+        int rowNumber = (int)floorf( in.along + 0.5f ) + ( in.acrossMm < 0.0f ? PROBELED_ROWS : 0 );
+        snprintf( line, sizeof( line ), "%s row %d", names[ in.state ], rowNumber );
+        textAt( canvas, 2, 2, MAGVIEW_TEXT, COLOR_TEXT, line );
+        snprintf( line, sizeof( line ), "+-%.2f %.0f%% up %.0fmm%s", in.sigmaRows, in.confidence * 100.0f, in.heightMm, in.haveUnder ? " *" : "" );
+        textAt( canvas, 2, 2 + MAGVIEW_LINE_H, MAGVIEW_TEXT, COLOR_TEXT_DIM, line );
+    }
+    snprintf( line, sizeof( line ), "%s %d LEDs %2.0f fps", probeLeds.v5 ? "V5" : "V6", layout.count, framesPerSecond );
+    textAt( canvas, 2, LCD_HEIGHT - MAGVIEW_LINE_H - 2, MAGVIEW_TEXT, COLOR_TEXT_DIM, line );
+#else
+    canvas->setCursor( 4, 4 );
+    canvas->setTextColor( COLOR_TEXT_DIM );
+    canvas->print( "MODULE_PROBE_LEDS is off" );
+#endif
+}
+
+// A draw, unless the LED service is due before it would be over: the LEDs
+// come first, and the loop cannot take a draw back once it has started. A
+// screen that takes longer than the LED period is drawn anyway (it would
+// never be shown otherwise); none does since text stopped going through
+// GFX. The draw is timed, per screen, for `e`.
+bool MagView::tryDraw( ) {
+    uint32_t t0 = micros( );
+#if MODULE_PROBE_LEDS
+    if ( probeLeds.strip ) {
+        // The expectation is the running average, not the last draw: one
+        // draw stalled by a settings write (a 20 ms flash page) read 18 ms,
+        // and 18 ms never fits between LED frames 20 ms apart with a 4 ms
+        // frame in them - and only a draw can bring the number down, so the
+        // screen froze (2026-09-19, twice). And whatever the numbers say, a
+        // screen not drawn for MAGVIEW_STARVE_US is drawn now: one late LED
+        // frame is nothing next to a display that has stopped.
+        uint32_t expect = drawAvgUs[ screen ];
+        if ( expect > 0 && expect < PROBELED_PERIOD_US && (uint32_t)( t0 - lastDrawStartUs ) < MAGVIEW_STARVE_US ) {
+            int64_t untilDue = (int64_t)( probeLeds.nextDueUs - micros64( ) );
+            if ( untilDue < (int64_t)expect ) {
+                yields++;
+                return false;
+            }
+        }
+    }
+#endif
+    lastDrawStartUs = t0;
+    if ( !drawFrame( millis( ) ) ) {
+        return false;
+    }
+    uint32_t took = micros( ) - t0;
+    drawLastUs[ screen ] = took;
+    drawAvgUs[ screen ] = drawAvgUs[ screen ] == 0 ? took : ( drawAvgUs[ screen ] * 15 + took ) / 16;
+    if ( took > drawMaxUs[ screen ] ) {
+        drawMaxUs[ screen ] = took;
+    }
+    return true;
 }
 
 ServiceStatus MagView::service( ) {
@@ -442,28 +888,54 @@ ServiceStatus MagView::service( ) {
         return lastStatus;
     }
 
-    if ( pushRow < 0 ) {
-        drawFrame( millis( ) );
-        pushRow = 0;
-    } else {
-        int rows = LCD_HEIGHT - pushRow;
-        if ( rows > MAGVIEW_BAND_ROWS ) {
-            rows = MAGVIEW_BAND_ROWS;
-        }
-        st7789PushRows( canvas->getBuffer( ), pushRow, rows );
-        pushRow += rows;
-        if ( pushRow >= LCD_HEIGHT ) {
-            pushRow = -1;
-            fpsWindowFrames++;
-            uint32_t now = millis( );
-            if ( now - fpsWindowStartMs >= 1000 ) {
-                framesPerSecond = fpsWindowFrames * 1000.0f / ( now - fpsWindowStartMs );
-                fpsWindowStartMs = now;
-                fpsWindowFrames = 0;
+    if ( pushRow >= 0 ) {
+        // A frame is on its way. While a band is on the wire, draw the next
+        // frame into the other buffer if that is not done yet; otherwise there
+        // is nothing to do until the wire is clear.
+        if ( st7789PushBusy( ) ) {
+            if ( !drawn && tryDraw( ) ) {
+                drawn = true;
+                lastStatus = ServiceStatus::BUSY;
+                return lastStatus;
             }
+            lastStatus = ServiceStatus::IDLE;
+            return lastStatus;
+        }
+        st7789PushFinish( );
+        if ( pushRow < LCD_HEIGHT ) {
+            int rows = LCD_HEIGHT - pushRow;
+            if ( rows > MAGVIEW_BAND_ROWS ) {
+                rows = MAGVIEW_BAND_ROWS;
+            }
+            st7789PushRowsStart( shown->getBuffer( ), pushRow, rows );
+            pushRow += rows;
+            lastStatus = ServiceStatus::BUSY;
+            return lastStatus;
+        }
+        // The whole frame is on the panel.
+        pushRow = -1;
+        fpsWindowFrames++;
+        uint32_t now = millis( );
+        if ( now - fpsWindowStartMs >= 1000 ) {
+            framesPerSecond = fpsWindowFrames * 1000.0f / ( now - fpsWindowStartMs );
+            fpsWindowStartMs = now;
+            fpsWindowFrames = 0;
         }
     }
 
+    // Nothing in flight: a drawn frame (or one drawn now) starts its way to
+    // the panel, and the buffers swap so the next one is drawn elsewhere.
+    if ( !drawn && !tryDraw( ) ) {
+        lastStatus = ServiceStatus::IDLE; // nothing new to show, or not now
+        return lastStatus;
+    }
+    GFXcanvas16* t = shown;
+    shown = canvas;
+    canvas = t;
+    drawn = false;
+    pushRow = 0;
+    st7789PushRowsStart( shown->getBuffer( ), 0, MAGVIEW_BAND_ROWS < LCD_HEIGHT ? MAGVIEW_BAND_ROWS : LCD_HEIGHT );
+    pushRow = MAGVIEW_BAND_ROWS < LCD_HEIGHT ? MAGVIEW_BAND_ROWS : LCD_HEIGHT;
     lastStatus = ServiceStatus::BUSY;
     return lastStatus;
 }

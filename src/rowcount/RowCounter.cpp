@@ -94,6 +94,20 @@ void RowCounter::forgetAnchors( Stream* out ) {
     out->println( "anchors forgotten: the grid is the one the firmware boots with" );
 }
 
+void RowCounter::restoreAnchors( const RowAnchor* list, int count ) {
+    anchorCount = 0;
+    for ( int k = 0; k < count && k < ROWCOUNT_MAX_ANCHORS; k++ ) {
+        anchors[ anchorCount++ ] = list[ k ];
+    }
+    Stream* out = console.port( );
+    if ( out != nullptr ) {
+        char line[ 80 ];
+        snprintf( line, sizeof( line ), "row anchors: %d put back from the saved settings", anchorCount );
+        out->println( line );
+    }
+    fitToAnchors( out );
+}
+
 void RowCounter::fitToAnchors( Stream* out ) {
     static const char* kindName[] = { "nothing", "moved into place only - angle and scale need anchors 10 mm or more apart", "place, angle and scale", "place, angle, a scale each way and skew" };
     char line[ 240 ];
@@ -190,7 +204,7 @@ void RowCounter::watchForTap( Stream* out ) {
     if ( stillCount == 0 ) {
         stillSum = { 0, 0, 0 };
     }
-    if ( stillCount <= ROWCOUNT_TAP_FIXES / 2 ) { // the measurement starts over until the settling half is done
+    if ( stillCount <= ROWCOUNT_TAP_SETTLE_FIXES ) { // the measurement starts over until the settling second is done
         tapSum = { 0, 0, 0 };
         tapSigmaSum = 0.0f;
         tapCount = 0;
@@ -263,6 +277,7 @@ void RowCounter::startHold( RowHoldPurpose purpose, int row, Stream* out ) {
     holdPurpose = purpose;
     holdRow = row;
     holdCount = 0;
+    holdSettle = 0;
     holdSum = { 0, 0, 0 };
     holdSigmaSum = 0.0f;
     holdSigmaMmSum = 0.0f;
@@ -273,6 +288,10 @@ void RowCounter::startHold( RowHoldPurpose purpose, int row, Stream* out ) {
 
 void RowCounter::collect( ) {
     const MagProbeFix& fix = magLocator.fix;
+    if ( holdSettle < ROWCOUNT_HOLD_SETTLE_FIXES ) {
+        holdSettle++; // the first second is the hand settling: not measured
+        return;
+    }
     held[ holdCount++ ] = reading.place.along;
     Vec3 p = touchZ > 0.0f ? fix.rawPointer : fix.rawTip; // as in watchForTap()
     holdSum.x += p.x;
@@ -371,20 +390,30 @@ ServiceStatus RowCounter::service( ) {
     if ( holdPurpose != ROWHOLD_NONE && now - holdStartMs > ROWCOUNT_HOLD_TIMEOUT_MS ) {
         if ( out != nullptr ) {
             char line[ 120 ];
-            snprintf( line, sizeof( line ), "gave up: only %d of %d fixes in %d s. l says why there is no fix.", holdCount, ROWCOUNT_HOLD_FIXES, ROWCOUNT_HOLD_TIMEOUT_MS / 1000 );
+            snprintf( line, sizeof( line ), "gave up: only %d of %d fixes in %d s (after a second's settling). l says why there is no fix.", holdCount, ROWCOUNT_HOLD_FIXES, ROWCOUNT_HOLD_TIMEOUT_MS / 1000 );
             out->println( line );
         }
         holdPurpose = ROWHOLD_NONE;
     }
 
-    if ( !fix.valid ) {
-        reading.valid = false;
+    const MagTrack& track = magLocator.track;
+    bool tracked = track.enabled && ( track.state == MAGTRACK_TRACKING || track.state == MAGTRACK_COASTING );
+    // A rough fix (the probe far up or off the edge) counts no row.
+    bool rough = track.enabled ? track.state == MAGTRACK_ROUGH : fix.rough;
+
+    if ( !fix.valid || rough ) {
+        if ( tracked && !rough ) {
+            followTrack( ); // the counted row rides the coasting track through a gap, and stays shown
+        } else {
+            reading.valid = false;
+            reading.tracked = false;
+        }
         if ( now - lastFixMs > ROWCOUNT_TAP_GAP_MS ) {
             stillCount = 0;   // a tap survives a dropped frame or two, not a lifted probe
             leftStart = true; // ...and a probe lifted right away has certainly left where it was
         }
         if ( active && !saidNoFix && out != nullptr && now - lastFixMs > ROWCOUNT_NO_FIX_AFTER_MS ) {
-            out->println( "row: no fix" );
+            out->println( rough ? "row: too far to say (rough fix)" : "row: no fix" );
             saidNoFix = true;
         }
         lastStatus = ServiceStatus::IDLE;
@@ -408,16 +437,15 @@ ServiceStatus RowCounter::service( ) {
     reading.confidence = rowGridConfidence( reading.place, reading.sigmaRows, reading.sigmaAcrossMm );
     reading.touching = touchZ > 0.0f && fix.rawTip.z < touchZ + ROWCOUNT_TOUCH_MARGIN_MM;
 
-    // The counted row follows the smoothed fix and needs a clear step to change,
-    // along the board or across the channel.
-    RowPlace smoothed = rowGridPlace( &grid, fix.pointer );
-    if ( !reading.valid || fabsf( smoothed.along - countedAlong ) > 0.5f + ROWCOUNT_HYSTERESIS_ROWS ) {
-        countedAlong = (int)floorf( smoothed.along + 0.5f );
+    // The counted row follows the tracker's cursor (or, with the tracker off,
+    // the smoothed fix) and needs a clear step to change, along the board or
+    // across the channel.
+    if ( tracked ) {
+        followTrack( );
+    } else {
+        reading.tracked = false;
+        countRow( rowGridPlace( &grid, fix.pointer ), !reading.valid );
     }
-    if ( !reading.valid || fabsf( smoothed.acrossMm ) > ROWCOUNT_HALF_HYSTERESIS_MM ) {
-        countedBottom = smoothed.acrossMm < 0.0f;
-    }
-    reading.row = rowGridRow( (float)countedAlong, countedBottom );
     reading.valid = true;
 
     if ( out != nullptr ) {
@@ -439,16 +467,45 @@ ServiceStatus RowCounter::service( ) {
     return lastStatus;
 }
 
+// The counted row from a place on the breadboard, with hysteresis unless it
+// is starting fresh.
+void RowCounter::countRow( RowPlace place, bool fresh ) {
+    if ( fresh || fabsf( place.along - countedAlong ) > 0.5f + ROWCOUNT_HYSTERESIS_ROWS ) {
+        countedAlong = (int)floorf( place.along + 0.5f );
+    }
+    if ( fresh || fabsf( place.acrossMm ) > ROWCOUNT_HALF_HYSTERESIS_MM ) {
+        countedBottom = place.acrossMm < 0.0f;
+    }
+    reading.row = rowGridRow( (float)countedAlong, countedBottom );
+}
+
+// The tracker's cursor in breadboard terms, and the counted row from it.
+void RowCounter::followTrack( ) {
+    const MagTrack& track = magLocator.track;
+    bool fresh = !reading.tracked;
+    reading.tracked = true;
+    reading.trackPlace = rowGridPlace( &grid, track.cursor );
+    Vec3 bar = { track.cursorSigmaMm * 0.7071f, track.cursorSigmaMm * 0.7071f, track.sigma.z };
+    reading.trackSigmaRows = rowGridSigmaAlong( &grid, bar );
+    reading.trackConfidence = rowGridConfidence( reading.trackPlace, reading.trackSigmaRows, rowGridSigmaAcross( &grid, bar ) );
+    countRow( reading.trackPlace, fresh );
+}
+
 void RowCounter::printReading( Stream* out ) const {
     const MagProbeFix& fix = magLocator.fix;
-    char line[ 220 ];
+    char line[ 280 ];
     char counted[ 8 ] = "off";
     if ( reading.row > 0 ) {
         snprintf( counted, sizeof( counted ), "%3d", reading.row );
     }
     float shown = reading.place.along + ( reading.place.acrossMm < 0.0f ? ROWGRID_ROWS_PER_HALF : 0 );
-    snprintf( line, sizeof( line ), "row %s   this fix %6.2f (%+.2f) hole %d  +/-%.2f rows  %3.0f %% sure   x %.1f y %.1f z %.1f%s  misfit %.0f %%  seen by %d+%d faint",
-              counted, shown, reading.offsetRows, reading.hole, reading.sigmaRows, reading.confidence * 100.0f,
+    char tracked[ 48 ] = "";
+    if ( reading.tracked ) {
+        float t = reading.trackPlace.along + ( reading.trackPlace.acrossMm < 0.0f ? ROWGRID_ROWS_PER_HALF : 0 );
+        snprintf( tracked, sizeof( tracked ), "  track %6.2f +/-%.2f %3.0f %%", t, reading.trackSigmaRows, reading.trackConfidence * 100.0f );
+    }
+    snprintf( line, sizeof( line ), "row %s   this fix %6.2f (%+.2f) hole %d  +/-%.2f rows  %3.0f %% sure%s   x %.1f y %.1f z %.1f%s  misfit %.0f %%  seen by %d+%d faint",
+              counted, shown, reading.offsetRows, reading.hole, reading.sigmaRows, reading.confidence * 100.0f, tracked,
               fix.rawPointer.x, fix.rawPointer.y, fix.rawTip.z, touchZ <= 0.0f ? "" : ( reading.touching ? " down" : " up" ), fix.misfit * 100.0f, fix.seenBy, fix.faintBy );
     out->println( line );
 }

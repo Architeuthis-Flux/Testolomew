@@ -67,22 +67,28 @@
 
 #define ROWCOUNT_HYSTERESIS_ROWS 0.1f
 #define ROWCOUNT_HALF_HYSTERESIS_MM 1.0f
-#define ROWCOUNT_HOLD_FIXES 150 // fixes in a hold test or an R anchor, about 2 s
-#define ROWCOUNT_BLOCK_FIXES 8  // the hold test also reports the scatter of averages of this many fixes
-#define ROWCOUNT_HOLD_TIMEOUT_MS 6000
+#define ROWCOUNT_HOLD_SETTLE_FIXES 100 // an R anchor or a hold test: this many fixes (1 s) are let go by first - the hand settling, the smoothing catching up...
+#define ROWCOUNT_HOLD_FIXES 200        // ...then this many (2 s) are the measurement
+#define ROWCOUNT_BLOCK_FIXES 8         // the hold test also reports the scatter of averages of this many fixes
+#define ROWCOUNT_HOLD_TIMEOUT_MS 8000
 #define ROWCOUNT_PRINT_PERIOD_MS 500
 #define ROWCOUNT_NO_FIX_AFTER_MS 1000   // "no fix" is only said after this long without one (a lifted probe is not news)
 #define ROWCOUNT_NUMBER_TIMEOUT_MS 8000 // how long R waits for the row number (the loop is stopped meanwhile)
 #define ROWCOUNT_MAX_ANCHORS 24
+#define ROWCOUNT_ROW_MODE_AT_BOOT true // boot in row mode (2026-09-18: Kevin wants it the default)
 
-// A tap: the fix stays put for this many fixes (about a second). The first
-// half lets the smoothing settle; the second half is the measurement. "Stays
-// put" is within three of the fix's own error bars, but never tighter or
-// looser than these. The next tap has to be at least ROWCOUNT_TAP_APART_MM from
-// the last, so resting on a hole is not taken for the next one as well
+// A tap: the fix stays put for ROWCOUNT_TAP_SETTLE_FIXES (a second: the hand
+// settling, the smoothing catching up) and then ROWCOUNT_TAP_MEASURE_FIXES
+// more (two seconds), which are the measurement (2026-09-19: Kevin wanted
+// the time to place the probe and a longer average; it was 0.4 + 0.4 s).
+// "Stays put" is within three of the fix's own error bars, but never tighter
+// or looser than these. The next tap has to be at least ROWCOUNT_TAP_APART_MM
+// from the last, so resting on a hole is not taken for the next one as well
 // (neighbouring targets are 10 mm apart).
 // A gap in the fixes shorter than ROWCOUNT_TAP_GAP_MS does not start the tap over.
-#define ROWCOUNT_TAP_FIXES 80
+#define ROWCOUNT_TAP_SETTLE_FIXES 100
+#define ROWCOUNT_TAP_MEASURE_FIXES 200
+#define ROWCOUNT_TAP_FIXES ( ROWCOUNT_TAP_SETTLE_FIXES + ROWCOUNT_TAP_MEASURE_FIXES )
 #define ROWCOUNT_TAP_GAP_MS 300
 #define ROWCOUNT_TAP_STRAYS 10 // ...nor do this many fixes in a row off the spot (a glitch; more is the probe moving)
 #define ROWCOUNT_TAP_STILL_MIN_MM 1.0f
@@ -99,6 +105,12 @@ struct RowReading {
     float sigmaAcrossMm; // ...and across them
     float confidence;    // chance that the raw fix's nearest row (and half) is the true one, 0..1 (see rowGridConfidence)
     bool touching;       // the magnet is down at the height the board puts it at (false if that height is not known)
+    // The same for the tracker's cursor (what the counted row follows when the
+    // tracker is on): filtered, and carried through gaps.
+    bool tracked; // the cursor below is live (tracking or coasting)
+    RowPlace trackPlace;
+    float trackSigmaRows;
+    float trackConfidence;
 };
 
 enum RowHoldPurpose {
@@ -123,7 +135,7 @@ class RowCounter : public Service {
 
     RowGrid grid;
     RowReading reading = { };
-    bool active = false; // row mode
+    bool active = ROWCOUNT_ROW_MODE_AT_BOOT; // row mode (r toggles it; a mode, not a saved setting)
     float touchZ = ROWCOUNT_TOUCH_Z_MM;
 
     void toggle( Stream* out );
@@ -136,6 +148,14 @@ class RowCounter : public Service {
     int calibrationStepNumber( ) const { return calibrationStep; }
     void calibrationTarget( int* row, int* hole ) const { rowGridCalibrationTarget( calibrationStep, row, hole ); }
     float tapProgress( ) const { return (float)stillCount / ROWCOUNT_TAP_FIXES; } // 0..1 while a tap is being taken
+
+    // The anchors as they stand (for saving), and anchors put back from a
+    // save: they replace what there is and the grid is fitted to them.
+    int anchorList( const RowAnchor** list ) const {
+        *list = anchors;
+        return anchorCount;
+    }
+    void restoreAnchors( const RowAnchor* list, int count );
 
   private:
     RowCounter( ) = default;
@@ -157,6 +177,7 @@ class RowCounter : public Service {
     RowHoldPurpose holdPurpose = ROWHOLD_NONE;
     int holdRow = 0; // the row number typed with R
     int holdCount = 0;
+    int holdSettle = 0; // fixes let go by at the start of a hold (ROWCOUNT_HOLD_SETTLE_FIXES)
     uint32_t holdStartMs = 0;
     float held[ ROWCOUNT_HOLD_FIXES ]; // how far along each raw fix was, rows
     Vec3 holdSum;                      // raw tip positions, summed
@@ -185,6 +206,8 @@ class RowCounter : public Service {
     void collect( );
     void finishHold( Stream* out );
     void printReading( Stream* out ) const;
+    void countRow( RowPlace place, bool fresh );
+    void followTrack( );
 };
 
 extern RowCounter& rowCounter;

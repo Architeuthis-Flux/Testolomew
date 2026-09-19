@@ -59,12 +59,71 @@
 // Spare pins on the same two headers. The bus check tries these as the supply
 // of any sensor that does not answer on the pin listed above, to find a wire
 // that is one header position off. Nothing else may be wired to them.
-#define PIN_MAG_VCC_CANDIDATES { PC12, PA13, PD1, PD7, PC8, PC7, PC6 }
-#define PIN_MAG_VCC_CANDIDATE_NAMES { "PC12", "PA13", "PD1", "PD7", "PC8", "PC7", "PC6" }
+// (PD7 left this list when it became the LED strip's data pin: the bus check
+// would otherwise drive a breadboard's data-in as a supply.)
+#define PIN_MAG_VCC_CANDIDATES { PC12, PA13, PD1, PC8, PC7, PC6 }
+#define PIN_MAG_VCC_CANDIDATE_NAMES { "PC12", "PA13", "PD1", "PC8", "PC7", "PC6" }
 
 // Each set of four has its ground on a GPIO too; they are driven low and left.
 #define PIN_MAG_GND_A PA15
 #define PIN_MAG_GND_B PD5
+
+// ---- controls (wired 2026-09-18) --------------------------------------------
+// The navigation stick (ALPS RKJXM1015004, 8-way with a centre push, LCSC
+// C97432), an analog joystick with a press, and two buttons (src/ui/Input.h).
+// -1 = not fitted: the UI then takes the same events from keys typed on the
+// console.
+//
+// The stick has four direction contacts A-D (a diagonal closes two
+// neighbours) and a centre push that is a contact of its own: the ALPS
+// drawing's circuit is  Com -o o- Push -> A/B/C/D, with two "Push" pads on
+// the footprint. So the press is read on its own pin (PIN_NAV_PRESS); with
+// no pin for it (-1) Input.cpp falls back to calling three or four
+// direction contacts at once a press. The four direction defines are the
+// contacts as wired; if a direction comes out turned, swap them here. The
+// switches pull to ground and use the chip's pull-ups; the joystick is two
+// potentiometers across 3.3 V into ADC pins (read at 12 bits, centre
+// assumed at half scale - `j` prints the raw readings).
+#define PIN_NAV_UP PD13
+#define PIN_NAV_DOWN PD10
+#define PIN_NAV_LEFT PE15
+#define PIN_NAV_RIGHT PD15
+#define PIN_NAV_PRESS PD14 // the stick's Push pad (wired 2026-09-18)
+#define PIN_JOY_X PA3
+#define PIN_JOY_Y PA4
+// The stick as wired reads the other way along X (right gave a falling
+// reading, 2026-09-19): 1 turns it round so + is right, as Input.h wants.
+#define JOY_X_REVERSED 1
+#define JOY_Y_REVERSED 0
+#define PIN_JOY_PRESS PF2
+#define PIN_BTN_A PE14
+#define PIN_BTN_B PD12
+
+// ---- a V5's breadboard LEDs (wired 2026-09-18) --------------------------------
+// The data-in of a V5's breadboard LEDs, driven straight from here
+// (src/probeled/LedStrip.h) so the probe cursor shows on a real breadboard.
+// The pin must be a MOSI: PD7 is SPI1's, whose SCK and MISO (PA5, PA6) are
+// named too (the SCK pad is put back to an input once the SPI is set up,
+// so nothing toggles on it). -1 = not wired. Grounds must be shared, and
+// the data wire kept away from the sensor bus wires (it couples into SDA).
+//
+// The frame is 400 pixels: the 300 hole LEDs and then the 100 rail LEDs, as
+// JumperlOS numbers them. On a V5 up to hardware revision 3 that is one
+// chain and the rails light from this pin. A revision 4+ V5 has the rails
+// at the start of a second strip with its own data-in (JumperlOS's "top"
+// strip, LEDs.cpp) - wire that to PIN_LED_STRIP_TOP, another MOSI: PC12 or
+// PA13 are SPI3's (AF6 / AF1) and free on the J5/J9 headers; SPI3's SCK and
+// MISO then have to be PB3 and PB4, since its other choices (PC10, PA14,
+// PC11, PC9) are sensor supplies and the I2C data line. -1 = no second
+// strip (the rails still go out on the first chain, which is harmless).
+#define PIN_LED_STRIP PD7
+#define PIN_LED_STRIP_SCK PA5
+#define PIN_LED_STRIP_MISO PA6
+#define LED_STRIP_COUNT 400
+#define PIN_LED_STRIP_TOP -1
+#define PIN_LED_STRIP_TOP_SCK PB3
+#define PIN_LED_STRIP_TOP_MISO PB4
+#define LED_STRIP_TOP_COUNT 100 // the rails; JumperlOS's top strip goes on to the header and logo LEDs (145)
 
 // True if the VIO18 rail is set to 3.3 V (what every pin above needs).
 bool boardVioIs3V3( void );

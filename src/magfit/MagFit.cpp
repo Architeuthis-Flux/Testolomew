@@ -124,6 +124,36 @@ static float evaluate( const FitProblem* fp, Vec3 p, Vec3* momentOut, float* res
     return cost;
 }
 
+// The cost alone, without the residuals: with the moment solved by least
+// squares the misfit is |b|^2 - (G^T b) . m, so the second pass over the
+// sensors is not needed. Half the work of evaluate(); used by the lattice
+// search, where the cost is all that is compared. sumSquares is |b|^2 over
+// the used sensors.
+static float costAt( const FitProblem* fp, Vec3 p, float sumSquares ) {
+    float gtg[ 3 ][ 3 ] = { { 0 } };
+    float gtb[ 3 ] = { 0 };
+    float g[ 3 ][ 3 ];
+    for ( int i = 0; i < fp->count; i++ ) {
+        if ( !sensorUsed( fp, i ) ) {
+            continue;
+        }
+        dipoleKernel( fp->sensors[ i ], p, g );
+        float b[ 3 ] = { fp->fields[ i ].x, fp->fields[ i ].y, fp->fields[ i ].z };
+        for ( int a = 0; a < 3; a++ ) {
+            for ( int c = 0; c < 3; c++ ) {
+                gtg[ a ][ c ] += g[ a ][ 0 ] * g[ 0 ][ c ] + g[ a ][ 1 ] * g[ 1 ][ c ] + g[ a ][ 2 ] * g[ 2 ][ c ];
+            }
+            gtb[ a ] += g[ a ][ 0 ] * b[ 0 ] + g[ a ][ 1 ] * b[ 1 ] + g[ a ][ 2 ] * b[ 2 ];
+        }
+    }
+    float m[ 3 ];
+    if ( !solve3( gtg, gtb, m ) ) {
+        return 1e30f;
+    }
+    float cost = sumSquares - ( gtb[ 0 ] * m[ 0 ] + gtb[ 1 ] * m[ 1 ] + gtb[ 2 ] * m[ 2 ] );
+    return cost < 0.0f ? 0.0f : cost;
+}
+
 static float clampf( float v, float lo, float hi ) {
     return v < lo ? lo : ( v > hi ? hi : v );
 }
@@ -280,6 +310,131 @@ static Vec3 positionSigma( const FitProblem* fp, Vec3 p, float cost, int used ) 
     return sigma;
 }
 
+// The search box round the sensors, and the signal in the readings.
+static int describeProblem( FitProblem* fp, const Vec3* sensors, const Vec3* fields, float margin, float* sumSquares ) {
+    int used = 0;
+    fp->xMin = 1e9f;
+    fp->xMax = -1e9f;
+    fp->yMin = 1e9f;
+    fp->yMax = -1e9f;
+    *sumSquares = 0.0f;
+    for ( int i = 0; i < fp->count; i++ ) {
+        if ( !sensorUsed( fp, i ) ) {
+            continue;
+        }
+        used++;
+        if ( sensors[ i ].x < fp->xMin )
+            fp->xMin = sensors[ i ].x;
+        if ( sensors[ i ].x > fp->xMax )
+            fp->xMax = sensors[ i ].x;
+        if ( sensors[ i ].y < fp->yMin )
+            fp->yMin = sensors[ i ].y;
+        if ( sensors[ i ].y > fp->yMax )
+            fp->yMax = sensors[ i ].y;
+        *sumSquares += fields[ i ].x * fields[ i ].x + fields[ i ].y * fields[ i ].y + fields[ i ].z * fields[ i ].z;
+    }
+    fp->xMin -= margin;
+    fp->xMax += margin;
+    fp->yMin -= margin;
+    fp->yMax += margin;
+    return used;
+}
+
+// The lattice search: every point of a coarse lattice over the box, then a
+// 3x3x3 lattice of half the step round the best, and again, down to
+// MAGFIT_COARSE_FINAL_MM. Returns the best point and its cost.
+static float latticeSearch( const FitProblem* fp, float sumSquares, Vec3* best ) {
+    float bestCost = 1e30f;
+    Vec3 b = { 0, 0, 0 };
+    float step = MAGFIT_COARSE_STEP_MM;
+
+    // A magnet low down between two sensors has a cost basin only a few mm
+    // wide, which a 25 mm lattice can miss entirely. The |B|^2-weighted
+    // centroid of the sensors is within a sensor pitch of it, so that point
+    // at a few low heights goes in first.
+    float cx = 0.0f, cy = 0.0f, cw = 0.0f;
+    for ( int i = 0; i < fp->count; i++ ) {
+        if ( !sensorUsed( fp, i ) )
+            continue;
+        float w = fp->fields[ i ].x * fp->fields[ i ].x + fp->fields[ i ].y * fp->fields[ i ].y + fp->fields[ i ].z * fp->fields[ i ].z;
+        cx += w * fp->sensors[ i ].x;
+        cy += w * fp->sensors[ i ].y;
+        cw += w;
+    }
+    if ( cw > 0.0f ) {
+        static const float lowHeights[ 4 ] = { 3.0f, 6.0f, 10.0f, 15.0f };
+        for ( int k = 0; k < 4; k++ ) {
+            Vec3 p = { cx / cw, cy / cw, lowHeights[ k ] };
+            float cost = costAt( fp, p, sumSquares );
+            if ( cost < bestCost ) {
+                bestCost = cost;
+                b = p;
+            }
+        }
+    }
+    float xLo = fp->xMin + MAGFIT_XY_MARGIN - MAGFIT_COARSE_MARGIN_MM, xHi = fp->xMax - MAGFIT_XY_MARGIN + MAGFIT_COARSE_MARGIN_MM;
+    float yLo = fp->yMin + MAGFIT_XY_MARGIN - MAGFIT_COARSE_MARGIN_MM, yHi = fp->yMax - MAGFIT_XY_MARGIN + MAGFIT_COARSE_MARGIN_MM;
+    for ( float z = MAGFIT_COARSE_Z_MIN_MM; z <= MAGFIT_COARSE_Z_MAX_MM; z += step ) {
+        for ( float y = yLo; y <= yHi + 0.01f; y += step ) {
+            for ( float x = xLo; x <= xHi + 0.01f; x += step ) {
+                Vec3 p = { x, y, z };
+                float cost = costAt( fp, p, sumSquares );
+                if ( cost < bestCost ) {
+                    bestCost = cost;
+                    b = p;
+                }
+            }
+        }
+    }
+    for ( step *= 0.5f; step >= MAGFIT_COARSE_FINAL_MM; step *= 0.5f ) {
+        Vec3 centre = b;
+        for ( int dz = -1; dz <= 1; dz++ ) {
+            for ( int dy = -1; dy <= 1; dy++ ) {
+                for ( int dx = -1; dx <= 1; dx++ ) {
+                    if ( dx == 0 && dy == 0 && dz == 0 )
+                        continue;
+                    Vec3 p = clampToBox( fp, { centre.x + dx * step, centre.y + dy * step, centre.z + dz * step } );
+                    float cost = costAt( fp, p, sumSquares );
+                    if ( cost < bestCost ) {
+                        bestCost = cost;
+                        b = p;
+                    }
+                }
+            }
+        }
+    }
+    *best = b;
+    return bestCost;
+}
+
+bool magFitCoarse( const Vec3* sensors, const Vec3* fields, const bool* use, int count, MagFitResult* result ) {
+    result->valid = false;
+    result->iterations = 0;
+    result->sigma = { 999.0f, 999.0f, 999.0f };
+    if ( count > MAGFIT_MAX_SENSORS ) {
+        count = MAGFIT_MAX_SENSORS;
+    }
+    FitProblem fp = { sensors, fields, use, count, 0, 0, 0, 0 };
+    float sumSquares;
+    int used = describeProblem( &fp, sensors, fields, MAGFIT_XY_MARGIN, &sumSquares );
+    if ( used < 3 || sumSquares <= 0.0f ) {
+        return false;
+    }
+    result->signal = sqrtf( sumSquares / ( 3.0f * used ) );
+    Vec3 best;
+    float cost = latticeSearch( &fp, sumSquares, &best );
+    if ( cost >= 1e29f ) {
+        return false;
+    }
+    result->position = best;
+    evaluate( &fp, best, &result->moment, nullptr );
+    result->strength = sqrtf( result->moment.x * result->moment.x + result->moment.y * result->moment.y + result->moment.z * result->moment.z );
+    result->residual = sqrtf( cost / ( 3.0f * used ) );
+    result->sigma = positionSigma( &fp, best, cost, used );
+    result->valid = true;
+    return true;
+}
+
 bool magFitSolve( const Vec3* sensors, const Vec3* fields, const bool* use, int count,
                   float maxMisfit, MagFitResult* result ) {
     bool warm = result->valid;
@@ -338,11 +493,30 @@ bool magFitSolve( const Vec3* sensors, const Vec3* fields, const bool* use, int 
     // Cold start - also the fallback when a warm start lands somewhere that
     // does not explain the readings (the magnet jumped, or was swapped).
     float misfitLimit = maxMisfit * maxMisfit * sumSquares;
-    if ( !warm || bestCost > misfitLimit ) {
+    bool cold = !warm || bestCost > misfitLimit;
+    if ( cold ) {
+        // First the lattice: its best point is within a few mm of the answer
+        // wherever the magnet is, and one refinement from there is usually the
+        // whole cold start (measured: a fifth of the seeds' time).
+        Vec3 coarse;
+        float coarseCost = latticeSearch( &fp, sumSquares, &coarse );
+        if ( coarseCost < 1e29f ) {
+            Vec3 p;
+            float cost = refine( &fp, coarse, &p, &result->iterations );
+            if ( cost < bestCost ) {
+                bestCost = cost;
+                best = p;
+            }
+        }
+    }
+    // A magnet close to the board and off to one side of a sensor has a false
+    // minimum pinned under that sensor, and it can fit to a few percent (a
+    // 6x3 mm N52 3 mm up beside the last sensor: 4.6 % misfit 9 mm away). The
+    // lattice cannot tell; only a start on the right side of it escapes. So a
+    // cold start that came out low, or that fits poorly, tries the seeds too.
+    if ( cold && ( bestCost > misfitLimit * MAGFIT_COARSE_GOOD_ENOUGH || best.z < MAGFIT_COARSE_LOW_MM ) ) {
         // Seeds: over the strongest readings at three heights, then a ring
-        // around that point low down - a magnet close to the board and off to
-        // one side of a sensor has a false minimum pinned under that sensor,
-        // and only a start on the right side of it escapes.
+        // around that point low down.
         static const float seeds[][ 3 ] = {
             { 0, 0, 5 },
             { 0, 0, 15 },

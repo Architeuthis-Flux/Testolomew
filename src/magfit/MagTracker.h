@@ -1,0 +1,172 @@
+// SPDX-License-Identifier: MIT
+#ifndef MAGTRACKER_H
+#define MAGTRACKER_H
+// ---------------------------------------------------------------------------
+// The probe over time. The fit answers "where is the magnet in THIS frame";
+// this takes those answers, one per frame, and keeps a track: where the probe
+// is and how fast it is moving, carried on through frames that gave no fix,
+// with fixes that cannot be right left out, and turned into the one point the
+// user cares about - the cursor on the breadboard's surface, either straight
+// under the tip or where the tip points.
+//
+// The filter is a Kalman filter with a constant-velocity model, one per axis
+// (three independent 2-state filters: position and velocity). Each fix comes
+// with its own error bar from the fit, and that is its weight - a sharp fix
+// over the middle of the array pulls hard, a rough one from the far edge
+// barely nudges. Between fixes the track moves at its velocity and its
+// uncertainty grows as a hand's acceleration allows (MAGTRACK_ACCEL_SIGMA).
+//
+// Gating: a fix that lands where the track says it cannot be - further than
+// MAGTRACK_GATE in units of the combined uncertainty, or implying a speed
+// past MAGTRACK_MAX_SPEED - is dropped. Because the fit's bar leaves out the
+// array's own systematic error, the bar is floored (MAGTRACK_SIGMA_FLOOR_MM)
+// before it gates anything, else real motion over a "perfect" fix would be
+// thrown away. And a track can be wrong: after MAGTRACK_REINIT_AFTER dropped
+// fixes in a row that agree with EACH OTHER, the track jumps to them.
+//
+// Coasting: with no fix, the track carries on for MAGTRACK_COAST_MS with its
+// velocity dying away (a hand that vanished from the array is not still
+// moving at the same speed), then gives up. A rough fix (the lattice search's
+// answer for a far probe, tens of mm of bar) is a fix like any other; it only
+// weighs a little, and keeps a far probe on the map at all.
+//
+// The shaft (the probe's direction) is smoothed separately and more heavily
+// than the position, because the direction is the noisiest thing the fit
+// gives and the pointer multiplies its error by the drop to the board.
+//
+// The cursor: the tip is MAGLOC_TIP_OFFSET_MM down the shaft; the cursor is
+// on the surface plane (surfaceZ above the sensors), either straight under
+// the tip (MAGCURSOR_UNDER) or where the shaft, carried on from the tip,
+// meets the plane (MAGCURSOR_POINTED) - never past it, and never further
+// from the tip than MAGTRACK_MAX_REACH_MM, so a probe held high and nearly
+// level cannot throw the cursor across the board. A tip at or below the plane
+// is its own cursor. The cursor then goes through a 1-Euro filter (Casiez,
+// Roussel, Vogel, CHI 2012): a low-pass whose cutoff rises with speed, so it
+// sits still when the hand is still and follows without lag when it moves.
+//
+// No Arduino in here; host-tested (test/test_magtracker).
+// ---------------------------------------------------------------------------
+#include <stdbool.h>
+#include <stdint.h>
+
+#include "Vec3.h"
+
+#define MAGTRACK_ACCEL_SIGMA 10000.0f     // mm/s^2: how jerky a hand's motion may be (process noise). 3000 lagged 20 ms; this lags 10 with the same rest jitter after the 1-Euro (tools/hostsim/pencil.cpp)
+#define MAGTRACK_ROUGH_ACCEL_SIGMA 2000.0f // mm/s^2: the process noise while ROUGH (far, 12 mm fixes: averaging beats following)
+#define MAGTRACK_SIGMA_FLOOR_MM 0.3f      // the array's systematic error, not in the fit's bar
+#define MAGTRACK_GATE 4.0f                // fixes further than this many sigmas from the track are dropped
+#define MAGTRACK_MAX_SPEED_MM_S 3000.0f   // faster than a hand moves over a desk
+#define MAGTRACK_REINIT_AFTER 3           // dropped fixes in a row that agree = the track was wrong
+#define MAGTRACK_REINIT_AGREE_MM 6.0f     // ...agree = within this of each other
+#define MAGTRACK_COAST_MS 400             // how long a track outlives its last fix
+#define MAGTRACK_ROUGH_HOLD_S 2.5f        // ...and how long a ROUGH one (the far glow) outlives its last rough fix (menu: far hold)
+#define MAGTRACK_ROUGH_SPREAD_MM_S 8.0f   // while it is held its bar widens this fast (the glow spreads and dims, honestly)
+#define MAGTRACK_COAST_TAU_S 0.15f        // velocity dies away with this time constant while coasting
+#define MAGTRACK_SHAFT_MIN_CUTOFF 1.0f    // Hz: the shaft direction's 1-Euro filter at rest (menu: shaft Hz)
+#define MAGTRACK_SHAFT_BETA 10.0f         // per unit/s of a component's change: how fast the cutoff opens as the pencil turns (menu: shaft beta)
+#define MAGTRACK_VIEW_MIN_CUTOFF 1.5f     // Hz: the 1-Euro filter on what the SCENE draws of the magnet (menu: view)
+#define MAGTRACK_VIEW_BETA 0.5f           // per mm/s (0.05 lagged 40 ms at writing speed; this 20, jitter at rest 0.025 mm - pencil.cpp)
+#define MAGTRACK_SHAFT_FLIP_DEG 45.0f     // a shaft swing bigger than this in one frame waits for confirmation
+#define MAGTRACK_MAX_REACH_MM 40.0f       // the pointer never reaches further from the tip than this
+#define MAGTRACK_ONE_EURO_MIN_CUTOFF 1.0f // Hz: how much the cursor may jitter at rest
+#define MAGTRACK_ONE_EURO_BETA 0.5f       // per mm/s: how fast the cutoff opens with speed (pencil.cpp: 20 ms behind at writing speed, 0.02 mm jitter at rest)
+#define MAGTRACK_ONE_EURO_D_CUTOFF 1.0f   // Hz: smoothing of the speed estimate itself
+
+enum MagTrackState {
+    MAGTRACK_NONE,     // nothing tracked
+    MAGTRACK_ROUGH,    // only rough fixes lately: the probe is far, somewhere about here
+    MAGTRACK_COASTING, // no fix for a moment; carried on from the last ones
+    MAGTRACK_TRACKING  // fixes coming in and agreeing
+};
+
+enum MagCursorMode {
+    MAGCURSOR_UNDER,  // straight under the tip
+    MAGCURSOR_POINTED // where the shaft points, on the surface plane
+};
+
+// One frame's input. A frame either has a fix (valid), a rough fix (rough:
+// position with a large sigma, from the lattice search), or nothing.
+struct MagTrackInput {
+    bool valid;    // a proper fix
+    bool rough;    // a rough one (valid is false)
+    Vec3 position; // the magnet, mm, as this frame's fit gave it
+    Vec3 sigma;    // its error bar, mm, per axis
+    float alpha;   // the field smoothing that made it (1 = none): fixes are correlated by 1/alpha frames
+    Vec3 shaft;    // unit vector up the shaft (only with a proper fix)
+    bool haveShaft;
+};
+
+// The 1-Euro filter, one axis.
+struct OneEuroAxis {
+    bool started;
+    float x;  // filtered value
+    float dx; // filtered speed
+};
+
+struct MagTrackAxis {
+    float p, v;          // position and velocity
+    float p00, p01, p11; // covariance: position, cross, velocity
+};
+
+struct MagTrack {
+    MagTrackState state;
+    Vec3 position;       // the magnet, filtered, mm
+    Vec3 velocity;       // mm/s
+    Vec3 sigma;          // the track's own error bar, mm, per axis (floored)
+    Vec3 shaft;          // unit vector up the shaft, smoothed
+    float tiltDeg;       // its angle from vertical
+    Vec3 tip;            // the probe's point
+    Vec3 cursor;         // on the surface plane, 1-Euro filtered
+    Vec3 rawCursor;      // before the 1-Euro filter
+    Vec3 viewPosition;   // the magnet for the scene: the position through its own 1-Euro filter (viewMinCutoff, viewBeta)
+    Vec3 viewTip;        // ...and the point from it
+    float cursorSigmaMm; // about how far the cursor may be off, across the board
+    float reachMm;       // how far the cursor sits from under the tip (0 in UNDER mode)
+    uint32_t ageMs;      // since the last accepted proper fix
+    uint32_t sinceAnyMs; // since the last accepted fix of any kind
+    float lastGate;      // the last fix's distance from the track, in sigmas
+    bool lastDropped;
+    uint32_t accepted, dropped, reinits, coasted; // counters since reset
+
+    // settings
+    bool enabled; // off = fixes pass straight through (for comparing)
+    MagCursorMode cursorMode;
+    float surfaceZ;    // the breadboard's surface, mm above the sensors
+    float tipOffsetMm; // the point is this far down the shaft from the magnet
+    float accelSigma;
+    float sigmaFloorMm;
+    float gate;
+    float maxReachMm;
+    float oneEuroMinCutoff, oneEuroBeta;
+    float viewMinCutoff, viewBeta; // the scene's smoothing of the magnet
+    float shaftMinCutoff, shaftBeta; // the shaft direction's own 1-Euro (a turn is followed at once, a resting shaft stays put)
+    float roughHoldS;              // how long the far glow is held after its last rough fix
+
+    // private-ish
+    MagTrackAxis axis[ 3 ];
+    OneEuroAxis euro[ 3 ];
+    OneEuroAxis viewEuro[ 3 ];
+    OneEuroAxis shaftEuro[ 3 ];
+    Vec3 roughSigma; // the bar the far glow is held at (the last rough fix's, spreading)
+    int shaftSwings; // frames in a row the shaft wanted to swing far
+    int droppedRun;  // dropped fixes in a row
+    Vec3 droppedAt[ MAGTRACK_REINIT_AFTER ];
+    bool haveShaft;
+    Vec3 lastFixSigma; // the last accepted proper fix's bar (floored)
+    bool hadProperFix; // this track has had a proper fix (else it is rough from birth)
+};
+
+// Defaults into every setting and an empty track.
+void magTrackInit( MagTrack* t, float surfaceZ, float tipOffsetMm );
+
+// Forget the track (settings stay).
+void magTrackReset( MagTrack* t );
+
+// One frame: dtS since the last call, and what the fit gave. Updates everything.
+void magTrackUpdate( MagTrack* t, float dtS, const MagTrackInput* in );
+
+// The cursor for a given tip and shaft, in the track's mode, plus how far it
+// reached. Exposed for the display.
+Vec3 magTrackCursorOf( const MagTrack* t, Vec3 tip, Vec3 shaft, float* reachMm );
+
+#endif // MAGTRACKER_H

@@ -1,0 +1,15 @@
+// SPDX-License-Identifier: MIT
+// The other-core sampler for the host: there is no other core, so the
+// array reads its (simulated) bus itself.
+#include "MagSampler.h"
+
+MagSamplerShared magSampler;
+
+void magSamplerSetup( int, int ) {}
+void magSamplerSetBusHz( uint32_t ) {}
+void magSamplerSetSensor( int, uint8_t, int, bool ) {}
+bool magSamplerCommand( MagSamplerCommand ) { return false; }
+bool magSamplerRunning( void ) { return false; }
+bool magSamplerTake( int, uint32_t*, uint8_t*, uint32_t* ) { return false; }
+bool magSamplerParkForFlash( void ) { return false; }
+bool magSamplerParked( void ) { return false; }

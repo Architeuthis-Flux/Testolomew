@@ -14,6 +14,10 @@
 #define MODULE_MAG_LOCATOR 1 // src/magfit   - dipole fit -> probe position   (needs MAG_ARRAY)
 #define MODULE_MAG_VIEW 1    // src/display  - the magnet in 3D on the LCD    (needs MAG_LOCATOR)
 #define MODULE_ROW_COUNT 1   // src/rowcount - which breadboard row is it over (needs MAG_LOCATOR)
+#define MODULE_PROBE_LEDS 1  // src/probeled - the probe cursor on the breadboard's LEDs (needs MAG_LOCATOR; the LCD previews it)
+#define MODULE_UI 1          // src/ui       - controls, on-screen menu, log screen, camera (needs MAG_VIEW)
+#define MODULE_SETTINGS 1    // src/settings - the menu's settings and the row anchors kept in flash (needs UI)
+#define MODULE_PLAY 1        // src/play     - paint, target game and a draw screen, to see the tracking with (needs PROBE_LEDS)
 
 #define CONSOLE_BAUD 115200
 

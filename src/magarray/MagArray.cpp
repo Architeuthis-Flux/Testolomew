@@ -3,14 +3,23 @@
 
 #include <Wire.h>
 #include <math.h>
+#if __has_include( <ch32h4_i2c.h> )
+#include <ch32h4_i2c.h> // the block's registers, for the wedge check below
+#define MAG_HAVE_I2C_REGS 1
+#else
+#define MAG_HAVE_I2C_REGS 0 // the host simulation
+#endif
 
 #include "Console.h"
+#include "MagSampler.h"
 
 #define MAG_BUS Wire
 
 #define STREAM_EVERY_N_FRAMES 5 // CSV at 20 Hz; 100 Hz of text outruns 115200 baud
 #define IDENTIFY_PERIOD_MS 250
 #define RECOVERY_PERIOD_MS 2000
+#define BUS_STUCK_US 5000   // a read that takes this long failed by Wire's 10 ms timeout, not by a NACK
+#define SAMPLER_LOST_MS 100 // no successful read by the other core's sampler for this long = the sensor is lost
 
 MagArray& magArray = MagArray::getInstance( );
 
@@ -29,7 +38,8 @@ static void onZero( Stream* out ) {
 }
 
 static void onPowerCycle( Stream* out ) {
-    int found = magArray.begin( );
+    magArray.pauseSampler( );
+    int found = magArray.begin( false );
     out->print( found );
     out->println( " sensors answered" );
     magArray.printStatus( out );
@@ -42,16 +52,28 @@ static void onStream( Stream* out ) {
     }
 }
 
-static void onBusCheck( Stream* out ) { magArray.printBusCheck( out ); }
+static void onBusCheck( Stream* out ) {
+    magArray.pauseSampler( );
+    magArray.printBusCheck( out ); // powers the sensors one at a time: they come back at their factory addresses...
+    out->println( "re-addressing after the check" );
+    magArray.begin( false ); // ...so they are walked through addressing again (the zero in use is kept)
+}
 
 static void onIdentify( Stream* out ) {
     magArray.identifying = !magArray.identifying;
     out->println( magArray.identifying ? "identify on - hold the magnet over one sensor at a time" : "identify off" );
 }
 
+static void onParkForFlash( Stream* out ) {
+    bool parked = magSamplerParkForFlash( );
+    out->println( parked ? "the V3F is parked in ITCM and the sampler stopped: flash now (pio run -t upload does this itself). No sensors are read until a reset; if the flash fails, wlink reset"
+                         : "the V3F did not park (it is not running the sampler?): flash anyway, and hold RESET if the flash fails" );
+    out->flush( );
+}
+
 // ---- power-up addressing ---------------------------------------------------
 
-int MagArray::begin( ) {
+int MagArray::begin( bool zero ) {
     static bool commandsAdded = false;
     if ( !commandsAdded ) {
         commandsAdded = true;
@@ -61,6 +83,7 @@ int MagArray::begin( ) {
         consoleAddCommand( 'f', "stream field frames as CSV (toggle)", onStream );
         consoleAddCommand( 'i', "identify: show the strongest sensor (toggle)", onIdentify );
         consoleAddCommand( 'b', "bus check: pull-ups, and what answers with each sensor powered alone", onBusCheck );
+        consoleAddCommand( 'F', "before a reflash: stop the sampler and park the other core (it fetches the flash being written); reset brings it back", onParkForFlash );
     }
 
     // Grounds first, then every supply driven low, and long enough for the
@@ -95,8 +118,51 @@ int MagArray::begin( ) {
     }
     addressSensors( all );
 
-    startBaseline( );
+    if ( zero || !baselineReady( ) ) {
+        startBaseline( ); // (a power-cycle at run time keeps the zero in use: the probe may be on the board)
+    }
+    startSampler( );
     return sensorsOk( );
+}
+
+// The other core takes over the bus: told which sensors to read, and run.
+// samplerOn says whether it obeyed (loop1() is running there); if not, the
+// bus is read from here as before.
+void MagArray::startSampler( ) {
+#if MAG_SAMPLER_CORE1
+    magSamplerSetup( busPeripheral, MAG_SENSOR_COUNT );
+    magSamplerSetBusHz( MAG_I2C_HZ );
+    for ( int i = 0; i < MAG_SENSOR_COUNT; i++ ) {
+        magSamplerSetSensor( i, sensors[ i ].dev.address, (int)tmag5273ReadBytes( &sensors[ i ].dev ), sensors[ i ].ok );
+        samplerSeq[ i ] = 0;
+        samplerSetCount[ i ] = -1;
+        samplerFailsSeen[ i ] = 0;
+        samplerReadsSeen[ i ] = 0;
+        samplerLastReadMs[ i ] = millis( );
+    }
+    samplerPassesSeen = 0;
+    samplerPassesSeenMs = millis( );
+    samplerOn = busPeripheral != 0 && magSamplerCommand( MAGSAMPLER_RUN );
+#else
+    samplerOn = false;
+#endif
+}
+
+// Before this core uses the bus itself (recovery, a power-cycle, the bus
+// check): the sampler stops between two reads and says so.
+void MagArray::pauseSampler( ) {
+    if ( samplerOn ) {
+        magSamplerCommand( MAGSAMPLER_PAUSE );
+    }
+}
+
+void MagArray::resumeSampler( ) {
+    if ( samplerOn ) {
+        for ( int i = 0; i < MAG_SENSOR_COUNT; i++ ) {
+            magSamplerSetSensor( i, sensors[ i ].dev.address, (int)tmag5273ReadBytes( &sensors[ i ].dev ), sensors[ i ].ok );
+        }
+        magSamplerCommand( MAGSAMPLER_RUN );
+    }
 }
 
 // Nothing on the bus can be talked to (a line with no pull-up, or held down).
@@ -107,6 +173,45 @@ static bool busFault( ) {
     return result != 0 && result != 2; // 0 = ACK, 2 = nobody at that address
 }
 
+// The I2C block's idea of the bus. Its BUSY flag is set by the lines
+// themselves - SDA falling while SCL is high is a START - and only a STOP
+// clears it, so a glitch on the wires (the LED strip's data line running
+// next to them does it) leaves the block sure another master holds the bus,
+// and every transaction after that waits Wire's full 10 ms for a START that
+// never comes. Between reads nothing of ours is on the bus, so BUSY set
+// then, and still set 100 us later, is that wedge: caught here it costs
+// microseconds instead of the timeouts.
+bool MagArray::busWedged( ) {
+#if MAG_HAVE_I2C_REGS
+    if ( busPeripheral == 0 ) {
+        return false;
+    }
+    I2C_TypeDef* dev = ch32h4_i2c_regs( busPeripheral );
+    // The wedge as it was actually found (2026-09-18, `m` after a timed-out
+    // read: STAR1 0, STAR2 0, CTLR1 0x0601, both lines high): the STOP
+    // request bit still set with the block idle and not master. A STOP
+    // asked for once the bus had already gone idle (a glitch ended the
+    // transaction early) is never carried out and never cleared, and the
+    // block will not START while it is pending. Clearing it by hand is the
+    // whole cure, and costs nothing.
+    if ( ( dev->CTLR1 & I2C_CTLR1_STOP ) && !( dev->STAR2 & I2C_STAR2_MSL ) ) {
+        dev->CTLR1 &= (uint16_t)~I2C_CTLR1_STOP;
+        stopClears++;
+        return false;
+    }
+    if ( !( dev->STAR2 & I2C_STAR2_BUSY ) ) {
+        return false;
+    }
+    uint32_t t0 = micros( );
+    while ( dev->STAR2 & I2C_STAR2_BUSY ) {
+        if ( micros( ) - t0 > 100 ) {
+            return true;
+        }
+    }
+#endif
+    return false;
+}
+
 // Re-initialise the I2C block: begin() resets the peripheral and, if a device
 // is holding SDA, clocks it out.
 void MagArray::resetBus( ) {
@@ -114,6 +219,8 @@ void MagArray::resetBus( ) {
     MAG_BUS.begin( );
     MAG_BUS.setClock( MAG_I2C_HZ );
     busResets++;
+    previousBusResetMs = lastBusResetMs;
+    lastBusResetMs = millis( );
 }
 
 // The addressing walk, over the sensors marked in `which`. This is the ONLY
@@ -201,9 +308,11 @@ bool MagArray::powerUpSensor( int i ) {
 //   4. otherwise nobody is home: leave them powered and look again later.
 void MagArray::recoverLostSensors( ) {
     recoveryRuns++;
+    pauseSampler( );
     if ( busFault( ) ) {
         resetBus( );
         recoveryNote = "bus fault: re-initialised the I2C block";
+        resumeSampler( );
         return;
     }
 
@@ -228,6 +337,7 @@ void MagArray::recoverLostSensors( ) {
     }
     if ( lostCount == 0 ) {
         recoveryNote = "found them all still at their own addresses";
+        resumeSampler( );
         return;
     }
 
@@ -237,6 +347,7 @@ void MagArray::recoverLostSensors( ) {
     }
     if ( !someoneAtFactoryAddress ) {
         recoveryNote = "lost sensors answer at neither their own nor a factory address";
+        resumeSampler( );
         return;
     }
 
@@ -247,6 +358,7 @@ void MagArray::recoverLostSensors( ) {
             sensors[ i ].recoveries++;
         }
     }
+    resumeSampler( );
 }
 
 int MagArray::sensorsOk( ) const {
@@ -297,15 +409,134 @@ Vec3 MagArray::sensorFrameField( int i ) const {
 }
 
 void MagArray::startBaseline( ) {
+    baselineRestored = false;
     for ( int i = 0; i < MAG_SENSOR_COUNT; i++ ) {
         baselineSum[ i ] = { 0, 0, 0 };
+        baselineFrames[ i ] = 0;
     }
     baselineLeft = MAG_BASELINE_FRAMES;
 }
 
+void MagArray::restoreBaseline( const Vec3* list, int count, const char* origin ) {
+    for ( int i = 0; i < MAG_SENSOR_COUNT && i < count; i++ ) {
+        baseline[ i ] = zeroed[ i ] = list[ i ];
+    }
+    baselineLeft = 0; // whatever zeroing was under way is off: this one is used
+    baselineCount++;
+    zeroedAt++; // it counts as a zero taken (the settings keep serialising it)
+    baselineRestored = true;
+    Stream* out = console.port( );
+    if ( out != nullptr ) {
+        out->print( "baseline: " );
+        out->print( origin );
+        out->println( " put back (z zeroes afresh - with the magnet away)" );
+    }
+}
+
+void MagArray::shiftBaseline( int i, Vec3 by ) {
+    if ( i < 0 || i >= MAG_SENSOR_COUNT ) {
+        return;
+    }
+    baseline[ i ] = { baseline[ i ].x - by.x, baseline[ i ].y - by.y, baseline[ i ].z - by.z };
+    zeroed[ i ] = baseline[ i ];
+}
+
+void MagArray::driftBaseline( float fraction ) {
+    if ( baselineLeft > 0 ) {
+        return;
+    }
+    for ( int i = 0; i < MAG_SENSOR_COUNT; i++ ) {
+        if ( !fresh[ i ] )
+            continue;
+        baseline[ i ].x += fraction * ( raw[ i ].x - baseline[ i ].x );
+        baseline[ i ].y += fraction * ( raw[ i ].y - baseline[ i ].y );
+        baseline[ i ].z += fraction * ( raw[ i ].z - baseline[ i ].z );
+    }
+}
+
+// A reading into the running sums (the frame is their average).
+void MagArray::takeReading( int i, const TMAG5273Reading& reading ) {
+    MagSensorState& s = sensors[ i ];
+    float limit = MAG_SATURATED * s.dev.rangeMt;
+    if ( fabsf( reading.x ) > limit || fabsf( reading.y ) > limit || fabsf( reading.z ) > limit ) {
+        sampleSaturated[ i ] = true;
+    }
+    sampleSum[ i ].x += reading.x;
+    sampleSum[ i ].y += reading.y;
+    sampleSum[ i ].z += reading.z;
+    sampleCount[ i ]++;
+    temperatureC[ i ] = reading.temperatureC;
+}
+
+// What the other core has left in shared RAM since the last look: every
+// sensor's newest sample, if it is a conversion not yet taken (the
+// sensor's own SET_COUNT tells a re-read of the same conversion from a new
+// one: the sampler reads faster than the sensors convert).
+void MagArray::takeSamplerReadings( ) {
+    if ( magSampler.resetWanted ) {
+        // Every sensor failed two passes running on the other core: the
+        // block is wedged. It waits off the bus; this core resets the block
+        // (Wire knows the clock) and lets it go on.
+        resetBus( );
+        magSampler.resetWanted = 0;
+    }
+    for ( int i = 0; i < MAG_SENSOR_COUNT; i++ ) {
+        MagSensorState& s = sensors[ i ];
+        if ( !s.ok ) {
+            continue;
+        }
+        uint8_t raw[ MAGSAMPLER_MAX_BYTES ];
+        uint32_t stampUs;
+        if ( !magSamplerTake( i, &samplerSeq[ i ], raw, &stampUs ) ) {
+            continue;
+        }
+        TMAG5273Reading reading;
+        tmag5273Decode( &s.dev, raw, &reading );
+        int setCount = TMAG5273_SET_COUNT( reading.status );
+        if ( setCount == samplerSetCount[ i ] ) {
+            samplerDuplicates++;
+            continue; // the same conversion read again
+        }
+        samplerSetCount[ i ] = setCount;
+        s.fails = 0;
+        takeReading( i, reading );
+    }
+    // A sensor the sampler cannot read any more is lost: no successful read
+    // at all for SAMPLER_LOST_MS while the sampler keeps trying (a glitched
+    // read now and then is not that - the bus glitches when the LED strip
+    // is busy, a failed read is simply the next one's turn). The first
+    // version counted failures between two looks 2.5 ms apart and lost
+    // every sensor 42 times in ten minutes, each loss a power-cycle and a
+    // re-addressing, until the sensors were stranded at factory addresses.
+    uint32_t now = millis( );
+    for ( int i = 0; i < MAG_SENSOR_COUNT; i++ ) {
+        MagSensorState& s = sensors[ i ];
+        if ( !s.ok ) {
+            continue;
+        }
+        uint32_t reads = magSampler.reads[ i ];
+        if ( reads != samplerReadsSeen[ i ] ) {
+            samplerReadsSeen[ i ] = reads;
+            samplerLastReadMs[ i ] = now;
+        } else if ( magSampler.fails[ i ] != samplerFailsSeen[ i ] && now - samplerLastReadMs[ i ] > SAMPLER_LOST_MS ) {
+            s.ok = false; // stays powered; recoverLostSensors() looks for it
+            nextRecoveryMs = now + RECOVERY_PERIOD_MS;
+        }
+        samplerFailsSeen[ i ] = magSampler.fails[ i ];
+    }
+}
+
 // Read every sensor once and add the readings to the running sums.
 void MagArray::sampleSensors( uint32_t now ) {
+    if ( samplerOn ) {
+        takeSamplerReadings( );
+        return;
+    }
     int tried = 0, failed = 0;
+    if ( busWedged( ) ) {
+        resetBus( );
+        busWedges++;
+    }
     for ( int i = 0; i < MAG_SENSOR_COUNT; i++ ) {
         MagSensorState& s = sensors[ i ];
         if ( !s.ok ) {
@@ -313,8 +544,31 @@ void MagArray::sampleSensors( uint32_t now ) {
         }
         tried++;
         TMAG5273Reading reading;
+        uint32_t t0 = micros( );
         if ( !tmag5273Read( &MAG_BUS, &s.dev, &reading ) ) {
             failed++;
+            if ( micros( ) - t0 > BUS_STUCK_US ) {
+                // No START, or no ACK, within Wire's 10 ms: the I2C block is
+                // wedged (or a device holds a line), not this sensor - a
+                // sensor that is merely absent answers with a NACK at once.
+                // Reset the block now, not after the other sensors have each
+                // burnt the same 10 ms (80 ms for eight: a hole in every
+                // stream downstream of this one). First a note of what the
+                // block and the lines look like, for `m`.
+#if MAG_HAVE_I2C_REGS
+                I2C_TypeDef* dev = ch32h4_i2c_regs( busPeripheral );
+                stuckStar1 = dev->STAR1;
+                stuckStar2 = dev->STAR2;
+                stuckCtlr1 = dev->CTLR1;
+                stuckScl = digitalRead( PIN_MAG_SCL );
+                stuckSda = digitalRead( PIN_MAG_SDA );
+#endif
+                resetBus( );
+                for ( int k = 0; k < MAG_SENSOR_COUNT; k++ ) {
+                    sensors[ k ].fails = 0;
+                }
+                return;
+            }
             if ( ++s.fails >= MAG_MAX_READ_FAILS ) {
                 s.ok = false; // stays powered; recoverLostSensors() looks for it
                 nextRecoveryMs = now + RECOVERY_PERIOD_MS;
@@ -322,19 +576,12 @@ void MagArray::sampleSensors( uint32_t now ) {
             continue;
         }
         s.fails = 0;
-        float limit = MAG_SATURATED * s.dev.rangeMt;
-        if ( fabsf( reading.x ) > limit || fabsf( reading.y ) > limit || fabsf( reading.z ) > limit ) {
-            sampleSaturated[ i ] = true;
-        }
-        sampleSum[ i ].x += reading.x;
-        sampleSum[ i ].y += reading.y;
-        sampleSum[ i ].z += reading.z;
-        sampleCount[ i ]++;
-        temperatureC[ i ] = reading.temperatureC;
+        takeReading( i, reading );
     }
 
-    // Every sensor failing at once is the bus, not the sensors: they are still
-    // powered and still at their addresses, so reset the bus and carry on.
+    // Every sensor failing at once (with NACKs, or the timeout above would
+    // have caught it) is the bus, not the sensors: they are still powered
+    // and still at their addresses, so reset the bus and carry on.
     if ( tried > 1 && failed == tried ) {
         resetBus( );
         for ( int i = 0; i < MAG_SENSOR_COUNT; i++ ) {
@@ -358,6 +605,7 @@ void MagArray::publishFrame( ) {
                 baselineSum[ i ].x += raw[ i ].x;
                 baselineSum[ i ].y += raw[ i ].y;
                 baselineSum[ i ].z += raw[ i ].z;
+                baselineFrames[ i ]++;
             }
             field[ i ] = { raw[ i ].x - baseline[ i ].x, raw[ i ].y - baseline[ i ].y, raw[ i ].z - baseline[ i ].z };
             if ( sampleCount[ i ] > samples ) {
@@ -372,8 +620,16 @@ void MagArray::publishFrame( ) {
 
     if ( baselineLeft > 0 && --baselineLeft == 0 ) {
         for ( int i = 0; i < MAG_SENSOR_COUNT; i++ ) {
-            baseline[ i ] = { baselineSum[ i ].x / MAG_BASELINE_FRAMES, baselineSum[ i ].y / MAG_BASELINE_FRAMES, baselineSum[ i ].z / MAG_BASELINE_FRAMES };
+            // Each sensor's own count: one that missed frames must not get a
+            // scaled-down baseline (a phantom field from then on).
+            int n = baselineFrames[ i ];
+            if ( n > 0 ) {
+                baseline[ i ] = { baselineSum[ i ].x / n, baselineSum[ i ].y / n, baselineSum[ i ].z / n };
+            }
+            zeroed[ i ] = baseline[ i ];
         }
+        baselineCount++;
+        zeroedAt++;
     }
     frameCount++;
 }
@@ -381,6 +637,9 @@ void MagArray::publishFrame( ) {
 ServiceStatus MagArray::service( ) {
     uint32_t now = millis( );
 
+    if ( magSamplerParked( ) ) {
+        return ServiceStatus::IDLE; // F: the other core is parked for a flash; nothing to read, nothing to recover
+    }
     if ( sensorsOk( ) < MAG_SENSOR_COUNT && now >= nextRecoveryMs ) {
         nextRecoveryMs = now + RECOVERY_PERIOD_MS;
         recoverLostSensors( );
@@ -390,7 +649,12 @@ ServiceStatus MagArray::service( ) {
 
     uint32_t nowUs = micros( );
     if ( nowUs - lastFrameUs >= MAG_FRAME_PERIOD_US ) {
-        lastFrameUs = nowUs;
+        // The next frame is due a period after this one was, not after this
+        // one was published: stamping "from now" made the frames 12-14 ms
+        // apart (the service's own latency on top of every period) - 60-80
+        // frames a second for a 100 Hz frame period. A loop that has fallen
+        // more than two periods behind starts afresh rather than catching up.
+        lastFrameUs = nowUs - lastFrameUs >= 2 * MAG_FRAME_PERIOD_US ? nowUs : lastFrameUs + MAG_FRAME_PERIOD_US;
         publishFrame( );
 
         Stream* out = console.port( );
@@ -445,15 +709,57 @@ void MagArray::printStrongest( Stream* out ) {
 }
 
 void MagArray::printStatus( Stream* out ) const {
-    char line[ 140 ];
+    char line[ 240 ];
     snprintf( line, sizeof( line ), "MagArray: %d of %d sensors, frame %lu (%.1f reads averaged per frame), baseline %s, VIO rail %s",
               sensorsOk( ), MAG_SENSOR_COUNT, (unsigned long)frameCount, samplesPerFrame, baselineReady( ) ? "set" : "averaging",
               boardVioIs3V3( ) ? "3.3 V" : "NOT 3.3 V - sensors cannot run" );
     out->println( line );
-    if ( recoveryRuns > 0 || busResets > 0 ) {
-        snprintf( line, sizeof( line ), "I2C block re-initialised %lu times; recovery has run %lu times, last: %s", (unsigned long)busResets,
-                  (unsigned long)recoveryRuns, recoveryNote );
+    if ( samplerOn ) {
+        uint32_t passes = magSampler.passes;
+        uint32_t dtMs = millis( ) - samplerPassesSeenMs;
+        float perS = dtMs > 0 ? ( passes - samplerPassesSeen ) * 1000.0f / dtMs : 0.0f;
+        samplerPassesSeen = passes;
+        samplerPassesSeenMs = millis( );
+        uint32_t enabledBits = 0;
+        for ( int i = 0; i < MAG_SENSOR_COUNT; i++ ) {
+            enabledBits |= magSampler.enabled[ i ] ? ( 1u << i ) : 0;
+        }
+        snprintf( line, sizeof( line ), "sampler on the V3F: command %lu state %lu count %lu enabled 0x%02lx, %lu passes (%.0f a second since the last look); reads/fails per sensor",
+                  (unsigned long)magSampler.command, (unsigned long)magSampler.state, (unsigned long)magSampler.count, (unsigned long)enabledBits, (unsigned long)passes, perS );
+        out->print( line );
+        for ( int i = 0; i < MAG_SENSOR_COUNT; i++ ) {
+            snprintf( line, sizeof( line ), " %lu/%lu", (unsigned long)magSampler.reads[ i ], (unsigned long)magSampler.fails[ i ] );
+            out->print( line );
+        }
+        snprintf( line, sizeof( line ), "; %lu re-reads of one conversion skipped; the sampler reset the block %lu times", (unsigned long)samplerDuplicates,
+                  (unsigned long)magSampler.resets );
         out->println( line );
+        // How long one read takes from this core, the sampler held off: the
+        // bus clock as it really is (a 7-byte read is ~200 us at 400 kHz).
+        MagArray* self = const_cast<MagArray*>( this );
+        self->pauseSampler( );
+        uint32_t t0 = micros( );
+        int good = 0;
+        for ( int n = 0; n < 10; n++ ) {
+            uint8_t raw[ 10 ];
+            good += tmag5273BurstRead( busPeripheral, sensors[ 0 ].dev.address, raw, tmag5273ReadBytes( &sensors[ 0 ].dev ) ) ? 1 : 0;
+        }
+        uint32_t took = micros( ) - t0;
+        self->resumeSampler( );
+        snprintf( line, sizeof( line ), "one read of sensor 0 from this core: %lu us (%d of 10 good; 200 us is 400 kHz)", (unsigned long)( took / 10 ), good );
+        out->println( line );
+    } else {
+        out->println( "sampler: NOT running on the V3F - the bus is read on this core" );
+    }
+    if ( recoveryRuns > 0 || busResets > 0 || stopClears > 0 ) {
+        snprintf( line, sizeof( line ), "I2C block re-initialised %lu times, %lu of them caught as a wedge before a read (last %.1f s ago, %.1f s after the one before); a pending STOP cleared %lu times; recovery has run %lu times, last: %s",
+                  (unsigned long)busResets, (unsigned long)busWedges, ( millis( ) - lastBusResetMs ) * 1e-3f, ( lastBusResetMs - previousBusResetMs ) * 1e-3f,
+                  (unsigned long)stopClears, (unsigned long)recoveryRuns, recoveryNote );
+        out->println( line );
+        if ( stuckStar1 != 0 || stuckStar2 != 0 || stuckCtlr1 != 0 ) {
+            snprintf( line, sizeof( line ), "at the last timed-out read: STAR1 0x%04x STAR2 0x%04x CTLR1 0x%04x, SCL %d SDA %d", stuckStar1, stuckStar2, stuckCtlr1, stuckScl, stuckSda );
+            out->println( line );
+        }
     }
     if ( busPeripheral == 0 ) {
         out->println( "the SCL/SDA pins in BoardPins.h are not a pair this chip can use for I2C" );

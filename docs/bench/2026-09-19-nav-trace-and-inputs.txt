@@ -1,0 +1,12 @@
+# Bench capture 2026-09-19, before the UI refactor (phase 0)
+# Board: nanoCH32H417 on /dev/cu.usbmodem85298F060AC72, firmware as of the baseline commit.
+# 'J' (the nav stick's last 32 contact changes) came back empty: the board had been reset since the last presses,
+# so no evidence for changing INPUT_NAV_DIRECTION_MS (60) / INPUT_NAV_DIRECTION_WITH_PUSH_MS (130); left as they are.
+# 'j' at rest: joystick centred (2030/2055 of 4095), push reads UP with activeLow = true on PF2 - i.e. the pin is high at rest,
+# so JOY_PRESS_ACTIVE_LOW 1 is right at rest (docs/knobs.md section 5 had recorded it reading pressed at rest earlier).
+# The pressed reading could not be taken without a hand on the stick.
+
+    0.0 Mnav stick contact changes, oldest first (ms since the previous one; up down left right, push):
+    0.0   (none yet)
+    0.0 joystick raw x 2030 y 2055 of 4095 (centre 2048)  ->  x +0.00 y +0.00 (dead zone 5 %)  press up
+    0.0 nav stick contacts up 0 down 0 left 0 right 0 push 0 (stable pattern 0x0, decoded: )  buttons A up B up

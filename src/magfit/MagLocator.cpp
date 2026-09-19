@@ -23,10 +23,24 @@ MagLocator& MagLocator::getInstance( ) {
     return instance;
 }
 
+static void onUnpollute( Stream* out ) {
+    long which = consoleReadNumber( out, "0 = the last good fix, 1 = the reference fix in MagLocator.h (2026-09-18, row 35 hole 3), then Enter: ", 8000 );
+    if ( which == 1 ) {
+        magLocator.lastGoodPosition = { MAGLOC_REFERENCE_X, MAGLOC_REFERENCE_Y, MAGLOC_REFERENCE_Z };
+        magLocator.lastGoodAxis = { MAGLOC_REFERENCE_AX, MAGLOC_REFERENCE_AY, MAGLOC_REFERENCE_AZ };
+        magLocator.lastGoodStrength = MAGLOC_REFERENCE_STRENGTH;
+        magLocator.haveLastGood = true;
+    } else if ( which != 0 ) {
+        out->println( "no number - nothing changed" );
+        return;
+    }
+    magLocator.unpolluteBaseline( out );
+}
+
 static void onStream( Stream* out ) {
     magLocator.streaming = !magLocator.streaming;
     if ( magLocator.streaming ) {
-        out->println( "fix,t_ms,present,valid,x,y,z,tip_x,tip_y,tip_z,axis_x,axis_y,axis_z,tilt_deg,strength,residual_mT,fit_us,misfit,seen_by,sigma_x,sigma_y,sigma_z,faint_by,raw_x,raw_y,raw_z" );
+        out->println( "fix,t_ms,present,valid,x,y,z,tip_x,tip_y,tip_z,axis_x,axis_y,axis_z,tilt_deg,strength,residual_mT,fit_us,misfit,seen_by,sigma_x,sigma_y,sigma_z,faint_by,raw_x,raw_y,raw_z,track_state,track_x,track_y,track_z,track_sx,track_sy,track_sz,cursor_x,cursor_y,cursor_z,gate,dropped" );
     }
 }
 
@@ -69,14 +83,94 @@ static void onMagnetAngle( Stream* out ) {
     out->println( line );
 }
 
+static void onCursorMode( Stream* out ) {
+    MagTrack& t = magLocator.track;
+    t.cursorMode = t.cursorMode == MAGCURSOR_UNDER ? MAGCURSOR_POINTED : MAGCURSOR_UNDER;
+    out->println( t.cursorMode == MAGCURSOR_UNDER ? "cursor: straight under the tip" : "cursor: where the tip points, on the board's surface (never further than the reach cap)" );
+}
+
+static void onSurface( Stream* out ) {
+    long mm = consoleReadNumber( out, "the breadboard's surface is this many mm above the sensors (0 = not known, use the sensor plane), then Enter: ", 8000 );
+    if ( mm < 0 || mm > 100 ) {
+        out->println( "no number (0-100) - nothing changed" );
+        return;
+    }
+    magLocator.boardZ = (float)mm;
+    char line[ 120 ];
+    snprintf( line, sizeof( line ), "surface at %ld mm; MAGLOC_BOARD_Z_MM makes it permanent", mm );
+    out->println( line );
+}
+
+static void onTracker( Stream* out ) {
+    MagTrack& t = magLocator.track;
+    t.enabled = !t.enabled;
+    magTrackReset( &t );
+    out->println( t.enabled ? "tracker on: fixes filtered, gated and carried through gaps" : "tracker off: every fix shown as it comes" );
+}
+
 void MagLocator::begin( ) {
+    magTrackInit( &track, boardZ, tipOffsetMm );
     consoleAddCommand( 'd', "stream probe fixes as CSV (toggle)", onStream );
     consoleAddCommand( 'l', "latest probe fix", onLatest );
     consoleAddCommand( 'o', "orientation check: hold a magnet 1-2 cm over the array first", onOrientation );
     consoleAddCommand( 'k', "learn this magnet's strength and hold the fit to it", onLearn );
     consoleAddCommand( 'K', "forget the magnet strength (fit it freely)", onForget );
     consoleAddCommand( 't', "the magnet's centre is <number> mm up the shaft from the probe's point (t12<Enter>)", onTipOffset );
-    consoleAddCommand( 'T', "the magnet's angle to the shaft: T0 = along it, T90 = a disc lying flat on it", onMagnetAngle );
+    consoleAddCommand( 'T', "the magnet's angle to the shaft, <number> degrees: T0 = along it, T90 = a disc lying flat on it", onMagnetAngle );
+    consoleAddCommand( 'u', "cursor: under the tip / where the tip points (toggle)", onCursorMode );
+    consoleAddCommand( 'S', "the breadboard's surface is <number> mm above the sensors (S17<Enter>)", onSurface );
+    consoleAddCommand( 'g', "tracker on/off (off = raw fixes, for comparing)", onTracker );
+    consoleAddCommand( 'Y', "the probe lay where it last was while the array zeroed: take that magnet back out of the baseline (<number>: 0 = last fix, 1 = the reference)", onUnpollute );
+}
+
+// The surface from where the point bottoms out (MAGLOC_FLOOR_* in the header).
+void MagLocator::learnFloor( uint32_t nowMs ) {
+    if ( fix.valid && fix.misfit < MAGLOC_FLOOR_MISFIT && fix.seenBy >= 5 && fix.tip.z < floorWindowMinZ ) {
+        floorWindowMinZ = fix.tip.z;
+    }
+    if ( floorWindowStartMs == 0 ) {
+        floorWindowStartMs = nowMs == 0 ? 1 : nowMs;
+        return;
+    }
+    if ( nowMs - floorWindowStartMs < MAGLOC_FLOOR_WINDOW_MS ) {
+        return;
+    }
+    floorWindowStartMs = nowMs == 0 ? 1 : nowMs;
+    if ( floorWindowMinZ > 1e8f ) {
+        floorMinCount = 0; // a second without a fix: start over
+        return;
+    }
+    if ( floorMinCount < MAGLOC_FLOOR_WINDOWS ) {
+        floorMins[ floorMinCount++ ] = floorWindowMinZ;
+    } else {
+        for ( int i = 1; i < MAGLOC_FLOOR_WINDOWS; i++ )
+            floorMins[ i - 1 ] = floorMins[ i ];
+        floorMins[ MAGLOC_FLOOR_WINDOWS - 1 ] = floorWindowMinZ;
+    }
+    floorWindowMinZ = 1e9f;
+    if ( floorMinCount < MAGLOC_FLOOR_WINDOWS ) {
+        return;
+    }
+    float lowest = floorMins[ 0 ], highest = floorMins[ 0 ], sum = 0.0f;
+    for ( int i = 0; i < MAGLOC_FLOOR_WINDOWS; i++ ) {
+        if ( floorMins[ i ] < lowest )
+            lowest = floorMins[ i ];
+        if ( floorMins[ i ] > highest )
+            highest = floorMins[ i ];
+        sum += floorMins[ i ];
+    }
+    float floor = sum / MAGLOC_FLOOR_WINDOWS;
+    if ( highest - lowest <= MAGLOC_FLOOR_AGREE_MM && floor < boardZ - MAGLOC_FLOOR_STEP_MM ) {
+        boardZ = floor;
+        surfaceLearned++;
+        floorMinCount = 0;
+        Stream* out = console.port( );
+        if ( out != nullptr ) {
+            char line[ 120 ];
+            snprintf( line, sizeof( line ), "surface: the point bottoms out at %.1f mm - taken as the board's height (S sets it by hand)", boardZ );
+            out->println( line );
+        }
+    }
 }
 
 // The shaft carried on from the point down to the board's surface. A point
@@ -92,24 +186,149 @@ Vec3 MagLocator::pointerOf( Vec3 tip, Vec3 shaft ) const {
     return pointer;
 }
 
+// Does the new baseline have a magnet in it? See MAGLOC_BASELINE_* in the header.
+// The boot zeroed with the magnet on the board, and the magnet has not moved
+// since the last good fix: its field at each sensor, from that fix, comes
+// out of the baseline. (Sensor offsets are random and drown a weak magnet in
+// the polluted-baseline check, so the check cannot always tell.)
+void MagLocator::unpolluteBaseline( Stream* out ) {
+    if ( !haveLastGood ) {
+        out->println( "no last good fix to take out of the baseline" );
+        return;
+    }
+    if ( magArray.baselineRestored || baselineCorrected ) {
+        // Only a zero taken fresh (boot, or z) with the magnet in place has
+        // the magnet in it once; a saved one, or one already corrected, has
+        // not, and taking the magnet out again would put a phantom in.
+        out->println( "the baseline in use is a saved or already corrected one, not a fresh zero: press z first (with the probe where it was), then Y" );
+        return;
+    }
+    baselineCorrected = true;
+    Vec3 moment = { lastGoodAxis.x * lastGoodStrength, lastGoodAxis.y * lastGoodStrength, lastGoodAxis.z * lastGoodStrength };
+    float biggest = 0.0f;
+    for ( int i = 0; i < magArray.sensorCount( ); i++ ) {
+        Vec3 b = magFitDipoleField( magArray.position[ i ], lastGoodPosition, moment );
+        magArray.shiftBaseline( i, b );
+        float m = sqrtf( b.x * b.x + b.y * b.y + b.z * b.z );
+        if ( m > biggest )
+            biggest = m;
+    }
+    checkedBaseline = 0; // the pollution check runs again on the corrected one
+    char line[ 200 ];
+    snprintf( line, sizeof( line ), "baseline corrected: the magnet last fitted at x %.1f y %.1f z %.1f (%.0f mT*mm^3, up to %.3f mT at a sensor) taken out; the fit should find it now",
+              lastGoodPosition.x, lastGoodPosition.y, lastGoodPosition.z, lastGoodStrength, biggest );
+    out->println( line );
+}
+
+void MagLocator::checkBaseline( ) {
+    checkedBaseline = magArray.baselineCount;
+    baselineCorrected = false; // a zero just taken: Y may be applied to it once
+    if ( magArray.baselineRestored ) {
+        baselinePolluted = false; // a saved zero, checked when it was taken; never retaken behind the user's back
+        baselineRetakes = 0;
+        retakeBaselineAtMs = 0;
+        return;
+    }
+    int count = magArray.sensorCount( );
+    Vec3 mean = { 0, 0, 0 };
+    int used = 0;
+    for ( int i = 0; i < count; i++ ) {
+        if ( !magArray.sensor( i ).ok )
+            continue;
+        Vec3 b = magArray.baselineOf( i );
+        mean = { mean.x + b.x, mean.y + b.y, mean.z + b.z };
+        used++;
+    }
+    if ( used < 4 ) {
+        baselinePolluted = false;
+        return;
+    }
+    mean = { mean.x / used, mean.y / used, mean.z / used };
+    Vec3 residue[ MAGFIT_MAX_SENSORS ];
+    bool use[ MAGFIT_MAX_SENSORS ];
+    for ( int i = 0; i < count; i++ ) {
+        Vec3 b = magArray.baselineOf( i );
+        residue[ i ] = { b.x - mean.x, b.y - mean.y, b.z - mean.z };
+        use[ i ] = magArray.sensor( i ).ok;
+    }
+    MagFitResult r = { };
+    magFitSolve( magArray.position, residue, use, count, 1e6f, &r );
+    baselineMagnetMisfit = r.signal > 0.0f ? r.residual / r.signal : 1.0f;
+    baselineMagnetStrength = r.strength;
+    baselinePolluted = baselineMagnetMisfit < MAGLOC_BASELINE_MAGNET_MISFIT && r.strength > MAGLOC_BASELINE_MAGNET_STRENGTH && r.position.z > 0.0f;
+
+    Stream* out = console.port( );
+    if ( baselinePolluted ) {
+        if ( out != nullptr ) {
+            char line[ 200 ];
+            snprintf( line, sizeof( line ), "BASELINE POLLUTED: a magnet (about %.0f mT*mm^3 at x %.0f y %.0f z %.0f, misfit %.0f %%) was over the array while it zeroed. Move it away%s",
+                      r.strength, r.position.x, r.position.y, r.position.z, baselineMagnetMisfit * 100.0f,
+                      baselineRetakes < MAGLOC_BASELINE_RETAKES ? " - zeroing again in 2 s." : " and press z." );
+            out->println( line );
+        }
+        if ( baselineRetakes < MAGLOC_BASELINE_RETAKES ) {
+            baselineRetakes++;
+            retakeBaselineAtMs = millis( ) + MAGLOC_BASELINE_RETAKE_MS;
+        }
+    } else {
+        baselineRetakes = 0;
+        retakeBaselineAtMs = 0; // a clean one is kept, whatever was pending
+    }
+}
+
 ServiceStatus MagLocator::service( ) {
+    if ( magArray.baselineReady( ) && magArray.baselineCount != checkedBaseline ) {
+        checkBaseline( );
+    }
+    if ( retakeBaselineAtMs != 0 && millis( ) >= retakeBaselineAtMs ) {
+        retakeBaselineAtMs = 0;
+        magArray.startBaseline( );
+    }
     if ( magArray.frameCount == lastFrame || !magArray.baselineReady( ) ) {
         lastStatus = ServiceStatus::IDLE;
         return lastStatus;
     }
     lastFrame = magArray.frameCount;
 
+    // One frame: the fit (or not), then the tracker, which is told about every
+    // frame - the ones with no fix are what it coasts through.
+    uint32_t nowUs = micros( );
+    float dtS = lastTrackUs == 0 ? 0.01f : ( nowUs - lastTrackUs ) * 1e-6f;
+    lastTrackUs = nowUs;
+    MagTrackInput in = { };
+    in.alpha = 1.0f;
+    lastStatus = fitFrame( &in );
+    learnFloor( millis( ) );
+    track.surfaceZ = boardZ;
+    track.tipOffsetMm = tipOffsetMm;
+    magTrackUpdate( &track, dtS, &in );
+    return lastStatus;
+}
+
+// The dipole fit on this frame's readings, filling in `fix` and what the
+// tracker needs to know about the frame.
+ServiceStatus MagLocator::fitFrame( MagTrackInput* in ) {
     // Glitch filter: each axis of each sensor goes through a median of its last
     // three frames. The bus has no checksum, and one corrupted read would
     // otherwise sit in the smoothing below for ten frames, none of which fit.
     // It costs one frame (10 ms) of delay and passes any real movement.
     Vec3 filtered[ MAGFIT_MAX_SENSORS ];
+    bool resync[ MAGFIT_MAX_SENSORS ];
     for ( int i = 0; i < magArray.sensorCount( ); i++ ) {
         const Vec3& b = magArray.field[ i ];
+        // A sensor back after missing a few frames has stale history: its
+        // median and smoothing start again from this reading.
+        resync[ i ] = magArray.fresh[ i ] && missedFrames[ i ] >= 3;
+        if ( resync[ i ] ) {
+            recent[ i ][ 0 ] = recent[ i ][ 1 ] = b;
+        }
         filtered[ i ] = { middleOf( b.x, recent[ i ][ 0 ].x, recent[ i ][ 1 ].x ), middleOf( b.y, recent[ i ][ 0 ].y, recent[ i ][ 1 ].y ), middleOf( b.z, recent[ i ][ 0 ].z, recent[ i ][ 1 ].z ) };
         if ( magArray.fresh[ i ] ) {
             recent[ i ][ 1 ] = recent[ i ][ 0 ];
             recent[ i ][ 0 ] = b;
+            missedFrames[ i ] = 0;
+        } else if ( missedFrames[ i ] < 1000 ) {
+            missedFrames[ i ]++;
         }
     }
 
@@ -129,13 +348,38 @@ ServiceStatus MagLocator::service( ) {
         freshCount += magArray.fresh[ i ] ? 1 : 0;
     }
     if ( freshCount == 0 ) {
-        lastStatus = ServiceStatus::IDLE;
-        return lastStatus;
+        fix.valid = false; // nothing was read: the last fix is not this frame's
+        return ServiceStatus::IDLE;
     }
 
     float alpha = sqrtf( rawPeakSq ) / MAGLOC_FAST_MT;
     if ( alpha < MAGLOC_SLOWEST_ALPHA )
         alpha = MAGLOC_SLOWEST_ALPHA;
+    // A moving probe gets less smoothing (see MAGLOC_ALPHA_PER_MM_S). The
+    // speed is how far the track has come over the last MAGLOC_SPEED_WINDOW
+    // frames (see the define: the filter's own velocity is jitter at rest).
+    if ( track.enabled && ( track.state == MAGTRACK_TRACKING || track.state == MAGTRACK_COASTING ) ) {
+        float dtS = MAG_FRAME_PERIOD_US * 1e-6f;
+        float jitter = speedJitterK * ( fix.sigma.x + fix.sigma.y + fix.sigma.z ) / 3.0f / dtS; // what jitter makes of the one-frame velocity
+        float velocity = sqrtf( track.velocity.x * track.velocity.x + track.velocity.y * track.velocity.y + track.velocity.z * track.velocity.z );
+        float windowed = 0.0f;
+        if ( speedRingCount >= MAGLOC_SPEED_WINDOW ) {
+            const Vec3& then = speedRing[ speedRingCount % MAGLOC_SPEED_WINDOW ]; // the oldest: MAGLOC_SPEED_WINDOW frames ago
+            float dx = track.position.x - then.x, dy = track.position.y - then.y, dz = track.position.z - then.z;
+            windowed = sqrtf( dx * dx + dy * dy + dz * dz ) / ( MAGLOC_SPEED_WINDOW * dtS ) - jitter / MAGLOC_SPEED_WINDOW;
+        }
+        speedRing[ speedRingCount % MAGLOC_SPEED_WINDOW ] = track.position;
+        speedRingCount++;
+        smoothSpeed = windowed > velocity - jitter ? windowed : velocity - jitter;
+        if ( smoothSpeed < 0.0f )
+            smoothSpeed = 0.0f;
+        float moving = smoothSpeed * MAGLOC_ALPHA_PER_MM_S;
+        if ( moving > alpha )
+            alpha = moving;
+    } else {
+        smoothSpeed = 0.0f;
+        speedRingCount = 0;
+    }
     if ( alpha > 1.0f )
         alpha = 1.0f;
 
@@ -147,9 +391,10 @@ ServiceStatus MagLocator::service( ) {
             continue;
         }
         Vec3& b = smooth[ i ];
-        b.x += alpha * ( filtered[ i ].x - b.x );
-        b.y += alpha * ( filtered[ i ].y - b.y );
-        b.z += alpha * ( filtered[ i ].z - b.z );
+        float k = resync[ i ] ? 1.0f : alpha;
+        b.x += k * ( filtered[ i ].x - b.x );
+        b.y += k * ( filtered[ i ].y - b.y );
+        b.z += k * ( filtered[ i ].z - b.z );
         float sq = b.x * b.x + b.y * b.y + b.z * b.z;
         if ( sq > peakSq ) {
             peakSq = sq;
@@ -161,23 +406,58 @@ ServiceStatus MagLocator::service( ) {
         }
     }
     fix.peakMt = sqrtf( peakSq );
-    // A little stickiness, so a magnet right at the threshold does not flicker in and out.
-    fix.present = fix.peakMt > ( fix.present ? 0.75f * MAGLOC_PRESENT_MT : MAGLOC_PRESENT_MT );
+    // Stickiness, so a magnet at the threshold does not flicker in and out:
+    // once present it stays so down to half the level.
+    fix.present = fix.peakMt > ( fix.present ? MAGLOC_PRESENT_LOW * presentMt : presentMt );
+    uint32_t nowMs = millis( );
+    if ( fix.present ) {
+        lastPresentMs = nowMs == 0 ? 1 : nowMs;
+    }
 
+    in->alpha = alpha;
+    smoothAlpha = alpha;
+    if ( fix.peakMt < MAGLOC_FAINT_MT ) {
+        // Nothing here: let the zero follow the drift - unless a magnet was
+        // here moments ago, which may only be wavering at the edge of reach.
+        if ( lastPresentMs == 0 || nowMs - lastPresentMs > MAGLOC_DRIFT_HOLDOFF_MS ) {
+            magArray.driftBaseline( MAGLOC_BASELINE_DRIFT );
+        }
+        roughOnlySinceMs = 0;
+    } else if ( !fix.present ) {
+        roughOnlySinceMs = 0;
+    } else {
+        // Present. Something that never fits for MAGLOC_ROUGH_ONLY_ABSORB_MS
+        // is drift or a stuck reading, and the zero follows it too.
+        uint32_t now = millis( );
+        if ( roughOnlySinceMs == 0 )
+            roughOnlySinceMs = now == 0 ? 1 : now;
+        if ( now - roughOnlySinceMs > MAGLOC_ROUGH_ONLY_ABSORB_MS ) {
+            magArray.driftBaseline( MAGLOC_BASELINE_DRIFT );
+        }
+    }
     if ( !fix.present || fix.seenBy + fix.faintBy < MAGLOC_MIN_SENSORS ) {
         fix.valid = false;
         result.valid = false; // next time is a cold start
         haveSmoothed = false;
-        lastStatus = ServiceStatus::IDLE;
-        return lastStatus;
+        // Something is there but too few sensors notice it for a fit: the
+        // lattice search still says roughly where, at the cold-start pace.
+        if ( fix.present && millis( ) >= nextColdStartMs ) {
+            nextColdStartMs = millis( ) + MAGLOC_COLD_START_PERIOD_MS;
+            MagFitResult coarse = { };
+            uint32_t start = micros( );
+            if ( magFitCoarse( magArray.position, smooth, magArray.fresh, magArray.sensorCount( ), &coarse ) ) {
+                offerRough( in, &coarse );
+            }
+            fix.fitUs = micros( ) - start;
+        }
+        return ServiceStatus::IDLE;
     }
 
     bool wasTracking = result.valid;
     if ( !wasTracking ) {
         uint32_t now = millis( );
         if ( now < nextColdStartMs ) {
-            lastStatus = ServiceStatus::IDLE;
-            return lastStatus;
+            return ServiceStatus::IDLE;
         }
         nextColdStartMs = now + MAGLOC_COLD_START_PERIOD_MS;
     }
@@ -191,6 +471,7 @@ ServiceStatus MagLocator::service( ) {
         good = magFitSolve( magArray.position, smooth, magArray.fresh, magArray.sensorCount( ), MAGLOC_MAX_MISFIT, &result );
     }
     fix.fitUs = micros( ) - start;
+    MagFitResult thisFrame = result; // as fitted, before the ride-through below may put the last good position back
     Vec3 position = result.position, sigma = result.sigma;
     float residual = result.residual, signal = result.signal;
 
@@ -203,6 +484,7 @@ ServiceStatus MagLocator::service( ) {
         good = false; // it "fits", but it could be anywhere
     }
     fix.valid = good;
+    fix.rough = false;
     fix.rawMagnet = position;
 
     bool keepTracking = good;
@@ -223,6 +505,9 @@ ServiceStatus MagLocator::service( ) {
         learnFrom( result.strength );
     }
     if ( !fix.valid ) {
+        // Not a fix, but the fit's best answer is still roughly right when it
+        // is not far off: a rough fix for the tracker, with its wide bar.
+        offerRough( in, &thisFrame );
         // Streamed too (valid = 0), so that a spot where nothing fits can be studied.
         Stream* out = console.port( );
         if ( streaming && out != nullptr && ++streamTick % STREAM_EVERY_N_FIXES == 0 ) {
@@ -230,8 +515,7 @@ ServiceStatus MagLocator::service( ) {
             printFixCsv( out );
         }
         haveSmoothed = false;
-        lastStatus = ServiceStatus::BUSY;
-        return lastStatus;
+        return ServiceStatus::BUSY;
     }
 
     // Smooth what is shown; the solver keeps warm-starting from its own raw answer.
@@ -250,6 +534,23 @@ ServiceStatus MagLocator::service( ) {
     float inv = result.strength > 0.0f ? 1.0f / result.strength : 0.0f;
     Vec3 pole = { result.moment.x * inv, result.moment.y * inv, result.moment.z * inv };
     fix.axis = pole;
+    if ( fix.misfit < MAGLOC_LEARN_MAX_MISFIT && fix.seenBy >= MAGLOC_LEARN_MIN_SENSORS ) {
+        // Remembered for Y (and the settings): the track's smoothed position
+        // when there is one, and only once it has moved a third of a
+        // millimetre (or the pole a few degrees) from what is remembered,
+        // so a resting probe's jitter leaves the record alone - the
+        // settings write it only once it stands still.
+        Vec3 p = track.enabled && track.state == MAGTRACK_TRACKING ? track.viewPosition : position;
+        float dx = p.x - lastGoodPosition.x, dy = p.y - lastGoodPosition.y, dz = p.z - lastGoodPosition.z;
+        float ax = pole.x - lastGoodAxis.x, ay = pole.y - lastGoodAxis.y, az = pole.z - lastGoodAxis.z;
+        if ( !haveLastGood || dx * dx + dy * dy + dz * dz > 0.3f * 0.3f || ax * ax + ay * ay + az * az > 0.05f * 0.05f ||
+             fabsf( result.strength - lastGoodStrength ) > 0.05f * lastGoodStrength ) {
+            lastGoodPosition = p;
+            lastGoodAxis = pole;
+            lastGoodStrength = result.strength;
+            haveLastGood = true;
+        }
+    }
     Vec3 up = { -pole.z * pole.x, -pole.z * pole.y, 1.0f - pole.z * pole.z }; // z-hat with its pole part removed
     float upLength = sqrtf( up.x * up.x + up.y * up.y + up.z * up.z );
     if ( upLength > 1e-3f ) {
@@ -268,13 +569,43 @@ ServiceStatus MagLocator::service( ) {
     fix.rawPointer = pointerOf( fix.rawTip, fix.shaft );
     fix.count++;
 
+    fix.rough = fix.errorMm > MAGLOC_ROUGH_ABOVE_MM;
+    if ( !fix.rough )
+        roughOnlySinceMs = 0; // a real fix: not drift
+    in->valid = !fix.rough;
+    in->rough = fix.rough;
+    in->position = fix.rawMagnet;
+    in->sigma = fix.sigma;
+    in->shaft = fix.shaft;
+    in->haveShaft = !fix.rough;
+
     Stream* out = console.port( );
     if ( streaming && out != nullptr && ++streamTick % STREAM_EVERY_N_FIXES == 0 ) {
         printFixCsv( out );
     }
 
-    lastStatus = ServiceStatus::BUSY;
-    return lastStatus;
+    return ServiceStatus::BUSY;
+}
+
+// A fit result that did not make a fix, offered to the tracker as a rough one
+// if it is not hopeless.
+void MagLocator::offerRough( MagTrackInput* in, const MagFitResult* r ) const {
+    float misfit = r->signal > 0.0f ? r->residual / r->signal : 1.0f;
+    float bar = sqrtf( r->sigma.x * r->sigma.x + r->sigma.y * r->sigma.y + r->sigma.z * r->sigma.z );
+    if ( misfit > MAGLOC_ROUGH_MAX_MISFIT || bar > MAGLOC_ROUGH_MAX_ERROR_MM || r->position.z <= 0.0f ) {
+        return;
+    }
+    in->rough = true;
+    in->position = r->position;
+    in->sigma = r->sigma;
+    // The fit's bar on a rough answer is not to be believed to the millimetre:
+    // widen it to at least what the lattice search resolves.
+    if ( in->sigma.x < MAGLOC_ROUGH_MIN_SIGMA_MM )
+        in->sigma.x = MAGLOC_ROUGH_MIN_SIGMA_MM;
+    if ( in->sigma.y < MAGLOC_ROUGH_MIN_SIGMA_MM )
+        in->sigma.y = MAGLOC_ROUGH_MIN_SIGMA_MM;
+    if ( in->sigma.z < MAGLOC_ROUGH_MIN_SIGMA_MM )
+        in->sigma.z = MAGLOC_ROUGH_MIN_SIGMA_MM;
 }
 
 void MagLocator::startLearningStrength( ) {
@@ -312,19 +643,21 @@ void MagLocator::learnFrom( float strength ) {
 }
 
 void MagLocator::printFixCsv( Stream* out ) const {
-    char line[ 340 ];
-    snprintf( line, sizeof( line ), "fix,%lu,%d,%d,%.2f,%.2f,%.2f,%.2f,%.2f,%.2f,%.3f,%.3f,%.3f,%.1f,%.0f,%.3f,%lu,%.3f,%d,%.2f,%.2f,%.2f,%d,%.2f,%.2f,%.2f",
+    char line[ 440 ];
+    snprintf( line, sizeof( line ), "fix,%lu,%d,%d,%.2f,%.2f,%.2f,%.2f,%.2f,%.2f,%.3f,%.3f,%.3f,%.1f,%.0f,%.3f,%lu,%.3f,%d,%.2f,%.2f,%.2f,%d,%.2f,%.2f,%.2f,%d,%.2f,%.2f,%.2f,%.2f,%.2f,%.2f,%.2f,%.2f,%.2f,%.1f,%lu",
               (unsigned long)millis( ), fix.present, fix.valid, fix.magnet.x, fix.magnet.y, fix.magnet.z,
               fix.tip.x, fix.tip.y, fix.tip.z, fix.axis.x, fix.axis.y, fix.axis.z,
               fix.tiltDeg, fix.strength, fix.residual, (unsigned long)fix.fitUs, fix.misfit, fix.seenBy, fix.sigma.x, fix.sigma.y, fix.sigma.z,
-              fix.faintBy, fix.rawMagnet.x, fix.rawMagnet.y, fix.rawMagnet.z );
+              fix.faintBy, fix.rawMagnet.x, fix.rawMagnet.y, fix.rawMagnet.z,
+              (int)track.state, track.position.x, track.position.y, track.position.z, track.sigma.x, track.sigma.y, track.sigma.z,
+              track.cursor.x, track.cursor.y, track.cursor.z, track.lastGate, (unsigned long)track.dropped );
     out->println( line );
 }
 
 void MagLocator::printFix( Stream* out ) const {
     char line[ 300 ];
     if ( !fix.present ) {
-        snprintf( line, sizeof( line ), "no magnet (strongest reading %.3f mT, threshold %.2f)", fix.peakMt, MAGLOC_PRESENT_MT );
+        snprintf( line, sizeof( line ), "no magnet (strongest reading %.3f mT, threshold %.2f)", fix.peakMt, presentMt );
     } else if ( fix.seenBy + fix.faintBy < MAGLOC_MIN_SENSORS ) {
         snprintf( line, sizeof( line ), "magnet near (%.2f mT) but only %d sensor%s notice it (%.3f mT or more) - a fix needs %d. Closer, stronger magnet, or tighter sensor pitch.",
                   fix.peakMt, fix.seenBy + fix.faintBy, fix.seenBy + fix.faintBy == 1 ? "" : "s", MAGLOC_FAINT_MT, MAGLOC_MIN_SENSORS );
@@ -336,6 +669,20 @@ void MagLocator::printFix( Stream* out ) const {
                   fix.magnet.x, fix.sigma.x, fix.magnet.y, fix.sigma.y, fix.magnet.z, fix.sigma.z, fix.tiltDeg, fix.strength,
                   learning( ) ? " (learning)" : ( knownStrength > 0.0f ? " (held)" : "" ), fix.misfit * 100.0f, fix.seenBy, fix.faintBy, (unsigned long)fix.fitUs );
     }
+    out->println( line );
+    if ( baselinePolluted ) {
+        snprintf( line, sizeof( line ), "BASELINE POLLUTED (a magnet of about %.0f fitted it at %.0f %% misfit): move the probe away and press z", baselineMagnetStrength, baselineMagnetMisfit * 100.0f );
+        out->println( line );
+    }
+    static const char* stateNames[ 4 ] = { "nothing", "rough", "coasting", "tracking" };
+    // Two speeds: the filter's velocity (jitter over a frame at rest: 10-20
+    // mm/s on a still probe) and what the smoothing takes as the speed
+    // (0 at rest; see MAGLOC_SPEED_JITTER_K).
+    snprintf( line, sizeof( line ), "track: %s%s  x %.1f y %.1f z %.1f +/-%.1f %.1f %.1f mm  velocity %.0f mm/s (moving %.0f, smoothing alpha %.2f)  tilt %.0f deg  cursor %s x %.1f y %.1f (+/-%.1f mm, reach %.1f)  %lu fixes taken, %lu dropped, %lu restarts",
+              stateNames[ track.state ], track.enabled ? "" : " (tracker off)", track.position.x, track.position.y, track.position.z, track.sigma.x, track.sigma.y, track.sigma.z,
+              sqrtf( track.velocity.x * track.velocity.x + track.velocity.y * track.velocity.y + track.velocity.z * track.velocity.z ), smoothSpeed, smoothAlpha, track.tiltDeg,
+              track.cursorMode == MAGCURSOR_UNDER ? "under" : "pointed", track.cursor.x, track.cursor.y, track.cursorSigmaMm, track.reachMm,
+              (unsigned long)track.accepted, (unsigned long)track.dropped, (unsigned long)track.reinits );
     out->println( line );
 }
 

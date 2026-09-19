@@ -1,0 +1,577 @@
+== 00:20:49
+    0.0 magnet at x 1.2 +/-0.1  y 9.1 +/-0.1  z 10.7 +/-0.1 mm   tilt 43 deg   strength 3966   misfit 1 %   seen by 5+3 faint   fit 1456 us
+    0.0 track: tracking  x 1.3 y 8.9 z 10.7 +/-0.3 0.3 0.3 mm  speed 23 mm/s  tilt 41 deg  cursor pointed x 1.1 y 9.3 (+/-0.4 mm, reach 0.0)  12561 fixes taken, 0 dropped, 0 restarts
+== 00:21:12
+    0.0 magnet at x 1.3 +/-0.1  y 9.1 +/-0.2  z 10.7 +/-0.1 mm   tilt 42 deg   strength 3976   misfit 2 %   seen by 5+3 faint   fit 1154 us
+    0.0 track: tracking  x 1.3 y 9.0 z 10.7 +/-0.3 0.3 0.3 mm  speed 17 mm/s  tilt 41 deg  cursor pointed x 1.3 y 9.2 (+/-0.4 mm, reach 0.0)  14881 fixes taken, 0 dropped, 0 restarts
+== 00:21:26
+    0.0 magnet at x 1.1 +/-0.1  y 9.4 +/-0.2  z 10.9 +/-0.1 mm   tilt 40 deg   strength 4291   misfit 2 %   seen by 6+2 faint   fit 1082 us
+    0.0 track: tracking  x 1.0 y 9.5 z 10.8 +/-0.3 0.3 0.3 mm  speed 25 mm/s  tilt 41 deg  cursor pointed x 1.1 y 9.4 (+/-0.4 mm, reach 0.0)  16226 fixes taken, 0 dropped, 0 restarts
+== 00:21:40
+    0.0 magnet at x 1.2 +/-0.1  y 9.2 +/-0.1  z 10.7 +/-0.1 mm   tilt 41 deg   strength 4105   misfit 2 %   seen by 5+2 faint   fit 1092 us
+    0.0 track: tracking  x 1.1 y 9.2 z 10.7 +/-0.3 0.3 0.3 mm  speed 7 mm/s  tilt 41 deg  cursor pointed x 1.2 y 9.4 (+/-0.4 mm, reach 0.0)  17587 fixes taken, 0 dropped, 0 restarts
+== 00:21:54
+    0.0 magnet at x 1.2 +/-0.1  y 9.2 +/-0.2  z 10.8 +/-0.1 mm   tilt 42 deg   strength 4187   misfit 2 %   seen by 6+2 faint   fit 1104 us
+    0.0 track: tracking  x 1.2 y 9.3 z 10.9 +/-0.3 0.3 0.3 mm  speed 6 mm/s  tilt 42 deg  cursor pointed x 1.2 y 9.2 (+/-0.4 mm, reach 0.0)  18973 fixes taken, 0 dropped, 0 restarts
+== 00:22:08
+    0.0 magnet at x 1.3 +/-0.1  y 9.2 +/-0.2  z 10.6 +/-0.1 mm   tilt 41 deg   strength 4059   misfit 2 %   seen by 5+3 faint   fit 1137 us
+    0.0 track: tracking  x 1.3 y 9.2 z 10.6 +/-0.3 0.3 0.3 mm  speed 20 mm/s  tilt 42 deg  cursor pointed x 1.2 y 9.2 (+/-0.4 mm, reach 0.0)  20342 fixes taken, 0 dropped, 0 restarts
+== 00:22:22
+    0.0 magnet at x 1.3 +/-0.1  y 8.9 +/-0.2  z 11.0 +/-0.1 mm   tilt 45 deg   strength 4060   misfit 2 %   seen by 5+3 faint   fit 1406 us
+    0.0 track: tracking  x 1.3 y 8.7 z 11.0 +/-0.3 0.3 0.3 mm  speed 42 mm/s  tilt 43 deg  cursor pointed x 1.2 y 9.0 (+/-0.4 mm, reach 0.0)  21717 fixes taken, 0 dropped, 0 restarts
+== 00:22:36
+    0.0 magnet at x 1.2 +/-0.2  y 9.2 +/-0.2  z 10.9 +/-0.2 mm   tilt 43 deg   strength 4182   misfit 2 %   seen by 7+1 faint   fit 1267 us
+    0.0 track: tracking  x 1.2 y 9.1 z 10.9 +/-0.3 0.3 0.3 mm  speed 6 mm/s  tilt 41 deg  cursor pointed x 1.2 y 9.3 (+/-0.4 mm, reach 0.0)  23109 fixes taken, 0 dropped, 0 restarts
+== 00:22:50
+    0.0 magnet at x 1.1 +/-0.2  y 9.1 +/-0.2  z 11.0 +/-0.2 mm   tilt 43 deg   strength 4323   misfit 2 %   seen by 5+3 faint   fit 1559 us
+    0.0 track: tracking  x 1.0 y 9.1 z 11.1 +/-0.3 0.3 0.3 mm  speed 27 mm/s  tilt 42 deg  cursor pointed x 1.2 y 9.2 (+/-0.4 mm, reach 0.0)  24476 fixes taken, 0 dropped, 0 restarts
+== 00:23:04
+    0.0 magnet at x 1.2 +/-0.2  y 9.1 +/-0.2  z 10.7 +/-0.2 mm   tilt 42 deg   strength 4053   misfit 2 %   seen by 6+2 faint   fit 1128 us
+    0.0 track: tracking  x 1.2 y 9.2 z 10.7 +/-0.3 0.3 0.3 mm  speed 10 mm/s  tilt 42 deg  cursor pointed x 1.1 y 9.2 (+/-0.4 mm, reach 0.0)  25834 fixes taken, 0 dropped, 0 restarts
+== 00:23:18
+    0.0 magnet at x 1.2 +/-0.2  y 9.1 +/-0.2  z 10.8 +/-0.2 mm   tilt 41 deg   strength 4128   misfit 2 %   seen by 6+2 faint   fit 1124 us
+    0.0 track: tracking  x 1.2 y 9.2 z 10.8 +/-0.3 0.3 0.3 mm  speed 24 mm/s  tilt 42 deg  cursor pointed x 1.1 y 9.2 (+/-0.4 mm, reach 0.0)  27230 fixes taken, 0 dropped, 0 restarts
+== 00:23:32
+    0.0 magnet at x 1.0 +/-0.2  y 9.0 +/-0.2  z 11.1 +/-0.2 mm   tilt 44 deg   strength 4299   misfit 2 %   seen by 7+1 faint   fit 1073 us
+    0.0 track: tracking  x 1.0 y 8.9 z 11.2 +/-0.3 0.3 0.3 mm  speed 4 mm/s  tilt 42 deg  cursor pointed x 1.1 y 9.1 (+/-0.4 mm, reach 0.0)  28628 fixes taken, 0 dropped, 0 restarts
+== 00:23:46
+    0.0 magnet at x 1.2 +/-0.2  y 9.1 +/-0.2  z 11.0 +/-0.2 mm   tilt 43 deg   strength 4324   misfit 2 %   seen by 7+1 faint   fit 1095 us
+    0.0 track: tracking  x 1.1 y 9.2 z 11.1 +/-0.3 0.3 0.3 mm  speed 16 mm/s  tilt 43 deg  cursor pointed x 1.1 y 9.1 (+/-0.4 mm, reach 0.0)  30019 fixes taken, 0 dropped, 0 restarts
+== 00:24:00
+    0.0 magnet at x 1.1 +/-0.1  y 9.3 +/-0.1  z 10.8 +/-0.1 mm   tilt 42 deg   strength 4167   misfit 2 %   seen by 7+1 faint   fit 1872 us
+    0.0 track: tracking  x 1.1 y 9.3 z 10.8 +/-0.3 0.3 0.3 mm  speed 28 mm/s  tilt 42 deg  cursor pointed x 1.1 y 9.3 (+/-0.4 mm, reach 0.0)  31418 fixes taken, 0 dropped, 0 restarts
+== 00:24:14
+    0.0 magnet at x 1.1 +/-0.2  y 9.5 +/-0.2  z 10.5 +/-0.2 mm   tilt 39 deg   strength 4076   misfit 3 %   seen by 7+0 faint   fit 1141 us
+    0.0 track: tracking  x 1.1 y 9.5 z 10.4 +/-0.3 0.3 0.3 mm  speed 8 mm/s  tilt 40 deg  cursor pointed x 1.2 y 9.3 (+/-0.4 mm, reach 0.0)  32806 fixes taken, 0 dropped, 0 restarts
+== 00:24:28
+    0.0 magnet at x 1.1 +/-0.1  y 9.4 +/-0.1  z 10.7 +/-0.1 mm   tilt 39 deg   strength 4173   misfit 2 %   seen by 6+2 faint   fit 1053 us
+    0.0 track: tracking  x 1.0 y 9.5 z 10.6 +/-0.3 0.3 0.3 mm  speed 24 mm/s  tilt 41 deg  cursor pointed x 1.1 y 9.2 (+/-0.4 mm, reach 0.0)  34204 fixes taken, 0 dropped, 0 restarts
+== 00:24:42
+    0.0 magnet at x 1.2 +/-0.2  y 9.0 +/-0.2  z 10.9 +/-0.2 mm   tilt 43 deg   strength 4110   misfit 2 %   seen by 6+2 faint   fit 1817 us
+    0.0 track: tracking  x 1.1 y 8.9 z 10.9 +/-0.3 0.3 0.3 mm  speed 14 mm/s  tilt 43 deg  cursor pointed x 1.2 y 9.0 (+/-0.4 mm, reach 0.0)  35575 fixes taken, 0 dropped, 0 restarts
+== 00:24:56
+    0.0 magnet at x 1.2 +/-0.2  y 9.1 +/-0.2  z 10.9 +/-0.2 mm   tilt 42 deg   strength 4119   misfit 2 %   seen by 6+2 faint   fit 1262 us
+    0.0 track: tracking  x 1.3 y 9.1 z 10.8 +/-0.3 0.3 0.3 mm  speed 15 mm/s  tilt 42 deg  cursor pointed x 1.2 y 9.2 (+/-0.4 mm, reach 0.0)  36973 fixes taken, 0 dropped, 0 restarts
+== 00:25:10
+    0.0 magnet at x 1.3 +/-0.2  y 8.8 +/-0.2  z 10.7 +/-0.2 mm   tilt 44 deg   strength 4016   misfit 3 %   seen by 7+1 faint   fit 1386 us
+    0.0 track: tracking  x 1.3 y 8.8 z 10.8 +/-0.3 0.3 0.3 mm  speed 24 mm/s  tilt 42 deg  cursor pointed x 1.2 y 9.1 (+/-0.4 mm, reach 0.0)  38341 fixes taken, 0 dropped, 0 restarts
+== 00:25:24
+    0.0 magnet at x 1.2 +/-0.1  y 9.2 +/-0.1  z 10.8 +/-0.1 mm   tilt 41 deg   strength 4152   misfit 2 %   seen by 6+2 faint   fit 1261 us
+    0.0 track: tracking  x 1.3 y 9.2 z 10.8 +/-0.3 0.3 0.3 mm  speed 19 mm/s  tilt 41 deg  cursor pointed x 1.2 y 9.1 (+/-0.4 mm, reach 0.0)  39734 fixes taken, 0 dropped, 0 restarts
+== 00:25:38
+    0.0 oo
+    0.0 magnet at x 1.3 +/-0.1  y 9.5 +/-0.2  z 10.1 +/-0.1 mm   tilt 38 deg   strength 3771   misfit 2 %   seen by 5+3 faint   fit 1379 us
+    0.0 track: tracking  x 1.3 y 9.5 z 10.0 +/-0.3 0.3 0.3 mm  speed 18 mm/s  tilt 39 deg  cursor pointed x 1.2 y 9.4 (+/-0.4 mm, reach 0.0)  634 fixes taken, 0 dropped, 0 restarts
+== 00:25:52
+    0.0 magnet at x 1.1 +/-0.1  y 9.4 +/-0.1  z 10.8 +/-0.1 mm   tilt 40 deg   strength 4309   misfit 2 %   seen by 6+1 faint   fit 1235 us
+    0.0 track: tracking  x 1.0 y 9.5 z 10.8 +/-0.3 0.3 0.3 mm  speed 19 mm/s  tilt 41 deg  cursor pointed x 1.2 y 9.2 (+/-0.4 mm, reach 0.0)  2033 fixes taken, 0 dropped, 0 restarts
+== 00:26:06
+    0.0 magnet at x 1.3 +/-0.1  y 9.0 +/-0.2  z 10.7 +/-0.1 mm   tilt 43 deg   strength 4154   misfit 2 %   seen by 5+3 faint   fit 1385 us
+    0.0 track: tracking  x 1.3 y 9.0 z 10.9 +/-0.3 0.3 0.3 mm  speed 38 mm/s  tilt 42 deg  cursor pointed x 1.4 y 9.1 (+/-0.4 mm, reach 0.0)  3431 fixes taken, 0 dropped, 0 restarts
+== 00:26:20
+    0.0 magnet at x 0.9 +/-0.2  y 9.5 +/-0.2  z 11.0 +/-0.2 mm   tilt 40 deg   strength 4412   misfit 3 %   seen by 6+2 faint   fit 1395 us
+    0.0 track: tracking  x 0.8 y 9.5 z 11.0 +/-0.3 0.3 0.3 mm  speed 18 mm/s  tilt 41 deg  cursor pointed x 0.9 y 9.3 (+/-0.4 mm, reach 0.0)  4793 fixes taken, 0 dropped, 0 restarts
+== 00:26:34
+    0.0 magnet at x 1.3 +/-0.1  y 9.3 +/-0.1  z 10.8 +/-0.1 mm   tilt 40 deg   strength 4253   misfit 1 %   seen by 5+2 faint   fit 1396 us
+    0.0 track: tracking  x 1.3 y 9.5 z 10.7 +/-0.3 0.3 0.3 mm  speed 49 mm/s  tilt 42 deg  cursor pointed x 1.2 y 9.2 (+/-0.4 mm, reach 0.0)  6161 fixes taken, 0 dropped, 0 restarts
+== 00:26:48
+    0.0 magnet at x 1.3 +/-0.1  y 9.0 +/-0.1  z 10.8 +/-0.1 mm   tilt 43 deg   strength 3928   misfit 2 %   seen by 6+1 faint   fit 1356 us
+    0.0 track: tracking  x 1.4 y 9.0 z 10.7 +/-0.3 0.3 0.3 mm  speed 32 mm/s  tilt 43 deg  cursor pointed x 1.3 y 9.1 (+/-0.4 mm, reach 0.0)  7560 fixes taken, 1 dropped, 0 restarts
+== 00:27:02
+    0.0 magnet at x 1.0 +/-0.1  y 9.3 +/-0.2  z 11.1 +/-0.1 mm   tilt 42 deg   strength 4386   misfit 2 %   seen by 6+2 faint   fit 1208 us
+    0.0 track: tracking  x 1.0 y 9.3 z 11.1 +/-0.3 0.3 0.3 mm  speed 9 mm/s  tilt 43 deg  cursor pointed x 1.2 y 9.1 (+/-0.4 mm, reach 0.0)  8953 fixes taken, 1 dropped, 0 restarts
+== 00:27:16
+    0.0 
+    0.0 magnet at x 1.3 +/-0.1  y 8.9 +/-0.1  z 10.8 +/-0.1 mm   tilt 42 deg   strength 4007   misfit 2 %   seen by 5+3 faint   fit 1672 us
+    0.0 track: tracking  x 1.3 y 9.0 z 10.7 +/-0.3 0.3 0.3 mm  speed 21 mm/s  tilt 44 deg  cursor pointed x 1.3 y 8.9 (+/-0.4 mm, reach 0.0)  257 fixes taken, 0 dropped, 0 restarts
+== 00:27:30
+    0.0 magnet at x 1.3 +/-0.1  y 8.9 +/-0.2  z 10.9 +/-0.1 mm   tilt 44 deg   strength 4093   misfit 2 %   seen by 5+3 faint   fit 1137 us
+    0.0 track: tracking  x 1.3 y 8.9 z 10.9 +/-0.3 0.3 0.3 mm  speed 6 mm/s  tilt 43 deg  cursor pointed x 1.2 y 9.0 (+/-0.4 mm, reach 0.0)  1653 fixes taken, 0 dropped, 0 restarts
+== 00:27:44
+    0.0 magnet at x 1.1 +/-0.1  y 9.1 +/-0.1  z 10.9 +/-0.1 mm   tilt 42 deg   strength 4222   misfit 2 %   seen by 5+2 faint   fit 1597 us
+    0.0 track: tracking  x 1.0 y 9.1 z 11.0 +/-0.3 0.3 0.3 mm  speed 30 mm/s  tilt 43 deg  cursor pointed x 1.2 y 9.1 (+/-0.4 mm, reach 0.0)  3054 fixes taken, 0 dropped, 0 restarts
+== 00:27:58
+    0.0 magnet at x 1.1 +/-0.1  y 9.1 +/-0.2  z 11.0 +/-0.1 mm   tilt 43 deg   strength 4165   misfit 2 %   seen by 6+2 faint   fit 1078 us
+    0.0 track: tracking  x 1.1 y 9.1 z 10.9 +/-0.3 0.3 0.3 mm  speed 14 mm/s  tilt 42 deg  cursor pointed x 1.1 y 9.1 (+/-0.4 mm, reach 0.0)  4445 fixes taken, 0 dropped, 0 restarts
+== 00:28:12
+    0.0 magnet at x 1.4 +/-0.2  y 9.0 +/-0.2  z 10.6 +/-0.2 mm   tilt 42 deg   strength 3958   misfit 2 %   seen by 5+3 faint   fit 1247 us
+    0.0 track: tracking  x 1.4 y 9.0 z 10.6 +/-0.3 0.3 0.3 mm  speed 11 mm/s  tilt 42 deg  cursor pointed x 1.3 y 9.0 (+/-0.4 mm, reach 0.0)  5808 fixes taken, 0 dropped, 0 restarts
+== 00:28:26
+== 00:28:40
+    0.0 magnet at x 1.3 +/-0.2  y 9.2 +/-0.2  z 10.8 +/-0.2 mm   tilt 42 deg   strength 4011   misfit 3 %   seen by 5+3 faint   fit 1378 us
+    0.0 track: tracking  x 1.4 y 9.1 z 10.7 +/-0.3 0.3 0.3 mm  speed 41 mm/s  tilt 42 deg  cursor pointed x 1.2 y 9.2 (+/-0.4 mm, reach 0.0)  8605 fixes taken, 0 dropped, 0 restarts
+== 00:28:54
+== 00:29:08
+== 00:29:22
+    0.0 magnet at x 1.0 +/-0.2  y 9.1 +/-0.2  z 11.0 +/-0.2 mm   tilt 43 deg   strength 4278   misfit 2 %   seen by 5+3 faint   fit 1034 us
+    0.0 track: tracking  x 1.0 y 9.1 z 11.0 +/-0.3 0.3 0.3 mm  speed 11 mm/s  tilt 42 deg  cursor pointed x 1.0 y 9.2 (+/-0.4 mm, reach 0.0)  2200 fixes taken, 0 dropped, 0 restarts
+== 00:29:36
+    0.0 magnet at x 1.2 +/-0.2  y 9.2 +/-0.2  z 10.8 +/-0.2 mm   tilt 42 deg   strength 4168   misfit 2 %   seen by 5+3 faint   fit 1231 us
+    0.0 track: tracking  x 1.1 y 9.2 z 10.9 +/-0.3 0.3 0.3 mm  speed 13 mm/s  tilt 41 deg  cursor pointed x 1.2 y 9.3 (+/-0.4 mm, reach 0.0)  3563 fixes taken, 0 dropped, 0 restarts
+== 00:29:50
+    0.0 .2 z 10.7 +/-0.2 mm   tilstrength 4081   misfit 3 %   seen b   fit 1489tracking  x 10.7 +/-0.  speed 26 mm/s  tilt 2 deg  cursor pointed x 1.2 y 9.1 taken, 0 dropped, 0 restarts
+== 00:30:04
+    0.0 magnet at x 1.3 +/-0.1  y 9.1 +/-0.2  z 10.7 +/-0.2 mm   tilt 42 deg   strength 4093   misfit 2 %   seen by 6+2 faint   fit 1222 us
+    0.0 track: tracking  x 1.3 y 9.1 z 10.8 +/-0.3 0.3 0.3 mm  speed 7 mm/s  tilt 42 deg  cursor pointed x 1.2 y 9.2 (+/-0.4 mm, reach 0.0)  6291 fixes taken, 0 dropped, 0 restarts
+== 00:30:17
+    0.0 magnet at x 1.4 +/-0.2  y 8.9 +/-0.2  z 11.0 +/-0.2 mm   tilt 44 deg   strength 4176   misfit 3 %   seen by 5+3 faint   fit 1230 us
+    0.0 track: tracking  x 1.3 y 9.0 z 11.0 +/-0.3 0.3 0.3 mm  speed 17 mm/s  tilt 44 deg  cursor pointed x 1.3 y 8.9 (+/-0.4 mm, reach 0.0)  7660 fixes taken, 1 dropped, 0 restarts
+== 00:30:41
+    0.0 magnet at x 1.4 +/-0.1  y 9.0 +/-0.2  z 10.6 +/-0.1 mm   tilt 42 deg   strength 3842   misfit 2 %   seen by 6+1 faint   fit 1224 us
+    0.0 track: tracking  x 1.5 y 8.9 z 10.5 +/-0.3 0.3 0.3 mm  speed 8 mm/s  tilt 41 deg  cursor pointed x 1.2 y 9.3 (+/-0.4 mm, reach 0.0)  9984 fixes taken, 1 dropped, 0 restarts
+== 00:30:55
+    0.0 magnet at x 1.3 +/-0.2  y 9.0 +/-0.2  z 11.0 +/-0.2 mm   tilt 44 deg   strength 4280   misfit 2 %   seen by 5+3 faint   fit 1097 us
+    0.0 track: tracking  x 1.2 y 9.0 z 11.1 +/-0.3 0.3 0.3 mm  speed 13 mm/s  tilt 42 deg  cursor pointed x 1.2 y 9.1 (+/-0.4 mm, reach 0.0)  11340 fixes taken, 1 dropped, 0 restarts
+== 00:31:09
+    0.0 magnet at x 1.2 +/-0.2  y 9.2 +/-0.2  z 10.8 +/-0.2 mm   tilt 42 deg   strength 4096   misfit 2 %   seen by 6+2 faint   fit 1712 us
+    0.0 track: tracking  x 1.2 y 9.1 z 10.8 +/-0.3 0.3 0.3 mm  speed 12 mm/s  tilt 41 deg  cursor pointed x 1.2 y 9.2 (+/-0.4 mm, reach 0.0)  12729 fixes taken, 1 dropped, 0 restarts
+== 00:31:23
+    0.0 magnet at x 1.1 +/-0.2  y 9.3 +/-0.2  z 10.8 +/-0.2 mm   tilt 40 deg   strength 4179   misfit 2 %   seen by 6+1 faint   fit 1047 us
+    0.0 track: tracking  x 1.1 y 9.4 z 10.7 +/-0.3 0.3 0.3 mm  speed 23 mm/s  tilt 41 deg  cursor pointed x 1.2 y 9.2 (+/-0.4 mm, reach 0.0)  14122 fixes taken, 1 dropped, 0 restarts
+== 00:31:37
+    0.0 magnet at x 1.1 +/-0.1  y 9.5 +/-0.1  z 10.9 +/-0.1 mm   tilt 40 deg   strength 4388   misfit 2 %   seen by 6+1 faint   fit 1074 us
+    0.0 track: tracking  x 1.2 y 9.6 z 10.9 +/-0.3 0.3 0.3 mm  speed 31 mm/s  tilt 41 deg  cursor pointed x 1.1 y 9.3 (+/-0.4 mm, reach 0.0)  15522 fixes taken, 1 dropped, 0 restarts
+== 00:31:51
+    0.0 magnet at x 1.4 +/-0.1  y 9.3 +/-0.2  z 10.7 +/-0.1 mm   tilt 41 deg   strength 4054   misfit 2 %   seen by 6+1 faint   fit 1289 us
+    0.0 track: tracking  x 1.4 y 9.2 z 10.7 +/-0.3 0.3 0.3 mm  speed 6 mm/s  tilt 41 deg  cursor pointed x 1.2 y 9.4 (+/-0.4 mm, reach 0.0)  16884 fixes taken, 1 dropped, 0 restarts
+== 00:32:05
+    0.0 magnet at x 1.4 +/-0.2  y 9.0 +/-0.2  z 10.7 +/-0.2 mm   tilt 43 deg   strength 3912   misfit 3 %   seen by 6+2 faint   fit 1105 us
+    0.0 track: tracking  x 1.5 y 8.9 z 10.6 +/-0.3 0.3 0.3 mm  speed 12 mm/s  tilt 42 deg  cursor pointed x 1.3 y 9.0 (+/-0.4 mm, reach 0.0)  18276 fixes taken, 1 dropped, 0 restarts
+== 00:32:19
+    0.0 magnet at x 1.3 +/-0.2  y 9.1 +/-0.2  z 10.8 +/-0.2 mm   tilt 43 deg   strength 4100   misfit 2 %   seen by 5+3 faint   fit 1145 us
+    0.0 track: tracking  x 1.3 y 9.0 z 10.8 +/-0.3 0.3 0.3 mm  speed 4 mm/s  tilt 41 deg  cursor pointed x 1.2 y 9.3 (+/-0.4 mm, reach 0.0)  19665 fixes taken, 1 dropped, 0 restarts
+== 00:32:33
+    0.0 magnet at x 1.2 +/-0.2  y 9.3 +/-0.2  z 10.8 +/-0.2 mm   tilt 41 deg   strength 4324   misfit 3 %   seen by 5+3 faint   fit 1463 us
+    0.0 track: tracking  x 1.1 y 9.3 z 10.9 +/-0.3 0.3 0.3 mm  speed 53 mm/s  tilt 41 deg  cursor pointed x 1.2 y 9.4 (+/-0.4 mm, reach 0.0)  21055 fixes taken, 1 dropped, 0 restarts
+== 00:32:47
+    0.0 magnet at x 1.1 +/-0.1  y 9.2 +/-0.1  z 10.9 +/-0.1 mm   tilt 43 deg   strength 4358   misfit 2 %   seen by 6+2 faint   fit 1725 us
+    0.0 track: tracking  x 1.1 y 9.1 z 11.1 +/-0.3 0.3 0.3 mm  speed 25 mm/s  tilt 42 deg  cursor pointed x 1.2 y 9.2 (+/-0.4 mm, reach 0.0)  22453 fixes taken, 1 dropped, 0 restarts
+== 00:33:01
+    0.0 magnet at x 1.2 +/-0.2  y 9.2 +/-0.2  z 10.8 +/-0.2 mm   tilt 42 deg   strength 4124   misfit 3 %   seen by 6+2 faint   fit 1423 us
+    0.0 track: tracking  x 1.2 y 9.2 z 10.8 +/-0.3 0.3 0.3 mm  speed 15 mm/s  tilt 41 deg  cursor pointed x 1.2 y 9.3 (+/-0.4 mm, reach 0.0)  23820 fixes taken, 1 dropped, 0 restarts
+== 00:33:15
+    0.0 magnet at x 1.4 +/-0.1  y 9.2 +/-0.1  z 10.8 +/-0.1 mm   tilt 41 deg   strength 4087   misfit 2 %   seen by 6+1 faint   fit 1257 us
+    0.0 track: tracking  x 1.4 y 9.2 z 10.7 +/-0.3 0.3 0.3 mm  speed 8 mm/s  tilt 42 deg  cursor pointed x 1.3 y 9.2 (+/-0.4 mm, reach 0.0)  25174 fixes taken, 1 dropped, 0 restarts
+== 00:33:29
+    0.0 magnet at x 1.1 +/-0.1  y 9.2 +/-0.2  z 10.9 +/-0.1 mm   tilt 41 deg   strength 4273   misfit 2 %   seen by 5+3 faint   fit 1095 us
+    0.0 track: tracking  x 1.1 y 9.3 z 10.9 +/-0.3 0.3 0.3 mm  speed 16 mm/s  tilt 42 deg  cursor pointed x 1.1 y 9.1 (+/-0.4 mm, reach 0.0)  26574 fixes taken, 1 dropped, 0 restarts
+== 00:33:43
+    0.0 magnet at x 1.2 +/-0.2  y 9.2 +/-0.2  z 10.8 +/-0.2 mm   tilt 42 deg   strength 4251   misfit 2 %   seen by 5+3 faint   fit 1794 us
+    0.0 track: tracking  x 1.2 y 9.3 z 10.9 +/-0.3 0.3 0.3 mm  speed 19 mm/s  tilt 42 deg  cursor pointed x 1.2 y 9.2 (+/-0.4 mm, reach 0.0)  27971 fixes taken, 1 dropped, 0 restarts
+== 00:33:57
+    0.0 magnet at x 1.0 +/-0.2  y 9.3 +/-0.2  z 11.1 +/-0.2 mm   tilt 42 deg   strength 4400   misfit 2 %   seen by 6+2 faint   fit 1275 us
+    0.0 track: tracking  x 1.0 y 9.3 z 11.1 +/-0.3 0.3 0.3 mm  speed 7 mm/s  tilt 41 deg  cursor pointed x 1.1 y 9.3 (+/-0.4 mm, reach 0.0)  29371 fixes taken, 1 dropped, 0 restarts
+== 00:34:11
+    0.0 magnet at x 1.3 +/-0.2  y 9.1 +/-0.2  z 10.9 +/-0.2 mm   tilt 43 deg   strength 4265   misfit 3 %   seen by 6+2 faint   fit 1465 us
+    0.0 track: tracking  x 1.2 y 9.1 z 11.0 +/-0.3 0.3 0.3 mm  speed 31 mm/s  tilt 42 deg  cursor pointed x 1.2 y 9.2 (+/-0.4 mm, reach 0.0)  30765 fixes taken, 1 dropped, 0 restarts
+== 00:34:25
+    0.0 magnet at x 1.2 +/-0.1  y 9.1 +/-0.1  z 10.8 +/-0.1 mm   tilt 42 deg   strength 4279   misfit 2 %   seen by 6+2 faint   fit 1965 us
+    0.0 track: tracking  x 1.1 y 9.2 z 11.0 +/-0.3 0.3 0.3 mm  speed 38 mm/s  tilt 41 deg  cursor pointed x 1.2 y 9.2 (+/-0.4 mm, reach 0.0)  32141 fixes taken, 1 dropped, 0 restarts
+== 00:34:39
+    0.0 magnet at x 1.1 +/-0.1  y 9.8 +/-0.2  z 10.6 +/-0.1 mm   tilt 38 deg   strength 4239   misfit 2 %   seen by 6+1 faint   fit 1404 us
+    0.0 track: tracking  x 1.1 y 9.8 z 10.5 +/-0.3 0.3 0.3 mm  speed 21 mm/s  tilt 39 deg  cursor pointed x 1.2 y 9.7 (+/-0.4 mm, reach 0.0)  33534 fixes taken, 1 dropped, 0 restarts
+== 00:34:53
+    0.0 magnet at x 1.3 +/-0.1  y 9.1 +/-0.2  z 10.7 +/-0.1 mm   tilt 42 deg   strength 3990   misfit 2 %   seen by 6+2 faint   fit 1377 us
+    0.0 track: tracking  x 1.3 y 9.1 z 10.7 +/-0.3 0.3 0.3 mm  speed 23 mm/s  tilt 41 deg  cursor pointed x 1.3 y 9.3 (+/-0.4 mm, reach 0.0)  34912 fixes taken, 1 dropped, 0 restarts
+== 00:35:20
+    0.0 magnet at x 1.1 +/-0.1  y 9.5 +/-0.2  z 10.6 +/-0.1 mm   tilt 39 deg   strength 4248   misfit 2 %   seen by 5+3 faint   fit 1276 us
+    0.0 track: tracking  x 1.1 y 9.5 z 10.7 +/-0.3 0.3 0.3 mm  speed 16 mm/s  tilt 40 deg  cursor pointed x 1.2 y 9.4 (+/-0.4 mm, reach 0.0)  939 fixes taken, 0 dropped, 0 restarts
+== 00:35:34
+    0.0 magnet at x 1.3 +/-0.1  y 9.3 +/-0.1  z 10.7 +/-0.1 mm   tilt 41 deg   strength 4176   misfit 2 %   seen by 5+3 faint   fit 1482 us
+    0.0 track: tracking  x 1.3 y 9.3 z 10.7 +/-0.3 0.3 0.3 mm  speed 17 mm/s  tilt 41 deg  cursor pointed x 1.2 y 9.3 (+/-0.4 mm, reach 0.0)  2337 fixes taken, 0 dropped, 0 restarts
+== 00:35:48
+    0.0 magnet at x 1.3 +/-0.1  y 9.5 +/-0.2  z 10.4 +/-0.1 mm   tilt 39 deg   strength 4028   misfit 2 %   seen by 5+3 faint   fit 1110 us
+    0.0 track: tracking  x 1.3 y 9.5 z 10.4 +/-0.3 0.3 0.3 mm  speed 13 mm/s  tilt 39 deg  cursor pointed x 1.3 y 9.5 (+/-0.4 mm, reach 0.0)  3734 fixes taken, 0 dropped, 0 restarts
+== 00:36:02
+    0.0 magnet at x 1.1 +/-0.1  y 9.5 +/-0.1  z 10.8 +/-0.1 mm   tilt 40 deg   strength 4418   misfit 2 %   seen by 6+2 faint   fit 1482 us
+    0.0 track: tracking  x 1.1 y 9.6 z 10.8 +/-0.3 0.3 0.3 mm  speed 26 mm/s  tilt 41 deg  cursor pointed x 1.2 y 9.3 (+/-0.4 mm, reach 0.0)  5133 fixes taken, 0 dropped, 0 restarts
+== 00:36:16
+    0.0 magnet at x 1.4 +/-0.1  y 9.0 +/-0.2  z 10.5 +/-0.1 mm   tilt 41 deg   strength 3879   misfit 2 %   seen by 5+3 faint   fit 1271 us
+    0.0 track: tracking  x 1.4 y 9.0 z 10.5 +/-0.3 0.3 0.3 mm  speed 17 mm/s  tilt 42 deg  cursor pointed x 1.3 y 9.1 (+/-0.4 mm, reach 0.0)  6531 fixes taken, 0 dropped, 0 restarts
+== 00:36:30
+    0.0 magnet at x 1.3 +/-0.1  y 9.2 +/-0.2  z 10.5 +/-0.1 mm   tilt 41 deg   strength 3933   misfit 2 %   seen by 5+3 faint   fit 1419 us
+    0.0 track: tracking  x 1.3 y 9.1 z 10.5 +/-0.3 0.3 0.3 mm  speed 17 mm/s  tilt 41 deg  cursor pointed x 1.3 y 9.2 (+/-0.4 mm, reach 0.0)  7930 fixes taken, 0 dropped, 0 restarts
+== 00:36:44
+    0.0 magnet at x 1.3 +/-0.1  y 9.1 +/-0.2  z 10.7 +/-0.1 mm   tilt 42 deg   strength 4079   misfit 2 %   seen by 5+3 faint   fit 1387 us
+    0.0 track: tracking  x 1.2 y 9.1 z 10.7 +/-0.3 0.3 0.3 mm  speed 9 mm/s  tilt 42 deg  cursor pointed x 1.3 y 9.1 (+/-0.4 mm, reach 0.0)  9327 fixes taken, 0 dropped, 0 restarts
+== 00:36:58
+    0.0 magnet at x 1.2 +/-0.1  y 9.1 +/-0.1  z 10.7 +/-0.1 mm   tilt 41 deg   strength 4068   misfit 1 %   seen by 5+3 faint   fit 1217 us
+    0.0 track: tracking  x 1.2 y 9.1 z 10.7 +/-0.3 0.3 0.3 mm  speed 11 mm/s  tilt 41 deg  cursor pointed x 1.3 y 9.1 (+/-0.4 mm, reach 0.0)  10725 fixes taken, 0 dropped, 0 restarts
+== 00:37:12
+    0.0 magnet at x 1.4 +/-0.1  y 9.0 +/-0.1  z 10.5 +/-0.1 mm   tilt 42 deg   strength 3823   misfit 1 %   seen by 5+2 faint   fit 1072 us
+    0.0 track: tracking  x 1.4 y 8.9 z 10.5 +/-0.3 0.3 0.3 mm  speed 17 mm/s  tilt 41 deg  cursor pointed x 1.3 y 9.2 (+/-0.4 mm, reach 0.0)  12123 fixes taken, 0 dropped, 0 restarts
+== 00:37:31
+    0.0 magnet at x 1.3 +/-0.1  y 9.0 +/-0.1  z 10.7 +/-0.1 mm   tilt 42 deg   strength 4011   misfit 1 %   seen by 6+2 faint   fit 1223 us
+    0.0 track: tracking  x 1.3 y 9.1 z 10.7 +/-0.3 0.3 0.3 mm  speed 4 mm/s  tilt 42 deg  cursor pointed x 1.3 y 9.0 (+/-0.4 mm, reach 0.0)  14027 fixes taken, 0 dropped, 0 restarts
+== 00:37:45
+    0.0 magnet at x 1.3 +/-0.1  y 8.9 +/-0.2  z 10.7 +/-0.1 mm   tilt 43 deg   strength 3992   misfit 2 %   seen by 5+3 faint   fit 1075 us
+    0.0 track: tracking  x 1.3 y 8.9 z 10.7 +/-0.3 0.3 0.3 mm  speed 3 mm/s  tilt 42 deg  cursor pointed x 1.3 y 9.0 (+/-0.4 mm, reach 0.0)  15425 fixes taken, 0 dropped, 0 restarts
+== 00:37:59
+    0.0  us
+    0.0 track: tracking  x 1.3 r pointeed, 0 re2000        1         5785
+    0.0 H       3000        Settings         0
+    0.0 passes: 4762698magnet at x 1.3 +/-0.1  y 9.1 +/-0.2  z 10.5 +/-0.1 mm   tilt 41 deg   strength 3950   misfit 2 %   seen by 6+2 faint   fit 1118 us
+    0.0 track: tracking  x 1.4 y 9.1 z 10.5 +/-0.3 0.3 0.3 mm  speed 14 mm/s  tilt 41 deg  cursor pointed x 1.3 y 9.1 (+/-0.4 mm, reach 0.0)  16822 fixes taken, 0 dropped, 0 restarts
+== 00:38:13
+    0.0 magnet at x 1.3 +/-0.1  y 9.1 +/-0.1  z 10.7 +/-0.1 mm   tilt 42 deg   strength 4048   misfit 1 %   seen by 5+2 faint   fit 1066 us
+    0.0 track: tracking  x 1.3 y 9.1 z 10.7 +/-0.3 0.3 0.3 mm  speed 2 mm/s  tilt 41 deg  cursor pointed x 1.3 y 9.1 (+/-0.4 mm, reach 0.0)  18219 fixes taken, 0 dropped, 0 restarts
+== 00:38:27
+    0.0 magnet at x 1.3 +/-0.1  y 9.2 +/-0.2  z 10.7 +/-0.1 mm   tilt 41 deg   strength 4050   misfit 2 %   seen by 5+3 faint   fit 1584 us
+    0.0 track: tracking  x 1.3 y 9.2 z 10.7 +/-0.3 0.3 0.3 mm  speed 17 mm/s  tilt 41 deg  cursor pointed x 1.3 y 9.2 (+/-0.4 mm, reach 0.0)  19617 fixes taken, 0 dropped, 0 restarts
+== 00:38:41
+    0.0 magnet at x 1.1 +/-0.1  y 9.2 +/-0.1  z 10.7 +/-0.1 mm   tilt 41 deg   strength 4083   misfit 1 %   seen by 6+1 faint   fit 1268 us
+    0.0 track: tracking  x 1.1 y 9.2 z 10.7 +/-0.3 0.3 0.3 mm  speed 9 mm/s  tilt 41 deg  cursor pointed x 1.2 y 9.2 (+/-0.4 mm, reach 0.0)  21015 fixes taken, 0 dropped, 0 restarts
+== 00:38:55
+    0.0 magnet at x 1.2 +/-0.1  y 9.3 +/-0.2  z 10.7 +/-0.1 mm   tilt 41 deg   strength 4178   misfit 2 %   seen by 5+3 faint   fit 1266 us
+    0.0 track: tracking  x 1.2 y 9.3 z 10.7 +/-0.3 0.3 0.3 mm  speed 3 mm/s  tilt 41 deg  cursor pointed x 1.2 y 9.2 (+/-0.4 mm, reach 0.0)  22414 fixes taken, 0 dropped, 0 restarts
+== 00:39:09
+    0.0 magnet at x 1.2 +/-0.1  y 9.4 +/-0.1  z 10.5 +/-0.1 mm   tilt 39 deg   strength 4099   misfit 1 %   seen by 5+3 faint   fit 1091 us
+    0.0 track: tracking  x 1.2 y 9.4 z 10.5 +/-0.3 0.3 0.3 mm  speed 10 mm/s  tilt 40 deg  cursor pointed x 1.2 y 9.3 (+/-0.4 mm, reach 0.0)  23811 fixes taken, 0 dropped, 0 restarts
+== 00:39:23
+    0.0 magnet at x 1.3 +/-0.1  y 9.2 +/-0.1  z 10.7 +/-0.1 mm   tilt 42 deg   strength 4091   misfit 1 %   seen by 6+2 faint   fit 1368 us
+    0.0 track: tracking  x 1.3 y 9.1 z 10.8 +/-0.3 0.3 0.3 mm  speed 21 mm/s  tilt 41 deg  cursor pointed x 1.3 y 9.2 (+/-0.4 mm, reach 0.0)  25209 fixes taken, 0 dropped, 0 restarts
+== 00:39:36
+    0.0 magnet at x 1.3 +/-0.1  y 9.3 +/-0.1  z 10.8 +/-0.1 mm   tilt 41 deg   strength 4188   misfit 2 %   seen by 6+1 faint   fit 1216 us
+    0.0 track: tracking  x 1.2 y 9.3 z 10.8 +/-0.3 0.3 0.3 mm  speed 13 mm/s  tilt 41 deg  cursor pointed x 1.3 y 9.3 (+/-0.4 mm, reach 0.0)  26606 fixes taken, 0 dropped, 0 restarts
+== 00:39:50
+    0.0 magnet at x 1.3 +/-0.1  y 9.3 +/-0.1  z 10.7 +/-0.1 mm   tilt 40 deg   strength 4059   misfit 2 %   seen by 5+2 faint   fit 1380 us
+    0.0 track: tracking  x 1.3 y 9.3 z 10.6 +/-0.3 0.3 0.3 mm  speed 21 mm/s  tilt 41 deg  cursor pointed x 1.3 y 9.2 (+/-0.4 mm, reach 0.0)  28000 fixes taken, 0 dropped, 0 restarts
+== 00:40:04
+    0.0 magnet at x 1.3 +/-0.1  y 9.2 +/-0.1  z 10.5 +/-0.1 mm   tilt 41 deg   strength 3982   misfit 1 %   seen by 5+2 faint   fit 1102 us
+    0.0 track: tracking  x 1.3 y 9.2 z 10.5 +/-0.3 0.3 0.3 mm  speed 13 mm/s  tilt 41 deg  cursor pointed x 1.4 y 9.2 (+/-0.4 mm, reach 0.0)  29398 fixes taken, 0 dropped, 0 restarts
+== 00:40:47
+    0.0 int
+    0.0 row  35   this fix  35.21 (+0.21) hole 5  +/-0.04 rows  100 % sure  track  35.14 +/-0.12 100 %   x 1.4 y 9.2 z 10.7 down  misfit 2 %  seen by 5+3 faint
+    0.0 magnet at x 1.2 +/-0.1  y 9.1 +/-0.1  z 10.8 +/-0.1 mm   tilt 42 deg   strength 4030   misfit 2 %   seen by 5+2 faint   fit 1207 us
+    0.0 track: tracking  x 1.3 y 9.1 z 10.7 +/-0.3 0.3 0.3 mm  speed 15 mm/s  tilt 42 deg  cursor pointed x 1.2 y 9.2 (+/-0.4 mm, reach 0.0)  1424 fixes taken, 0 dropped, 0 restarts
+    0.4 row  35   this fix  35.13 (+0.13) hole 5  +/-0.04 rows  100 % sure  track  35.18 +/-0.12 100 %   x 1.2 y 9.1 z 10.8 down  misfit 1 %  seen by 5+3 faint
+    0.9 row  35   this fix  35.14 (+0.14) hole 5  +/-0.05 rows  100 % sure  track  35.14 +/-0.12 100 %   x 1.2 y 9.2 z 10.9 down  misfit 2 %  seen by 5+3 faint
+    1.4 row  35   this fix  35.23 (+0.23) hole 5  +/-0.06 rows  100 % sure  track  35.18 +/-0.12 100 %   x 1.4 y 9.0 z 10.6 down  misfit 2 %  seen by 6+2 faint
+== 00:41:01
+    0.0 int
+    0.0 magnet at x 1.3 +/-0.1  y 9.1 +/-0.2  z 10.8 +/-0.1 mm   tilt 43 deg   strength 4109   misfit 2 %   seen by 6+2 faint   fit 1102 us
+    0.0 track: tracking  x 1.3 y 9.1 z 10.9 +/-0.3 0.3 0.3 mm  speed 7 mm/s  tilt 42 deg  cursor pointed x 1.2 y 9.1 (+/-0.4 mm, reach 0.0)  2813 fixes taken, 0 dropped, 0 restarts
+    0.1 row  35   this fix  35.24 (+0.24) hole 5  +/-0.05 rows  100 % sure  track  35.18 +/-0.12 100 %   x 1.4 y 8.9 z 10.7 down  misfit 2 %  seen by 5+2 faint
+    0.6 row  35   this fix  35.17 (+0.17) hole 5  +/-0.05 rows  100 % sure  track  35.18 +/-0.12 100 %   x 1.3 y 9.3 z 10.7 down  misfit 2 %  seen by 6+2 faint
+    1.1 row  35   this fix  35.16 (+0.16) hole 5  +/-0.05 rows  100 % sure  track  35.14 +/-0.12 100 %   x 1.3 y 9.3 z 10.7 down  misfit 2 %  seen by 5+3 faint
+== 00:41:15
+    0.0 int
+    0.0 row  35   this fix  35.21 (+0.21) hole 5  +/-0.05 rows  100 % sure  track  35.16 +/-0.12 100 %   x 1.4 y 9.1 z 10.8 down  misfit 2 %  seen by 6+2 faint
+    0.0 magnet at x 1.3 +/-0.1  y 9.1 +/-0.2  z 10.8 +/-0.1 mm   tilt 42 deg   strength 4089   misfit 2 %   seen by 6+2 faint   fit 1197 us
+    0.0 track: tracking  x 1.3 y 9.1 z 10.8 +/-0.3 0.3 0.3 mm  speed 14 mm/s  tilt 42 deg  cursor pointed x 1.2 y 9.2 (+/-0.4 mm, reach 0.0)  4195 fixes taken, 0 dropped, 0 restarts
+    0.4 row  35   this fix  35.13 (+0.13) hole 5  +/-0.04 rows  100 % sure  track  35.15 +/-0.12 100 %   x 1.2 y 9.4 z 10.9 down  misfit 2 %  seen by 6+1 faint
+    0.9 row  35   this fix  35.16 (+0.16) hole 5  +/-0.06 rows  100 % sure  track  35.15 +/-0.12 100 %   x 1.2 y 9.1 z 10.8 down  misfit 2 %  seen by 6+2 faint
+    1.4 row  35   this fix  35.19 (+0.19) hole 5  +/-0.04 rows  100 % sure  track  35.14 +/-0.12 100 %   x 1.3 y 9.0 z 10.8 down  misfit 2 %  seen by 5+3 faint
+== 00:41:29
+    0.0  faint
+    0.0 magnet at x 1.3 +/-0.1  y 9.0 +/-0.2  z 10.7 +/-0.2 mm   tilt 42 deg   strength 3984   misfit 2 %   seen by 5+2 faint   fit 1391 us
+    0.0 track: tracking  x 1.4 y 9.0 z 10.7 +/-0.3 0.3 0.3 mm  speed 13 mm/s  tilt 41 deg  cursor pointed x 1.2 y 9.1 (+/-0.4 mm, reach 0.0)  5581 fixes taken, 0 dropped, 0 restarts
+    0.1 row  35   this fix  35.20 (+0.20) hole 5  +/-0.05 rows  100 % sure  track  35.20 +/-0.12  99 %   x 1.3 y 9.1 z 10.7 down  misfit 2 %  seen by 5+3 faint
+    0.7 row  35   this fix  35.15 (+0.15) hole 5  +/-0.04 rows  100 % sure  track  35.16 +/-0.12 100 %   x 1.2 y 9.3 z 10.6 down  misfit 2 %  seen by 6+2 faint
+    1.2 row  35   this fix  35.07 (+0.07) hole 5  +/-0.06 rows  100 % sure  track  35.15 +/-0.12 100 %   x 1.0 y 9.3 z 10.8 down  misfit 2 %  seen by 5+3 faint
+== 00:41:42
+    0.0 aint
+    0.0 row  35   this fix  35.20 (+0.20) hole 5  +/-0.05 rows  100 % sure  track  35.17 +/-0.12 100 %   x 1.4 y 9.1 z 10.8 down  misfit 2 %  seen by 6+2 faint
+    0.0 magnet at x 1.1 +/-0.1  y 9.2 +/-0.2  z 10.9 +/-0.1 mm   tilt 42 deg   strength 4116   misfit 2 %   seen by 5+3 faint   fit 1531 us
+    0.0 track: tracking  x 1.1 y 9.2 z 10.8 +/-0.3 0.3 0.3 mm  speed 24 mm/s  tilt 42 deg  cursor pointed x 1.2 y 9.1 (+/-0.4 mm, reach 0.0)  6967 fixes taken, 0 dropped, 0 restarts
+    0.5 row  35   this fix  35.19 (+0.19) hole 5  +/-0.06 rows  100 % sure  track  35.16 +/-0.12 100 %   x 1.3 y 9.2 z 10.6 down  misfit 2 %  seen by 5+3 faint
+    1.0 row  35   this fix  35.20 (+0.20) hole 5  +/-0.06 rows  100 % sure  track  35.13 +/-0.12 100 %   x 1.3 y 9.0 z 10.8 down  misfit 2 %  seen by 6+2 faint
+    1.5 row  35   this fix  35.23 (+0.23) hole 5  +/-0.05 rows  100 % sure  track  35.18 +/-0.12 100 %   x 1.4 y 9.2 z 10.7 down  misfit 2 %  seen by 5+3 faint
+== 00:41:56
+    0.0  5+2 faint
+    0.0 magnet at x 1.3 +/-0.1  y 9.4 +/-0.2  z 10.6 +/-0.2 mm   tilt 40 deg   strength 4130   misfit 2 %   seen by 6+2 faint   fit 1075 us
+    0.0 track: tracking  x 1.3 y 9.4 z 10.6 +/-0.3 0.3 0.3 mm  speed 13 mm/s  tilt 40 deg  cursor pointed x 1.3 y 9.3 (+/-0.4 mm, reach 0.0)  8363 fixes taken, 0 dropped, 0 restarts
+    0.1 row  35   this fix  35.10 (+0.10) hole 5  +/-0.06 rows  100 % sure  track  35.17 +/-0.12 100 %   x 1.1 y 9.4 z 10.8 down  misfit 2 %  seen by 5+2 faint
+    0.6 row  35   this fix  35.18 (+0.18) hole 5  +/-0.04 rows  100 % sure  track  35.18 +/-0.12 100 %   x 1.3 y 9.1 z 10.5 down  misfit 1 %  seen by 5+3 faint
+    1.1 row  35   this fix  35.21 (+0.21) hole 5  +/-0.06 rows  100 % sure  track  35.17 +/-0.12 100 %   x 1.4 y 9.3 z 10.5 down  misfit 2 %  seen by 6+2 faint
+== 00:42:10
+    0.0 aint
+    0.0 row  35   this fix  35.15 (+0.15) hole 5  +/-0.05 rows  100 % sure  track  35.17 +/-0.12 100 %   x 1.2 y 9.4 z 10.6 down  misfit 2 %  seen by 5+3 faint
+    0.0 magnet at x 1.3 +/-0.1  y 9.1 +/-0.1  z 10.5 +/-0.1 mm   tilt 41 deg   strength 3948   misfit 1 %   seen by 5+3 faint   fit 1093 us
+    0.0 track: tracking  x 1.3 y 9.1 z 10.5 +/-0.3 0.3 0.3 mm  speed 8 mm/s  tilt 41 deg  cursor pointed x 1.3 y 9.2 (+/-0.4 mm, reach 0.0)  9746 fixes taken, 0 dropped, 0 restarts
+    0.4 row  35   this fix  35.19 (+0.19) hole 5  +/-0.05 rows  100 % sure  track  35.18 +/-0.12 100 %   x 1.3 y 9.2 z 10.5 down  misfit 2 %  seen by 6+2 faint
+    0.9 row  35   this fix  35.12 (+0.12) hole 5  +/-0.07 rows  100 % sure  track  35.12 +/-0.12 100 %   x 1.2 y 9.1 z 11.0 down  misfit 2 %  seen by 6+2 faint
+    1.4 row  35   this fix  35.18 (+0.18) hole 5  +/-0.05 rows  100 % sure  track  35.16 +/-0.12 100 %   x 1.3 y 9.3 z 10.7 down  misfit 2 %  seen by 6+2 faint
+== 00:42:24
+    0.0 +3 faint
+    0.0 magnet at x 1.3 +/-0.2  y 9.3 +/-0.2  z 10.6 +/-0.2 mm   tilt 41 deg   strength 3985   misfit 2 %   seen by 6+2 faint   fit 1566 us
+    0.0 track: tracking  x 1.4 y 9.2 z 10.6 +/-0.3 0.3 0.3 mm  speed 29 mm/s  tilt 41 deg  cursor pointed x 1.2 y 9.3 (+/-0.4 mm, reach 0.0)  11135 fixes taken, 0 dropped, 0 restarts
+    0.1 row  35   this fix  35.18 (+0.18) hole 5  +/-0.07 rows  100 % sure  track  35.15 +/-0.12 100 %   x 1.3 y 9.2 z 10.7 down  misfit 3 %  seen by 7+1 faint
+    0.6 row  35   this fix  35.16 (+0.16) hole 5  +/-0.05 rows  100 % sure  track  35.12 +/-0.12 100 %   x 1.3 y 9.3 z 10.8 down  misfit 2 %  seen by 5+3 faint
+    1.1 row  35   this fix  35.10 (+0.10) hole 5  +/-0.06 rows  100 % sure  track  35.13 +/-0.12 100 %   x 1.1 y 9.0 z 11.1 down  misfit 2 %  seen by 6+2 faint
+== 00:42:38
+    0.0 int
+    0.0 row  35   this fix  35.12 (+0.12) hole 5  +/-0.04 rows  100 % sure  track  35.15 +/-0.12 100 %   x 1.1 y 9.2 z 10.9 down  misfit 2 %  seen by 6+2 faint
+    0.0 magnet at x 1.2 +/-0.1  y 9.1 +/-0.1  z 10.7 +/-0.1 mm   tilt 41 deg   strength 4100   misfit 2 %   seen by 6+2 faint   fit 1217 us
+    0.0 track: tracking  x 1.1 y 9.2 z 10.7 +/-0.3 0.3 0.3 mm  speed 14 mm/s  tilt 42 deg  cursor pointed x 1.2 y 9.1 (+/-0.4 mm, reach 0.0)  12512 fixes taken, 0 dropped, 0 restarts
+    0.4 row  35   this fix  35.13 (+0.13) hole 5  +/-0.07 rows  100 % sure  track  35.16 +/-0.12 100 %   x 1.2 y 9.2 z 11.0 down  misfit 2 %  seen by 6+2 faint
+    0.9 row  35   this fix  35.11 (+0.11) hole 5  +/-0.07 rows  100 % sure  track  35.14 +/-0.12 100 %   x 1.1 y 9.2 z 10.9 down  misfit 2 %  seen by 7+1 faint
+    1.4 row  35   this fix  35.16 (+0.16) hole 5  +/-0.04 rows  100 % sure  track  35.15 +/-0.12 100 %   x 1.3 y 9.2 z 10.6 down  misfit 1 %  seen by 5+2 faint
+== 00:42:52
+    0.0  faint
+    0.0 magnet at x 1.2 +/-0.1  y 9.0 +/-0.1  z 10.8 +/-0.1 mm   tilt 43 deg   strength 3998   misfit 1 %   seen by 5+3 faint   fit 1096 us
+    0.0 track: tracking  x 1.2 y 8.9 z 10.8 +/-0.3 0.3 0.3 mm  speed 14 mm/s  tilt 42 deg  cursor pointed x 1.2 y 9.1 (+/-0.4 mm, reach 0.0)  13902 fixes taken, 0 dropped, 0 restarts
+    0.1 row  35   this fix  35.15 (+0.15) hole 5  +/-0.06 rows  100 % sure  track  35.18 +/-0.12 100 %   x 1.2 y 9.1 z 10.7 down  misfit 2 %  seen by 5+2 faint
+    0.6 row  35   this fix  35.15 (+0.15) hole 5  +/-0.04 rows  100 % sure  track  35.16 +/-0.12 100 %   x 1.2 y 9.3 z 10.6 down  misfit 2 %  seen by 5+3 faint
+    1.1 row  35   this fix  35.15 (+0.15) hole 5  +/-0.06 rows  100 % sure  track  35.16 +/-0.12 100 %   x 1.2 y 9.0 z 10.9 down  misfit 2 %  seen by 5+3 faint
+== 00:43:06
+    0.0 aint
+    0.0 row  35   this fix  35.15 (+0.15) hole 5  +/-0.04 rows  100 % sure  track  35.14 +/-0.12 100 %   x 1.2 y 9.3 z 10.7 down  misfit 1 %  seen by 6+2 faint
+    0.0 magnet at x 1.2 +/-0.1  y 9.2 +/-0.2  z 10.7 +/-0.1 mm   tilt 42 deg   strength 4045   misfit 2 %   seen by 6+2 faint   fit 1146 us
+    0.0 track: tracking  x 1.3 y 9.1 z 10.7 +/-0.3 0.3 0.3 mm  speed 3 mm/s  tilt 41 deg  cursor pointed x 1.2 y 9.3 (+/-0.4 mm, reach 0.0)  15279 fixes taken, 0 dropped, 0 restarts
+    0.5 row  35   this fix  35.18 (+0.18) hole 5  +/-0.04 rows  100 % sure  track  35.16 +/-0.12 100 %   x 1.3 y 9.1 z 10.7 down  misfit 2 %  seen by 6+2 faint
+    1.0 row  35   this fix  35.07 (+0.07) hole 5  +/-0.05 rows  100 % sure  track  35.11 +/-0.12 100 %   x 1.0 y 9.4 z 10.9 down  misfit 2 %  seen by 6+2 faint
+    1.5 row  35   this fix  35.12 (+0.12) hole 5  +/-0.05 rows  100 % sure  track  35.17 +/-0.12 100 %   x 1.2 y 9.2 z 10.8 down  misfit 2 %  seen by 5+3 faint
+== 00:43:25
+    0.0 magnet at x 1.2 +/-0.1  y 9.1 +/-0.1  z 10.7 +/-0.1 mm   tilt 41 deg   strength 4112   misfit 2 %   seen by 5+2 faint   fit 1126 us
+    0.0 track: tracking  x 1.3 y 9.2 z 10.7 +/-0.3 0.3 0.3 mm  speed 6 mm/s  tilt 42 deg  cursor pointed x 1.3 y 9.0 (+/-0.4 mm, reach 0.0)  17197 fixes taken, 0 dropped, 0 restarts
+== 00:43:39
+    0.0 
+    0.0 row  35   this fix  35.12 (+0.12) hole 5  +/-0.08 rows  100 % sure  track  35.16 +/-0.12 100 %   x 1.2 y 9.2 z 10.9 down  misfit 3 %  seen by 6+2 faint
+    0.0 magnet at x 1.4 +/-0.1  y 9.0 +/-0.2  z 10.8 +/-0.2 mm   tilt 43 deg   strength 4045   misfit 2 %   seen by 6+1 faint   fit 1301 us
+    0.0 track: tracking  x 1.5 y 9.0 z 10.8 +/-0.3 0.3 0.3 mm  speed 10 mm/s  tilt 43 deg  cursor pointed x 1.3 y 9.1 (+/-0.4 mm, reach 0.0)  18598 fixes taken, 0 dropped, 0 restarts
+    0.3 row  35   this fix  35.19 (+0.19) hole 5  +/-0.06 rows  100 % sure  track  35.17 +/-0.12 100 %   x 1.3 y 9.1 z 10.6 down  misfit 2 %  seen by 6+1 faint
+    0.8 row  35   this fix  35.13 (+0.13) hole 5  +/-0.04 rows  100 % sure  track  35.16 +/-0.12 100 %   x 1.2 y 8.8 z 11.0 down  misfit 1 %  seen by 6+1 faint
+    1.3 row  35   this fix  35.19 (+0.19) hole 5  +/-0.05 rows  100 % sure  track  35.18 +/-0.12 100 %   x 1.3 y 9.1 z 10.8 down  misfit 2 %  seen by 5+3 faint
+== 00:43:53
+    0.0 faint
+    0.0 magnet at x 1.3 +/-0.1  y 9.1 +/-0.1  z 10.6 +/-0.1 mm   tilt 42 deg   strength 3926   misfit 2 %   seen by 6+2 faint   fit 1525 us
+    0.0 track: tracking  x 1.4 y 9.0 z 10.6 +/-0.3 0.3 0.3 mm  speed 32 mm/s  tilt 41 deg  cursor pointed x 1.2 y 9.2 (+/-0.4 mm, reach 0.0)  19981 fixes taken, 0 dropped, 0 restarts
+    0.1 row  35   this fix  35.14 (+0.14) hole 5  +/-0.05 rows  100 % sure  track  35.14 +/-0.12 100 %   x 1.2 y 9.2 z 10.7 down  misfit 2 %  seen by 5+3 faint
+    0.6 row  35   this fix  35.14 (+0.14) hole 5  +/-0.05 rows  100 % sure  track  35.17 +/-0.12 100 %   x 1.2 y 9.3 z 10.8 down  misfit 2 %  seen by 6+1 faint
+    1.2 row  35   this fix  35.16 (+0.16) hole 5  +/-0.05 rows  100 % sure  track  35.18 +/-0.12 100 %   x 1.2 y 9.1 z 10.8 down  misfit 2 %  seen by 5+3 faint
+== 00:44:07
+    0.0  faint
+    0.0 row  35   this fix  35.20 (+0.20) hole 5  +/-0.05 rows  100 % sure  track  35.16 +/-0.12 100 %   x 1.4 y 9.1 z 10.5 down  misfit 2 %  seen by 5+3 faint
+    0.0 magnet at x 1.1 +/-0.1  y 9.2 +/-0.1  z 10.7 +/-0.1 mm   tilt 41 deg   strength 4114   misfit 2 %   seen by 5+3 faint   fit 1057 us
+    0.0 track: tracking  x 1.1 y 9.2 z 10.7 +/-0.3 0.3 0.3 mm  speed 7 mm/s  tilt 41 deg  cursor pointed x 1.2 y 9.2 (+/-0.4 mm, reach 0.0)  21368 fixes taken, 0 dropped, 0 restarts
+    0.4 row  35   this fix  35.17 (+0.17) hole 5  +/-0.04 rows  100 % sure  track  35.19 +/-0.12 100 %   x 1.3 y 9.3 z 10.6 down  misfit 1 %  seen by 5+2 faint
+    0.9 row  35   this fix  35.15 (+0.15) hole 5  +/-0.04 rows  100 % sure  track  35.14 +/-0.12 100 %   x 1.2 y 9.1 z 10.6 down  misfit 2 %  seen by 6+1 faint
+    1.4 row  35   this fix  35.20 (+0.20) hole 5  +/-0.05 rows  100 % sure  track  35.17 +/-0.12 100 %   x 1.4 y 9.2 z 10.7 down  misfit 2 %  seen by 6+2 faint
+== 00:44:21
+    0.0 2 faint
+    0.0 magnet at x 1.2 +/-0.2  y 9.0 +/-0.2  z 11.0 +/-0.2 mm   tilt 43 deg   strength 4145   misfit 2 %   seen by 6+2 faint   fit 1049 us
+    0.0 track: tracking  x 1.2 y 9.0 z 10.9 +/-0.3 0.3 0.3 mm  speed 17 mm/s  tilt 42 deg  cursor pointed x 1.3 y 9.1 (+/-0.4 mm, reach 0.0)  22755 fixes taken, 0 dropped, 0 restarts
+    0.2 row  35   this fix  35.16 (+0.16) hole 5  +/-0.04 rows  100 % sure  track  35.16 +/-0.12 100 %   x 1.3 y 9.0 z 11.0 down  misfit 2 %  seen by 5+2 faint
+    0.7 row  35   this fix  35.11 (+0.11) hole 5  +/-0.05 rows  100 % sure  track  35.16 +/-0.12 100 %   x 1.1 y 9.3 z 10.8 down  misfit 2 %  seen by 6+2 faint
+    1.2 row  35   this fix  35.14 (+0.14) hole 5  +/-0.05 rows  100 % sure  track  35.14 +/-0.12 100 %   x 1.2 y 9.2 z 10.9 down  misfit 2 %  seen by 6+2 faint
+== 00:44:34
+    0.0 +3 faint
+    0.0 row  35   this fix  35.15 (+0.15) hole 5  +/-0.06 rows  100 % sure  track  35.12 +/-0.12 100 %   x 1.2 y 9.1 z 10.6 down  misfit 2 %  seen by 6+2 faint
+    0.0 magnet at x 1.2 +/-0.1  y 9.4 +/-0.2  z 10.8 +/-0.1 mm   tilt 41 deg   strength 4339   misfit 2 %   seen by 6+1 faint   fit 1576 us
+    0.0 track: tracking  x 1.2 y 9.4 z 10.8 +/-0.3 0.3 0.3 mm  speed 21 mm/s  tilt 41 deg  cursor pointed x 1.1 y 9.4 (+/-0.4 mm, reach 0.0)  24142 fixes taken, 0 dropped, 0 restarts
+    0.4 row  35   this fix  35.16 (+0.16) hole 5  +/-0.06 rows  100 % sure  track  35.13 +/-0.12 100 %   x 1.3 y 9.4 z 10.7 down  misfit 2 %  seen by 6+2 faint
+    0.9 row  35   this fix  35.19 (+0.19) hole 5  +/-0.05 rows  100 % sure  track  35.17 +/-0.12 100 %   x 1.3 y 9.1 z 10.7 down  misfit 2 %  seen by 5+3 faint
+    1.4 row  35   this fix  35.15 (+0.15) hole 5  +/-0.05 rows  100 % sure  track  35.14 +/-0.12 100 %   x 1.2 y 9.1 z 10.7 down  misfit 2 %  seen by 5+3 faint
+== 00:44:48
+    0.0 faint
+    0.0 magnet at x 1.2 +/-0.1  y 9.3 +/-0.2  z 10.7 +/-0.1 mm   tilt 41 deg   strength 4215   misfit 2 %   seen by 5+3 faint   fit 1229 us
+    0.0 track: tracking  x 1.2 y 9.4 z 10.8 +/-0.3 0.3 0.3 mm  speed 11 mm/s  tilt 41 deg  cursor pointed x 1.3 y 9.3 (+/-0.4 mm, reach 0.0)  25532 fixes taken, 0 dropped, 0 restarts
+    0.1 row  35   this fix  35.12 (+0.12) hole 5  +/-0.05 rows  100 % sure  track  35.18 +/-0.12 100 %   x 1.1 y 9.3 z 10.6 down  misfit 2 %  seen by 5+3 faint
+    0.6 row  35   this fix  35.17 (+0.17) hole 5  +/-0.06 rows  100 % sure  track  35.17 +/-0.12 100 %   x 1.3 y 9.3 z 10.6 down  misfit 2 %  seen by 5+3 faint
+    1.1 row  35   this fix  35.20 (+0.20) hole 5  +/-0.05 rows  100 % sure  track  35.18 +/-0.12 100 %   x 1.3 y 9.1 z 10.6 down  misfit 2 %  seen by 6+2 faint
+== 00:45:02
+    0.0 
+    0.0 row  35   this fix  35.08 (+0.08) hole 5  +/-0.04 rows  100 % sure  track  35.15 +/-0.12 100 %   x 1.1 y 9.5 z 10.7 down  misfit 2 %  seen by 5+3 faint
+    0.0 magnet at x 1.3 +/-0.2  y 9.2 +/-0.2  z 10.6 +/-0.2 mm   tilt 41 deg   strength 4129   misfit 2 %   seen by 6+1 faint   fit 1358 us
+    0.0 track: tracking  x 1.3 y 9.3 z 10.6 +/-0.3 0.3 0.3 mm  speed 29 mm/s  tilt 41 deg  cursor pointed x 1.3 y 9.3 (+/-0.4 mm, reach 0.0)  26914 fixes taken, 0 dropped, 0 restarts
+    0.4 row  35   this fix  35.12 (+0.12) hole 5  +/-0.05 rows  100 % sure  track  35.13 +/-0.12 100 %   x 1.1 y 9.5 z 10.6 down  misfit 2 %  seen by 5+3 faint
+    0.9 row  35   this fix  35.17 (+0.17) hole 5  +/-0.04 rows  100 % sure  track  35.12 +/-0.12 100 %   x 1.3 y 9.4 z 10.6 down  misfit 2 %  seen by 5+3 faint
+    1.4 row  35   this fix  35.14 (+0.14) hole 4  +/-0.06 rows  100 % sure  track  35.13 +/-0.12 100 %   x 1.2 y 9.6 z 10.5 down  misfit 2 %  seen by 5+3 faint
+== 00:45:16
+    0.0  faint
+    0.0 magnet at x 1.2 +/-0.2  y 9.3 +/-0.2  z 10.7 +/-0.2 mm   tilt 40 deg   strength 4268   misfit 2 %   seen by 6+2 faint   fit 1463 us
+    0.0 track: tracking  x 1.1 y 9.5 z 10.8 +/-0.3 0.3 0.3 mm  speed 18 mm/s  tilt 41 deg  cursor pointed x 1.3 y 9.2 (+/-0.4 mm, reach 0.0)  28308 fixes taken, 0 dropped, 0 restarts
+    0.1 row  35   this fix  35.15 (+0.15) hole 5  +/-0.06 rows  100 % sure  track  35.13 +/-0.12 100 %   x 1.2 y 9.2 z 10.7 down  misfit 2 %  seen by 5+3 faint
+    0.6 row  35   this fix  35.15 (+0.15) hole 5  +/-0.06 rows  100 % sure  track  35.17 +/-0.12 100 %   x 1.2 y 9.0 z 10.7 down  misfit 2 %  seen by 6+2 faint
+    1.1 row  35   this fix  35.19 (+0.19) hole 5  +/-0.04 rows  100 % sure  track  35.17 +/-0.12 100 %   x 1.3 y 9.3 z 10.7 down  misfit 2 %  seen by 5+3 faint
+== 00:45:30
+    0.0 aint
+    0.0 row  35   this fix  35.15 (+0.15) hole 5  +/-0.05 rows  100 % sure  track  35.17 +/-0.12 100 %   x 1.2 y 9.1 z 10.9 down  misfit 1 %  seen by 4+1 faint
+    0.0 magnet at x 1.2 +/-0.1  y 9.1 +/-0.1  z 10.9 +/-0.1 mm   tilt 42 deg   strength 4252   misfit 1 %   seen by 6+1 faint   fit 1641 us
+    0.0 track: tracking  x 1.1 y 9.2 z 10.9 +/-0.3 0.3 0.3 mm  speed 36 mm/s  tilt 42 deg  cursor pointed x 1.2 y 9.1 (+/-0.4 mm, reach 0.0)  29693 fixes taken, 0 dropped, 0 restarts
+    0.4 row  35   this fix  35.24 (+0.24) hole 5  +/-0.07 rows  100 % sure  track  35.16 +/-0.12 100 %   x 1.4 y 8.9 z 10.7 down  misfit 2 %  seen by 5+3 faint
+    0.9 row  35   this fix  35.12 (+0.12) hole 5  +/-0.06 rows  100 % sure  track  35.14 +/-0.12 100 %   x 1.2 y 9.2 z 10.7 down  misfit 2 %  seen by 5+3 faint
+    1.4 row  35   this fix  35.17 (+0.17) hole 5  +/-0.05 rows  100 % sure  track  35.19 +/-0.12 100 %   x 1.3 y 9.3 z 10.6 down  misfit 2 %  seen by 5+3 faint
+== 00:45:44
+    0.0 
+    0.0 magnet at x 1.2 +/-0.1  y 9.4 +/-0.1  z 10.6 +/-0.1 mm   tilt 40 deg   strength 4145   misfit 2 %   seen by 5+3 faint   fit 1152 us
+    0.0 track: tracking  x 1.2 y 9.5 z 10.6 +/-0.3 0.3 0.3 mm  speed 4 mm/s  tilt 40 deg  cursor pointed x 1.2 y 9.4 (+/-0.4 mm, reach 0.0)  31078 fixes taken, 0 dropped, 0 restarts
+    0.2 row  35   this fix  35.12 (+0.12) hole 4  +/-0.06 rows  100 % sure  track  35.14 +/-0.12 100 %   x 1.1 y 9.6 z 10.7 down  misfit 2 %  seen by 5+3 faint
+    0.7 row  35   this fix  35.15 (+0.15) hole 5  +/-0.05 rows  100 % sure  track  35.15 +/-0.12 100 %   x 1.2 y 9.3 z 10.7 down  misfit 2 %  seen by 5+3 faint
+    1.2 row  35   this fix  35.27 (+0.27) hole 5  +/-0.04 rows  100 % sure  track  35.22 +/-0.12  99 %   x 1.5 y 9.4 z 10.3 down  misfit 1 %  seen by 5+3 faint
+== 00:45:58
+    0.0 int
+    0.0 row  35   this fix  35.13 (+0.13) hole 4  +/-0.07 rows  100 % sure  track  35.16 +/-0.12 100 %   x 1.2 y 9.7 z 10.6 down  misfit 3 %  seen by 6+2 faint
+    0.0 magnet at x 1.2 +/-0.1  y 9.6 +/-0.2  z 10.5 +/-0.1 mm   tilt 39 deg   strength 4209   misfit 2 %   seen by 5+3 faint   fit 1519 us
+    0.0 track: tracking  x 1.2 y 9.6 z 10.6 +/-0.3 0.3 0.3 mm  speed 29 mm/s  tilt 39 deg  cursor pointed x 1.2 y 9.5 (+/-0.4 mm, reach 0.0)  32463 fixes taken, 0 dropped, 0 restarts
+    0.5 row  35   this fix  35.17 (+0.17) hole 5  +/-0.06 rows  100 % sure  track  35.13 +/-0.12 100 %   x 1.3 y 9.5 z 10.5 down  misfit 2 %  seen by 5+3 faint
+    1.0 row  35   this fix  35.17 (+0.17) hole 5  +/-0.06 rows  100 % sure  track  35.16 +/-0.12 100 %   x 1.3 y 9.3 z 10.5 down  misfit 2 %  seen by 5+2 faint
+    1.5 row  35   this fix  35.01 (+0.01) hole 5  +/-0.07 rows  100 % sure  track  35.09 +/-0.12 100 %   x 0.9 y 9.5 z 10.8 down  misfit 3 %  seen by 6+2 faint
+== 00:46:12
+    0.0 +3 faint
+    0.0 magnet at x 1.3 +/-0.1  y 9.1 +/-0.1  z 10.6 +/-0.1 mm   tilt 42 deg   strength 3932   misfit 2 %   seen by 6+2 faint   fit 1073 us
+    0.0 track: tracking  x 1.3 y 9.0 z 10.6 +/-0.3 0.3 0.3 mm  speed 11 mm/s  tilt 41 deg  cursor pointed x 1.2 y 9.3 (+/-0.4 mm, reach 0.0)  33855 fixes taken, 0 dropped, 0 restarts
+    0.1 row  35   this fix  35.16 (+0.16) hole 5  +/-0.04 rows  100 % sure  track  35.16 +/-0.12 100 %   x 1.3 y 9.4 z 10.6 down  misfit 1 %  seen by 5+3 faint
+    0.6 row  35   this fix  35.18 (+0.18) hole 5  +/-0.05 rows  100 % sure  track  35.17 +/-0.12 100 %   x 1.3 y 9.1 z 10.6 down  misfit 2 %  seen by 5+2 faint
+    1.1 row  35   this fix  35.15 (+0.15) hole 5  +/-0.04 rows  100 % sure  track  35.17 +/-0.12 100 %   x 1.2 y 9.3 z 10.5 down  misfit 1 %  seen by 5+3 faint
+== 00:46:26
+    0.0 int
+    0.0 row  35   this fix  35.16 (+0.16) hole 5  +/-0.07 rows  100 % sure  track  35.18 +/-0.12 100 %   x 1.2 y 9.0 z 10.8 down  misfit 2 %  seen by 5+2 faint
+    0.0 magnet at x 1.2 +/-0.1  y 9.3 +/-0.2  z 10.6 +/-0.1 mm   tilt 40 deg   strength 4034   misfit 2 %   seen by 6+2 faint   fit 1163 us
+    0.0 track: tracking  x 1.2 y 9.3 z 10.5 +/-0.3 0.3 0.3 mm  speed 12 mm/s  tilt 41 deg  cursor pointed x 1.3 y 9.2 (+/-0.4 mm, reach 0.0)  35238 fixes taken, 0 dropped, 0 restarts
+    0.4 row  35   this fix  35.10 (+0.10) hole 5  +/-0.05 rows  100 % sure  track  35.16 +/-0.12 100 %   x 1.1 y 9.5 z 10.8 down  misfit 2 %  seen by 5+2 faint
+    0.9 row  35   this fix  35.18 (+0.18) hole 5  +/-0.05 rows  100 % sure  track  35.14 +/-0.12 100 %   x 1.3 y 9.3 z 10.5 down  misfit 2 %  seen by 5+3 faint
+    1.4 row  35   this fix  35.11 (+0.11) hole 4  +/-0.05 rows  100 % sure  track  35.14 +/-0.12 100 %   x 1.1 y 9.5 z 10.6 down  misfit 2 %  seen by 7+1 faint
+== 00:46:40
+    0.0 t
+    0.0 magnet at x 1.3 +/-0.1  y 9.2 +/-0.1  z 10.7 +/-0.1 mm   tilt 41 deg   strength 4080   misfit 1 %   seen by 6+2 faint   fit 1100 us
+    0.0 track: tracking  x 1.3 y 9.2 z 10.7 +/-0.3 0.3 0.3 mm  speed 18 mm/s  tilt 41 deg  cursor pointed x 1.2 y 9.3 (+/-0.4 mm, reach 0.0)  36626 fixes taken, 0 dropped, 0 restarts
+    0.1 row  35   this fix  35.16 (+0.16) hole 5  +/-0.04 rows  100 % sure  track  35.15 +/-0.12 100 %   x 1.2 y 9.3 z 10.7 down  misfit 2 %  seen by 5+3 faint
+    0.7 row  35   this fix  35.11 (+0.11) hole 5  +/-0.06 rows  100 % sure  track  35.13 +/-0.12 100 %   x 1.1 y 9.3 z 10.9 down  misfit 2 %  seen by 5+3 faint
+    1.2 row  35   this fix  35.15 (+0.15) hole 5  +/-0.05 rows  100 % sure  track  35.17 +/-0.12 100 %   x 1.2 y 9.5 z 10.4 down  misfit 2 %  seen by 5+3 faint
+== 00:46:53
+    0.0 +2 faint
+    0.0 row  35   this fix  35.14 (+0.14) hole 5  +/-0.04 rows  100 % sure  track  35.13 +/-0.12 100 %   x 1.2 y 9.2 z 10.8 down  misfit 1 %  seen by 5+3 faint
+    0.0 magnet at x 1.1 +/-0.1  y 9.3 +/-0.2  z 10.9 +/-0.1 mm   tilt 41 deg   strength 4281   misfit 2 %   seen by 6+2 faint   fit 1061 us
+    0.0 track: tracking  x 1.1 y 9.3 z 10.9 +/-0.3 0.3 0.3 mm  speed 8 mm/s  tilt 41 deg  cursor pointed x 1.2 y 9.2 (+/-0.4 mm, reach 0.0)  38009 fixes taken, 0 dropped, 0 restarts
+    0.4 row  35   this fix  35.17 (+0.17) hole 5  +/-0.06 rows  100 % sure  track  35.15 +/-0.12 100 %   x 1.3 y 9.4 z 10.5 down  misfit 2 %  seen by 6+2 faint
+    0.9 row  35   this fix  35.19 (+0.19) hole 5  +/-0.07 rows  100 % sure  track  35.16 +/-0.12 100 %   x 1.3 y 9.1 z 10.6 down  misfit 3 %  seen by 5+3 faint
+    1.4 row  35   this fix  35.18 (+0.18) hole 5  +/-0.03 rows  100 % sure  track  35.15 +/-0.12 100 %   x 1.3 y 9.2 z 10.7 down  misfit 1 %  seen by 5+3 faint
+== 00:47:07
+    0.0 nt
+    0.0 magnet at x 1.4 +/-0.1  y 9.4 +/-0.1  z 10.4 +/-0.1 mm   tilt 40 deg   strength 4019   misfit 2 %   seen by 5+3 faint   fit 1134 us
+    0.0 track: tracking  x 1.4 y 9.3 z 10.4 +/-0.3 0.3 0.3 mm  speed 20 mm/s  tilt 40 deg  cursor pointed x 1.3 y 9.4 (+/-0.4 mm, reach 0.0)  39394 fixes taken, 0 dropped, 0 restarts
+    0.1 row  35   this fix  35.26 (+0.26) hole 5  +/-0.05 rows  100 % sure  track  35.22 +/-0.12  99 %   x 1.5 y 8.9 z 10.3 down  misfit 2 %  seen by 5+3 faint
+    0.6 row  35   this fix  35.21 (+0.21) hole 5  +/-0.05 rows  100 % sure  track  35.15 +/-0.12 100 %   x 1.4 y 9.2 z 10.4 down  misfit 2 %  seen by 5+2 faint
+    1.1 row  35   this fix  35.25 (+0.25) hole 5  +/-0.04 rows  100 % sure  track  35.20 +/-0.12  99 %   x 1.5 y 9.2 z 10.5 down  misfit 2 %  seen by 5+3 faint
+== 00:47:21
+    0.0 int
+    0.0 row  35   this fix  35.19 (+0.19) hole 5  +/-0.07 rows  100 % sure  track  35.18 +/-0.12 100 %   x 1.3 y 8.9 z 10.7 down  misfit 2 %  seen by 5+3 faint
+    0.0 magnet at x 1.2 +/-0.1  y 9.1 +/-0.1  z 10.9 +/-0.1 mm   tilt 42 deg   strength 4210   misfit 1 %   seen by 5+3 faint   fit 1079 us
+    0.0 track: tracking  x 1.2 y 9.2 z 10.9 +/-0.3 0.3 0.3 mm  speed 8 mm/s  tilt 42 deg  cursor pointed x 1.3 y 9.1 (+/-0.4 mm, reach 0.0)  40770 fixes taken, 0 dropped, 0 restarts
+    0.4 row  35   this fix  35.14 (+0.14) hole 5  +/-0.06 rows  100 % sure  track  35.17 +/-0.12 100 %   x 1.2 y 9.1 z 10.8 down  misfit 2 %  seen by 5+3 faint
+    0.9 row  35   this fix  35.08 (+0.08) hole 5  +/-0.06 rows  100 % sure  track  35.14 +/-0.12 100 %   x 1.0 y 8.8 z 11.1 down  misfit 2 %  seen by 5+3 faint
+    1.4 row  35   this fix  35.20 (+0.20) hole 5  +/-0.03 rows  100 % sure  track  35.12 +/-0.12 100 %   x 1.3 y 9.1 z 10.6 down  misfit 1 %  seen by 5+3 faint
+== 00:47:35
+    0.0 3 faint
+    0.0 magnet at x 1.1 +/-0.1  y 9.2 +/-0.2  z 11.0 +/-0.1 mm   tilt 42 deg   strength 4325   misfit 2 %   seen by 5+3 faint   fit 1062 us
+    0.0 track: tracking  x 1.1 y 9.2 z 11.0 +/-0.3 0.3 0.3 mm  speed 11 mm/s  tilt 42 deg  cursor pointed x 1.2 y 9.2 (+/-0.4 mm, reach 0.0)  42156 fixes taken, 0 dropped, 0 restarts
+    0.1 row  35   this fix  35.10 (+0.10) hole 5  +/-0.05 rows  100 % sure  track  35.14 +/-0.12 100 %   x 1.1 y 9.1 z 10.9 down  misfit 2 %  seen by 5+3 faint
+    0.6 row  35   this fix  35.12 (+0.12) hole 5  +/-0.05 rows  100 % sure  track  35.13 +/-0.12 100 %   x 1.2 y 9.3 z 10.7 down  misfit 2 %  seen by 6+2 faint
+    1.1 row  35   this fix  35.12 (+0.12) hole 4  +/-0.05 rows  100 % sure  track  35.14 +/-0.12 100 %   x 1.2 y 9.6 z 10.6 down  misfit 2 %  seen by 6+2 faint
+== 00:47:49
+    0.0 int
+    0.0 row  35   this fix  35.14 (+0.14) hole 5  +/-0.06 rows  100 % sure  track  35.13 +/-0.12 100 %   x 1.2 y 9.5 z 11.0 down  misfit 2 %  seen by 6+1 faint
+    0.0 magnet at x 1.1 +/-0.1  y 9.5 +/-0.1  z 10.8 +/-0.1 mm   tilt 40 deg   strength 4327   misfit 2 %   seen by 5+3 faint   fit 1095 us
+    0.0 track: tracking  x 1.0 y 9.5 z 10.8 +/-0.3 0.3 0.3 mm  speed 7 mm/s  tilt 41 deg  cursor pointed x 1.1 y 9.4 (+/-0.4 mm, reach 0.0)  43537 fixes taken, 0 dropped, 0 restarts
+    0.5 row  35   this fix  35.23 (+0.23) hole 5  +/-0.04 rows  100 % sure  track  35.17 +/-0.12 100 %   x 1.4 y 9.4 z 10.3 down  misfit 2 %  seen by 5+3 faint
+    1.0 row  35   this fix  35.17 (+0.17) hole 5  +/-0.05 rows  100 % sure  track  35.13 +/-0.12 100 %   x 1.3 y 9.4 z 10.5 down  misfit 2 %  seen by 5+2 faint
+    1.5 row  35   this fix  35.13 (+0.13) hole 5  +/-0.05 rows  100 % sure  track  35.11 +/-0.12 100 %   x 1.2 y 9.3 z 10.8 down  misfit 2 %  seen by 6+2 faint
+== 00:48:03
+    0.0 5+3 faint
+    0.0 magnet at x 1.2 +/-0.2  y 9.4 +/-0.2  z 10.8 +/-0.2 mm   tilt 40 deg   strength 4321   misfit 2 %   seen by 5+3 faint   fit 1679 us
+    0.0 track: tracking  x 1.1 y 9.5 z 10.8 +/-0.3 0.3 0.3 mm  speed 26 mm/s  tilt 41 deg  cursor pointed x 1.2 y 9.4 (+/-0.4 mm, reach 0.0)  44931 fixes taken, 0 dropped, 0 restarts
+    0.2 row  35   this fix  35.12 (+0.12) hole 5  +/-0.06 rows  100 % sure  track  35.14 +/-0.12 100 %   x 1.1 y 9.3 z 10.7 down  misfit 2 %  seen by 6+2 faint
+    0.7 row  35   this fix  35.14 (+0.14) hole 5  +/-0.07 rows  100 % sure  track  35.16 +/-0.12 100 %   x 1.2 y 9.2 z 10.8 down  misfit 2 %  seen by 5+3 faint
+    1.2 row  35   this fix  35.16 (+0.16) hole 5  +/-0.06 rows  100 % sure  track  35.13 +/-0.12 100 %   x 1.2 y 9.3 z 10.6 down  misfit 2 %  seen by 5+3 faint
+== 00:48:17
+    0.0 aint
+    0.0 row  35   this fix  35.12 (+0.12) hole 5  +/-0.05 rows  100 % sure  track  35.11 +/-0.12 100 %   x 1.1 y 9.5 z 10.7 down  misfit 2 %  seen by 5+2 faint
+    0.0 magnet at x 1.2 +/-0.1  y 9.3 +/-0.1  z 10.7 +/-0.1 mm   tilt 40 deg   strength 4102   misfit 2 %   seen by 5+2 faint   fit 1289 us
+    0.0 track: tracking  x 1.3 y 9.3 z 10.7 +/-0.3 0.3 0.3 mm  speed 9 mm/s  tilt 41 deg  cursor pointed x 1.2 y 9.3 (+/-0.4 mm, reach 0.0)  46315 fixes taken, 0 dropped, 0 restarts
+    0.4 row  35   this fix  35.11 (+0.11) hole 5  +/-0.06 rows  100 % sure  track  35.12 +/-0.12 100 %   x 1.1 y 9.2 z 10.8 down  misfit 2 %  seen by 6+2 faint
+    0.9 row  35   this fix  35.07 (+0.07) hole 5  +/-0.05 rows  100 % sure  track  35.13 +/-0.12 100 %   x 1.0 y 9.4 z 10.9 down  misfit 2 %  seen by 6+2 faint
+    1.5 row  35   this fix  35.07 (+0.07) hole 5  +/-0.06 rows  100 % sure  track  35.10 +/-0.12 100 %   x 1.0 y 9.3 z 11.0 down  misfit 2 %  seen by 5+3 faint
+== 00:48:31
+    0.0 
+    0.0 magnet at x 1.2 +/-0.2  y 9.2 +/-0.2  z 10.7 +/-0.2 mm   tilt 41 deg   strength 4044   misfit 2 %   seen by 5+2 faint   fit 1438 us
+    0.0 track: tracking  x 1.2 y 9.3 z 10.6 +/-0.3 0.3 0.3 mm  speed 13 mm/s  tilt 41 deg  cursor pointed x 1.2 y 9.3 (+/-0.4 mm, reach 0.0)  47711 fixes taken, 0 dropped, 0 restarts
+    0.1 row  35   this fix  35.08 (+0.08) hole 5  +/-0.06 rows  100 % sure  track  35.11 +/-0.12 100 %   x 1.0 y 9.5 z 10.8 down  misfit 2 %  seen by 5+3 faint
+    0.6 row  35   this fix  35.12 (+0.12) hole 5  +/-0.05 rows  100 % sure  track  35.17 +/-0.12 100 %   x 1.1 y 9.4 z 10.8 down  misfit 2 %  seen by 5+3 faint
+    1.1 row  35   this fix  35.13 (+0.13) hole 5  +/-0.06 rows  100 % sure  track  35.16 +/-0.12 100 %   x 1.2 y 9.4 z 10.7 down  misfit 2 %  seen by 5+3 faint
+== 00:48:45
+    0.0 
+    0.0 row  35   this fix  35.07 (+0.07) hole 5  +/-0.05 rows  100 % sure  track  35.16 +/-0.12 100 %   x 1.0 y 9.5 z 10.7 down  misfit 2 %  seen by 5+2 faint
+    0.0 magnet at x 1.2 +/-0.2  y 9.4 +/-0.2  z 10.7 +/-0.2 mm   tilt 40 deg   strength 4167   misfit 2 %   seen by 5+2 faint   fit 1774 us
+    0.0 track: tracking  x 1.2 y 9.4 z 10.7 +/-0.3 0.3 0.3 mm  speed 27 mm/s  tilt 40 deg  cursor pointed x 1.2 y 9.4 (+/-0.4 mm, reach 0.0)  49089 fixes taken, 0 dropped, 0 restarts
+    0.4 row  35   this fix  35.15 (+0.15) hole 5  +/-0.05 rows  100 % sure  track  35.13 +/-0.12 100 %   x 1.2 y 9.5 z 10.5 down  misfit 2 %  seen by 6+2 faint
+    0.9 row  35   this fix  35.12 (+0.12) hole 5  +/-0.06 rows  100 % sure  track  35.15 +/-0.12 100 %   x 1.2 y 9.5 z 10.6 down  misfit 2 %  seen by 5+3 faint
+    1.4 row  35   this fix  35.15 (+0.15) hole 5  +/-0.07 rows  100 % sure  track  35.10 +/-0.12 100 %   x 1.2 y 9.3 z 10.6 down  misfit 3 %  seen by 5+3 faint
+== 00:48:58
+    0.0 aint
+    0.0 magnet at x 1.1 +/-0.1  y 9.3 +/-0.1  z 10.8 +/-0.1 mm   tilt 41 deg   strength 4208   misfit 2 %   seen by 6+2 faint   fit 1089 us
+    0.0 track: tracking  x 1.1 y 9.3 z 10.8 +/-0.3 0.3 0.3 mm  speed 9 mm/s  tilt 42 deg  cursor pointed x 1.2 y 9.2 (+/-0.4 mm, reach 0.0)  50477 fixes taken, 0 dropped, 0 restarts
+    0.2 row  35   this fix  35.13 (+0.13) hole 5  +/-0.05 rows  100 % sure  track  35.15 +/-0.12 100 %   x 1.2 y 9.4 z 10.5 down  misfit 2 %  seen by 6+2 faint
+    0.7 row  35   this fix  35.14 (+0.14) hole 5  +/-0.05 rows  100 % sure  track  35.11 +/-0.12 100 %   x 1.2 y 9.2 z 10.8 down  misfit 2 %  seen by 5+3 faint
+    1.2 row  35   this fix  35.17 (+0.17) hole 5  +/-0.05 rows  100 % sure  track  35.14 +/-0.12 100 %   x 1.3 y 9.0 z 10.6 down  misfit 2 %  seen by 5+3 faint
+== 00:49:12
+    0.0 int
+    0.0 row  35   this fix  35.18 (+0.18) hole 5  +/-0.03 rows  100 % sure  track  35.15 +/-0.12 100 %   x 1.3 y 9.3 z 10.8 down  misfit 1 %  seen by 6+2 faint
+    0.0 magnet at x 1.1 +/-0.1  y 9.6 +/-0.1  z 10.9 +/-0.1 mm   tilt 41 deg   strength 4430   misfit 2 %   seen by 6+1 faint   fit 1398 us
+    0.0 track: tracking  x 1.0 y 9.5 z 11.0 +/-0.3 0.3 0.3 mm  speed 18 mm/s  tilt 41 deg  cursor pointed x 1.2 y 9.5 (+/-0.4 mm, reach 0.0)  51863 fixes taken, 0 dropped, 0 restarts
+    0.4 row  35   this fix  35.15 (+0.15) hole 5  +/-0.05 rows  100 % sure  track  35.11 +/-0.12 100 %   x 1.2 y 9.2 z 10.8 down  misfit 2 %  seen by 5+3 faint
+    0.9 row  35   this fix  35.14 (+0.14) hole 5  +/-0.04 rows  100 % sure  track  35.10 +/-0.12 100 %   x 1.2 y 9.4 z 10.9 down  misfit 2 %  seen by 5+2 faint
+    1.4 row  35   this fix  35.12 (+0.12) hole 5  +/-0.07 rows  100 % sure  track  35.08 +/-0.12 100 %   x 1.1 y 9.3 z 10.8 down  misfit 3 %  seen by 5+3 faint
+== 00:49:26
+    0.0 nt
+    0.0 magnet at x 1.0 +/-0.1  y 9.4 +/-0.1  z 10.8 +/-0.1 mm   tilt 40 deg   strength 4339   misfit 2 %   seen by 5+3 faint   fit 1555 us
+    0.0 track: tracking  x 0.9 y 9.5 z 10.9 +/-0.3 0.3 0.3 mm  speed 33 mm/s  tilt 41 deg  cursor pointed x 1.1 y 9.3 (+/-0.4 mm, reach 0.0)  53252 fixes taken, 0 dropped, 0 restarts
+    0.1 row  35   this fix  35.09 (+0.09) hole 5  +/-0.05 rows  100 % sure  track  35.12 +/-0.12 100 %   x 1.1 y 9.4 z 10.8 down  misfit 2 %  seen by 6+1 faint
+    0.7 row  35   this fix  35.10 (+0.10) hole 5  +/-0.04 rows  100 % sure  track  35.13 +/-0.12 100 %   x 1.1 y 9.3 z 10.9 down  misfit 1 %  seen by 5+3 faint
+    1.2 row  35   this fix  35.09 (+0.09) hole 5  +/-0.06 rows  100 % sure  track  35.10 +/-0.12 100 %   x 1.1 y 9.4 z 10.9 down  misfit 2 %  seen by 5+2 faint
+== 00:49:40
+    0.0 3 faint
+    0.0 row  35   this fix  35.11 (+0.11) hole 5  +/-0.07 rows  100 % sure  track  35.10 +/-0.12 100 %   x 1.1 y 9.4 z 10.7 down  misfit 3 %  seen by 5+3 faint
+    0.0 magnet at x 1.1 +/-0.2  y 9.5 +/-0.2  z 10.7 +/-0.2 mm   tilt 40 deg   strength 4281   misfit 3 %   seen by 5+2 faint   fit 1100 us
+    0.0 track: tracking  x 1.1 y 9.6 z 10.7 +/-0.3 0.3 0.3 mm  speed 7 mm/s  tilt 40 deg  cursor pointed x 1.1 y 9.5 (+/-0.4 mm, reach 0.0)  54633 fixes taken, 0 dropped, 0 restarts
+    0.4 row  35   this fix  35.10 (+0.10) hole 5  +/-0.05 rows  100 % sure  track  35.11 +/-0.12 100 %   x 1.1 y 9.4 z 10.7 down  misfit 2 %  seen by 5+2 faint
+    0.9 row  35   this fix  35.15 (+0.15) hole 5  +/-0.05 rows  100 % sure  track  35.12 +/-0.12 100 %   x 1.2 y 9.3 z 10.7 down  misfit 2 %  seen by 5+3 faint
+    1.4 row  35   this fix  35.11 (+0.11) hole 5  +/-0.06 rows  100 % sure  track  35.13 +/-0.12 100 %   x 1.1 y 9.4 z 10.9 down  misfit 2 %  seen by 6+2 faint
+== 00:49:54
+    0.0 int
+    0.0 magnet at x 1.1 +/-0.2  y 9.4 +/-0.2  z 11.0 +/-0.2 mm   tilt 41 deg   strength 4378   misfit 3 %   seen by 5+3 faint   fit 1284 us
+    0.0 track: tracking  x 1.1 y 9.3 z 11.0 +/-0.3 0.3 0.3 mm  speed 15 mm/s  tilt 41 deg  cursor pointed x 1.1 y 9.3 (+/-0.4 mm, reach 0.0)  56025 fixes taken, 0 dropped, 0 restarts
+    0.1 row  35   this fix  35.15 (+0.15) hole 5  +/-0.06 rows  100 % sure  track  35.12 +/-0.12 100 %   x 1.2 y 9.2 z 10.8 down  misfit 2 %  seen by 6+1 faint
+    0.6 row  35   this fix  35.10 (+0.10) hole 5  +/-0.05 rows  100 % sure  track  35.12 +/-0.12 100 %   x 1.1 y 9.3 z 10.8 down  misfit 2 %  seen by 5+3 faint
+    1.1 row  35   this fix  35.13 (+0.13) hole 5  +/-0.07 rows  100 % sure  track  35.12 +/-0.12 100 %   x 1.2 y 9.2 z 10.8 down  misfit 3 %  seen by 5+2 faint
+== 00:50:17
+    0.0 aint
+    0.0 row  35   this fix  35.14 (+0.14) hole 5  +/-0.05 rows  100 % sure  track  35.12 +/-0.12 100 %   x 1.2 y 9.3 z 10.7 down  misfit 2 %  seen by 5+3 faint
+    0.0 magnet at x 1.3 +/-0.1  y 9.0 +/-0.1  z 10.9 +/-0.1 mm   tilt 43 deg   strength 4128   misfit 2 %   seen by 5+3 faint   fit 1101 us
+    0.0 track: tracking  x 1.3 y 8.9 z 10.9 +/-0.3 0.3 0.3 mm  speed 9 mm/s  tilt 42 deg  cursor pointed x 1.2 y 9.2 (+/-0.4 mm, reach 0.0)  58313 fixes taken, 0 dropped, 0 restarts
+    0.4 row  35   this fix  35.17 (+0.17) hole 5  +/-0.06 rows  100 % sure  track  35.15 +/-0.12 100 %   x 1.3 y 9.2 z 10.7 down  misfit 2 %  seen by 6+2 faint
+    0.9 row  35   this fix  35.09 (+0.09) hole 5  +/-0.05 rows  100 % sure  track  35.11 +/-0.12 100 %   x 1.1 y 9.3 z 10.9 down  misfit 2 %  seen by 5+3 faint
+    1.4 row  35   this fix  35.14 (+0.14) hole 5  +/-0.08 rows  100 % sure  track  35.14 +/-0.12 100 %   x 1.2 y 9.1 z 10.9 down  misfit 3 %  seen by 5+3 faint
+== 00:50:31
+    0.0 faint
+    0.0 magnet at x 1.2 +/-0.2  y 9.1 +/-0.2  z 10.9 +/-0.2 mm   tilt 42 deg   strength 4143   misfit 2 %   seen by 6+2 faint   fit 1113 us
+    0.0 track: tracking  x 1.3 y 9.1 z 10.8 +/-0.3 0.3 0.3 mm  speed 20 mm/s  tilt 42 deg  cursor pointed x 1.2 y 9.2 (+/-0.4 mm, reach 0.0)  59696 fixes taken, 0 dropped, 0 restarts
+    0.1 row  35   this fix  35.14 (+0.14) hole 5  +/-0.07 rows  100 % sure  track  35.16 +/-0.12 100 %   x 1.2 y 9.1 z 10.8 down  misfit 2 %  seen by 6+2 faint
+    0.6 row  35   this fix  35.19 (+0.19) hole 5  +/-0.05 rows  100 % sure  track  35.14 +/-0.12 100 %   x 1.3 y 9.1 z 10.7 down  misfit 2 %  seen by 5+3 faint
+    1.1 row  35   this fix  35.16 (+0.16) hole 5  +/-0.05 rows  100 % sure  track  35.14 +/-0.12 100 %   x 1.2 y 9.1 z 11.0 down  misfit 2 %  seen by 5+3 faint
+== 00:50:45
+    0.0 
+    0.0 row  35   this fix  35.08 (+0.08) hole 5  +/-0.05 rows  100 % sure  track  35.09 +/-0.12 100 %   x 1.1 y 9.4 z 10.9 down  misfit 2 %  seen by 5+2 faint
+    0.0 magnet at x 1.1 +/-0.1  y 9.4 +/-0.2  z 10.8 +/-0.1 mm   tilt 41 deg   strength 4309   misfit 2 %   seen by 5+2 faint   fit 1126 us
+    0.0 track: tracking  x 1.1 y 9.4 z 10.9 +/-0.3 0.3 0.3 mm  speed 7 mm/s  tilt 41 deg  cursor pointed x 1.1 y 9.3 (+/-0.4 mm, reach 0.0)  61074 fixes taken, 0 dropped, 0 restarts
+    0.4 row  35   this fix  35.12 (+0.12) hole 5  +/-0.05 rows  100 % sure  track  35.13 +/-0.12 100 %   x 1.2 y 9.2 z 11.0 down  misfit 2 %  seen by 6+2 faint
+    0.9 row  35   this fix  35.12 (+0.12) hole 5  +/-0.04 rows  100 % sure  track  35.11 +/-0.12 100 %   x 1.2 y 9.3 z 10.9 down  misfit 2 %  seen by 5+3 faint
+    1.4 row  35   this fix  35.05 (+0.05) hole 4  +/-0.05 rows  100 % sure  track  35.11 +/-0.12 100 %   x 1.0 y 9.6 z 10.8 down  misfit 2 %  seen by 5+3 faint
+== 00:50:59
+    0.0 +2 faint
+    0.0 magnet at x 1.2 +/-0.1  y 9.4 +/-0.1  z 10.6 +/-0.1 mm   tilt 41 deg   strength 4091   misfit 2 %   seen by 5+3 faint   fit 1078 us
+    0.0 track: tracking  x 1.2 y 9.3 z 10.6 +/-0.3 0.3 0.3 mm  speed 17 mm/s  tilt 40 deg  cursor pointed x 1.2 y 9.5 (+/-0.4 mm, reach 0.0)  62466 fixes taken, 0 dropped, 0 restarts
+    0.2 row  35   this fix  35.11 (+0.11) hole 5  +/-0.04 rows  100 % sure  track  35.13 +/-0.12 100 %   x 1.1 y 9.2 z 10.9 down  misfit 1 %  seen by 6+2 faint
+    0.7 row  35   this fix  35.04 (+0.04) hole 4  +/-0.04 rows  100 % sure  track  35.15 +/-0.12 100 %   x 0.9 y 9.5 z 10.8 down  misfit 1 %  seen by 5+3 faint
+    1.2 row  35   this fix  35.13 (+0.13) hole 5  +/-0.05 rows  100 % sure  track  35.14 +/-0.12 100 %   x 1.2 y 9.3 z 10.8 down  misfit 2 %  seen by 6+2 faint
+== 00:51:12
+    0.0  faint
+    0.0 row  35   this fix  35.11 (+0.11) hole 5  +/-0.05 rows  100 % sure  track  35.14 +/-0.12 100 %   x 1.1 y 9.5 z 10.7 down  misfit 2 %  seen by 5+3 faint
+    0.0 magnet at x 1.2 +/-0.1  y 9.2 +/-0.1  z 10.7 +/-0.1 mm   tilt 41 deg   strength 4079   misfit 1 %   seen by 6+2 faint   fit 1087 us
+    0.0 track: tracking  x 1.2 y 9.2 z 10.7 +/-0.3 0.3 0.3 mm  speed 10 mm/s  tilt 41 deg  cursor pointed x 1.2 y 9.3 (+/-0.4 mm, reach 0.0)  63854 fixes taken, 0 dropped, 0 restarts
+    0.4 row  35   this fix  35.10 (+0.10) hole 5  +/-0.04 rows  100 % sure  track  35.13 +/-0.12 100 %   x 1.1 y 9.3 z 11.0 down  misfit 2 %  seen by 5+2 faint
+    0.9 row  35   this fix  35.13 (+0.13) hole 5  +/-0.05 rows  100 % sure  track  35.14 +/-0.12 100 %   x 1.2 y 9.2 z 10.7 down  misfit 2 %  seen by 5+3 faint
+    1.4 row  35   this fix  35.14 (+0.14) hole 5  +/-0.05 rows  100 % sure  track  35.18 +/-0.12 100 %   x 1.2 y 9.3 z 10.8 down  misfit 2 %  seen by 5+3 faint
+== 00:51:57
+== stopped 01:03:06: the board went dark at 00:51 (a flash failed part way; the probe cannot attach: 0x55)

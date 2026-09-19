@@ -2,6 +2,7 @@
 #include "ST7789.h"
 
 #include <SPI.h>
+#include <ch32h4_spi.h> // the peripheral's registers, for the DMA push below
 
 #include "BoardPins.h"
 
@@ -99,4 +100,96 @@ void st7789PushRows( uint16_t* frame, int y0, int rows ) {
     LCD_BUS.transfer( band, nullptr, pixels * 2 ); // one DMA transfer, send-only
     digitalWrite( PIN_LCD_CS, HIGH );
     LCD_BUS.endTransaction( );
+}
+
+// ---- the same, without waiting --------------------------------------------
+// The SPI library's DMA transfer blocks until the bytes are out, which for a
+// band of the frame is milliseconds the loop would rather spend reading
+// sensors. This starts the DMA the same way the library does (its channel
+// 3, request line 61 + 2 x peripheral, from the reference manual's table)
+// and hands the wait to the caller, who polls st7789PushBusy() from the
+// scheduler and calls st7789PushFinish() when it is clear. Nothing else may
+// use the bus in between; the caller holds the transaction.
+#define LCD_DMA_TX_CH DMA1_Channel3
+#define LCD_DMA_TX_MUX DMA_MuxChannel3
+#define LCD_DMA_TX_FLAGS 0x00000F00u // channel 3's bits of INTFR / INTFCR
+#define LCD_DMA_TX_REQ( id ) ( 61 + 2 * ( id ) )
+#define LCD_DMA_MAX 65535u
+
+static bool pushInFlight = false;
+static SPI_TypeDef* pushDev = nullptr;
+
+bool st7789PushRowsStart( uint16_t* frame, int y0, int rows ) {
+    if ( pushInFlight ) {
+        return false;
+    }
+    uint16_t* band = frame + (size_t)y0 * LCD_WIDTH;
+    size_t bytes = (size_t)rows * LCD_WIDTH * 2;
+    if ( bytes > LCD_DMA_MAX ) {
+        return false; // one DMA block: at most 136 rows of 240
+    }
+    for ( size_t i = 0; i < bytes / 2; i++ ) {
+        band[ i ] = (uint16_t)( ( band[ i ] << 8 ) | ( band[ i ] >> 8 ) );
+    }
+
+    LCD_BUS.beginTransaction( SPISettings( LCD_SPI_HZ, MSBFIRST, LCD_SPI_MODE ) );
+    digitalWrite( PIN_LCD_CS, LOW );
+    setWindow( LCD_X_OFFSET, LCD_Y_OFFSET + y0, LCD_X_OFFSET + LCD_WIDTH - 1, LCD_Y_OFFSET + y0 + rows - 1 );
+    writeCommand( CMD_RAMWR, nullptr, 0 );
+
+    pushDev = ch32h4_spi_regs( LCD_BUS.peripheral( ) );
+    if ( pushDev == nullptr ) {
+        // No peripheral to hand: send it the slow way and report done.
+        LCD_BUS.transfer( band, nullptr, bytes );
+        digitalWrite( PIN_LCD_CS, HIGH );
+        LCD_BUS.endTransaction( );
+        return true;
+    }
+    RCC_HBPeriphClockCmd( RCC_HBPeriph_DMA1, ENABLE );
+    DMA_MuxChannelConfig( LCD_DMA_TX_MUX, LCD_DMA_TX_REQ( LCD_BUS.peripheral( ) ) );
+    DMA_Cmd( LCD_DMA_TX_CH, DISABLE );
+    DMA1->INTFCR = LCD_DMA_TX_FLAGS;
+    DMA_InitTypeDef d = { };
+    d.DMA_PeripheralBaseAddr = (uint32_t)&pushDev->DATAR;
+    d.DMA_PeripheralInc = DMA_PeripheralInc_Disable;
+    d.DMA_BufferSize = (uint16_t)bytes;
+    d.DMA_DIR = DMA_DIR_PeripheralDST;
+    d.DMA_Memory0BaseAddr = (uint32_t)band;
+    d.DMA_MemoryInc = DMA_MemoryInc_Enable;
+    d.DMA_Priority = DMA_Priority_High;
+    DMA_Init( LCD_DMA_TX_CH, &d );
+    if ( pushDev->STATR & SPI_STATR_RXNE ) {
+        (void)pushDev->DATAR; // a byte left over from the command
+    }
+    SPI_I2S_DMACmd( pushDev, SPI_I2S_DMAReq_Tx, ENABLE );
+    DMA_Cmd( LCD_DMA_TX_CH, ENABLE );
+    pushInFlight = true;
+    return true;
+}
+
+bool st7789PushBusy( void ) {
+    if ( !pushInFlight ) {
+        return false;
+    }
+    // Every byte handed to the peripheral, and the last one off the wire.
+    return LCD_DMA_TX_CH->CNTR != 0 || ( pushDev->STATR & SPI_STATR_BSY );
+}
+
+void st7789PushFinish( void ) {
+    if ( !pushInFlight ) {
+        return;
+    }
+    uint32_t guard = 200000u;
+    while ( st7789PushBusy( ) && guard ) {
+        guard--;
+    }
+    SPI_I2S_DMACmd( pushDev, SPI_I2S_DMAReq_Tx, DISABLE );
+    DMA_Cmd( LCD_DMA_TX_CH, DISABLE );
+    DMA1->INTFCR = LCD_DMA_TX_FLAGS;
+    if ( pushDev->STATR & SPI_STATR_RXNE ) {
+        (void)pushDev->DATAR;
+    }
+    digitalWrite( PIN_LCD_CS, HIGH );
+    LCD_BUS.endTransaction( );
+    pushInFlight = false;
 }

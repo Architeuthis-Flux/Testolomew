@@ -54,10 +54,10 @@ bool tmag5273Present( TwoWire* bus, uint8_t address );
 // Move the sensor at oldAddress to newAddress (until its next power cycle).
 bool tmag5273SetAddress( TwoWire* bus, uint8_t oldAddress, uint8_t newAddress );
 
-// Continuous conversion of X, Y and Z, low-noise mode, NdFeB temperature
-// compensation (the part scales its readings by 0.12 %/degC of its own
-// temperature, to follow the magnet's), the INT pin masked (it may be
-// unconnected). highRange picks the wider of the part's two ranges.
+// Continuous conversion of X, Y and Z, low-noise mode, no magnet temperature
+// compensation (it would scale the readings by the DIE's temperature to
+// follow a magnet that is not there; the fit solves the strength anyway),
+// the INT pin masked (it may be unconnected). highRange picks the wider of the part's two ranges.
 // temperature also converts and returns the die temperature, which costs a
 // quarter of the conversion rate at 32x averaging (3.2 ms per result instead
 // of 2.4) and two more bytes per read. Fills in *dev.
@@ -77,6 +77,18 @@ bool tmag5273Acknowledges( TwoWire* bus, uint8_t address );
 // The latest result: field in mT, and die temperature if that channel is on
 // (else 0). One 7- or 9-byte read. false on a bus error.
 bool tmag5273Read( TwoWire* bus, const TMAG5273* dev, TMAG5273Reading* reading );
+// The same in two halves, for a sampler that reads on one core and decodes
+// on the other: the bytes of one 1-byte-mode read (7, or 9 with the
+// temperature channel), taken straight off I2C block `peripheral` (1-3;
+// false = failed, in at most a millisecond), and what they mean.
+size_t tmag5273ReadBytes( const TMAG5273* dev );
+bool tmag5273BurstRead( int peripheral, uint8_t address, uint8_t* out, size_t count );
+// The block reset and re-initialised as a master at `hz` (a wedge cleared).
+void tmag5273BusReset( int peripheral, uint32_t hz );
+void tmag5273Decode( const TMAG5273* dev, const uint8_t* raw, TMAG5273Reading* reading );
+// CONV_STATUS's rolling conversion-set count (bits 7-5): the same value twice
+// from one sensor is the same conversion read twice.
+#define TMAG5273_SET_COUNT( status ) ( ( ( status ) >> 5 ) & 7 )
 
 // The last bus transaction that failed, for diagnostics: which register, and
 // Wire's endTransmission() code (2 = address not acknowledged, 3 = data not

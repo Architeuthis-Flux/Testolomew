@@ -1,6 +1,17 @@
 // SPDX-License-Identifier: MIT
 #include "TMAG5273.h"
 
+#if __has_include( <ch32h4_i2c.h> )
+#include <ch32h4_i2c.h> // the I2C block's registers: the burst read below runs on them
+extern "C" {
+#include <ch32h4_itcm.h>  // __itcm_func
+#include <ch32h4_xcore.h> // ch32h4_core_num(): which core is reading
+}
+#define TMAG_DIRECT_READ 1
+#else
+#define TMAG_DIRECT_READ 0 // the host simulation reads through Wire
+#endif
+
 // Register map (datasheet table 8-1).
 #define REG_DEVICE_CONFIG_1 0x00
 #define REG_DEVICE_CONFIG_2 0x01
@@ -99,7 +110,13 @@ bool tmag5273Acknowledges( TwoWire* bus, uint8_t address ) {
 bool tmag5273Begin( TwoWire* bus, TMAG5273* dev, uint8_t address, uint8_t averaging, bool highRange, bool temperature ) {
     // Standard reads first: if the part is already in 1-byte read mode the
     // DEVICE_ID read below would come back as sensor data.
-    uint8_t config1 = MAG_TEMPCO_NDFEB | (uint8_t)( averaging << 2 );
+    // No magnet temperature compensation: it scales every reading by 0.12 %/degC
+    // of the DIE's temperature, to follow a magnet that sits at the same
+    // temperature as the sensor. The probe's magnet is in a hand, the die is
+    // on the board, and the fit solves the magnet's strength every frame
+    // anyway, so the setting only adds a temperature-tracking gain error
+    // (datasheet 5.9, 7.1.2; see docs/magnetometer-fusion-prior-art.md 2.5).
+    uint8_t config1 = (uint8_t)( averaging << 2 );
     if ( !tmag5273WriteRegister( bus, address, REG_DEVICE_CONFIG_1, config1 | I2C_RD_STANDARD ) ) {
         return false;
     }
@@ -125,19 +142,151 @@ bool tmag5273Begin( TwoWire* bus, TMAG5273* dev, uint8_t address, uint8_t averag
     return ok;
 }
 
-bool tmag5273Read( TwoWire* bus, const TMAG5273* dev, TMAG5273Reading* reading ) {
-    // 1-byte read mode: no register address, the part just sends the enabled
-    // channels (T first if it is on, each MSB first) and then CONV_STATUS.
-    uint8_t raw[ 9 ];
-    size_t count = dev->temperature ? 9 : 7;
-    if ( bus->requestFrom( dev->address, count ) != count ) {
-        tmag5273LastFailedRegister = REG_T_MSB_RESULT;
-        tmag5273LastFailedCode = 5;
+#if !TMAG_DIRECT_READ
+bool tmag5273BurstRead( int, uint8_t, uint8_t*, size_t ) {
+    return false; // no I2C block on the host
+}
+void tmag5273BusReset( int, uint32_t ) {}
+#else
+// The I2C block reset and set up again as a master at `hz`, the way Wire's
+// begin() does it (minus the pins, which stay as they are): what gets a
+// block out of a wedge a glitch put it in. Registers only, so the sampler
+// can do it from the other core.
+void tmag5273BusReset( int peripheral, uint32_t hz ) {
+    uint8_t id = (uint8_t)peripheral;
+    I2C_TypeDef* dev = ch32h4_i2c_regs( id );
+    if ( dev == nullptr ) {
+        return;
+    }
+    ch32h4_i2c_reset( id );
+    ch32h4_i2c_clock_enable( id );
+    I2C_InitTypeDef init = { };
+    init.I2C_Mode = I2C_Mode_I2C;
+    init.I2C_DutyCycle = I2C_DutyCycle_2;
+    init.I2C_OwnAddress1 = 0x00;
+    init.I2C_Ack = I2C_Ack_Enable;
+    init.I2C_AcknowledgedAddress = I2C_AcknowledgedAddress_7bit;
+    init.I2C_ClockSpeed = hz;
+    I2C_Init( dev, &init );
+    I2C_Cmd( dev, ENABLE );
+}
+
+// The burst read on the I2C block itself rather than through Wire, for the
+// waits: Wire waits a fixed 10 ms for every flag, and a glitch on the lines
+// (2026-09-18: the LED strip's data wire coupling into SDA, seen by the
+// block as a STOP) drops the block out of master mode in the middle of a
+// read, after which each remaining flag is waited for in vain - 10 ms gone
+// from every service behind this one, ten times a second with the strip
+// busy. Here a wait ends the moment the block is no longer master or
+// reports a bus error, and in TMAG_READ_TIMEOUT_US anyway (a 9-byte read
+// at 400 kHz is 225 us). The STOP request such an aborted read leaves
+// pending would stop the next START ever happening; it is cleared first.
+#define TMAG_READ_TIMEOUT_US 1000
+#define TMAG_I2C_ERRORS ( I2C_STAR1_BERR | I2C_STAR1_ARLO | I2C_STAR1_AF )
+
+// The clock for the timeout. micros() is right on the V5F only: its
+// sub-millisecond part is that core's own SysTick, which the V3F does not
+// have (there it reads as noise, and a timeout of noise fails one read in
+// eight - seen 2026-09-18). On the V3F, where the sampler runs, millis()
+// (kept by the V5F in shared memory) is used instead, with a coarser limit.
+#define TMAG_READ_TIMEOUT_MS 3
+
+struct ReadClock {
+    bool coarse;
+    uint32_t start;
+};
+
+__itcm_func static ReadClock clockStart( ) {
+    ReadClock c;
+    c.coarse = ch32h4_core_num( ) == 0;
+    c.start = c.coarse ? millis( ) : micros( );
+    return c;
+}
+
+__itcm_func static bool clockExpired( const ReadClock* c ) {
+    return c->coarse ? ( millis( ) - c->start > TMAG_READ_TIMEOUT_MS ) : ( micros( ) - c->start > TMAG_READ_TIMEOUT_US );
+}
+
+// The read's hot path is __itcm_func: the V3F, which runs it most, has no
+// instruction cache and fetches flash at a crawl (a pass over eight sensors
+// took 6 ms against 1.6 ms of bus time: the block stretched the clock every
+// byte waiting for the core to notice). ITCM it reaches over the bus in a
+// few cycles. The SDK's calls (in flash) are replaced by the register
+// writes they make.
+__itcm_func static bool waitFlag( I2C_TypeDef* dev, uint16_t flag, const ReadClock* clock, bool mustBeMaster ) {
+    // The clock is looked at every 32nd turn only: it is a safety net, and
+    // on the V3F reading it means the other core's memory, with waits, which
+    // at every turn of a 20 us wait halved the sampler's pass rate.
+    for ( uint32_t turn = 0;; turn++ ) {
+        uint16_t star1 = dev->STAR1;
+        if ( star1 & flag ) {
+            return true;
+        }
+        if ( star1 & TMAG_I2C_ERRORS ) {
+            return false;
+        }
+        if ( mustBeMaster && !( dev->STAR2 & I2C_STAR2_MSL ) ) {
+            return false; // a STOP the block did not send: the lines glitched
+        }
+        if ( ( turn & 31u ) == 31u && clockExpired( clock ) ) {
+            return false;
+        }
+    }
+}
+
+// false = failed; the block is left idle and ready for the next transaction.
+// On the I2C block's registers alone, so it runs the same from either core
+// (the sampler on the V3F calls it, MagSampler.cpp).
+__itcm_func static bool burstReadOn( I2C_TypeDef* dev, uint8_t address, uint8_t* out, size_t count ) {
+    if ( ( dev->CTLR1 & I2C_CTLR1_STOP ) && !( dev->STAR2 & I2C_STAR2_MSL ) ) {
+        dev->CTLR1 &= (uint16_t)~I2C_CTLR1_STOP; // left over from an aborted transaction
+    }
+    dev->STAR1 &= (uint16_t)~TMAG_I2C_ERRORS;
+    ReadClock t0 = clockStart( );
+    dev->CTLR1 |= I2C_CTLR1_ACK;
+    dev->CTLR1 |= I2C_CTLR1_START;
+    if ( !waitFlag( dev, I2C_STAR1_SB, &t0, false ) ) {
+        dev->CTLR1 |= I2C_CTLR1_STOP;
         return false;
     }
-    for ( size_t i = 0; i < count; i++ ) {
-        raw[ i ] = (uint8_t)bus->read( );
+    dev->DATAR = (uint16_t)( ( address << 1 ) | 1u ); // the address, read direction
+    if ( !waitFlag( dev, I2C_STAR1_ADDR, &t0, true ) ) {
+        dev->STAR1 &= (uint16_t)~I2C_STAR1_AF; // a NACK: nobody there
+        dev->CTLR1 |= I2C_CTLR1_STOP;
+        return false;
     }
+    (void)dev->STAR2; // reading STAR1 then STAR2 clears ADDR
+    for ( size_t i = 0; i < count; i++ ) {
+        if ( i + 1 == count ) {
+            // NACK the last byte, and the STOP after it, before it arrives.
+            dev->CTLR1 &= (uint16_t)~I2C_CTLR1_ACK;
+            dev->CTLR1 |= I2C_CTLR1_STOP;
+        }
+        if ( !waitFlag( dev, I2C_STAR1_RXNE, &t0, i + 1 < count ) ) {
+            dev->CTLR1 |= I2C_CTLR1_STOP;
+            return false;
+        }
+        out[ i ] = (uint8_t)dev->DATAR;
+    }
+    return true;
+}
+
+bool tmag5273BurstRead( int peripheral, uint8_t address, uint8_t* out, size_t count ) {
+    I2C_TypeDef* dev = ch32h4_i2c_regs( (uint8_t)peripheral );
+    if ( dev == nullptr ) {
+        return false;
+    }
+    return burstReadOn( dev, address, out, count );
+}
+#endif
+
+size_t tmag5273ReadBytes( const TMAG5273* dev ) {
+    return dev->temperature ? 9 : 7;
+}
+
+void tmag5273Decode( const TMAG5273* dev, const uint8_t* raw, TMAG5273Reading* reading ) {
+    // 1-byte read mode: the part sends the enabled channels (T first if it
+    // is on, each MSB first) and then CONV_STATUS.
     const uint8_t* xyz = raw;
     reading->temperatureC = 0.0f;
     if ( dev->temperature ) {
@@ -149,5 +298,27 @@ bool tmag5273Read( TwoWire* bus, const TMAG5273* dev, TMAG5273Reading* reading )
     reading->y = (int16_t)( ( xyz[ 2 ] << 8 ) | xyz[ 3 ] ) * scale;
     reading->z = (int16_t)( ( xyz[ 4 ] << 8 ) | xyz[ 5 ] ) * scale;
     reading->status = xyz[ 6 ];
+}
+
+bool tmag5273Read( TwoWire* bus, const TMAG5273* dev, TMAG5273Reading* reading ) {
+    uint8_t raw[ 9 ];
+    size_t count = tmag5273ReadBytes( dev );
+#if TMAG_DIRECT_READ
+    if ( !tmag5273BurstRead( bus->peripheral( ), dev->address, raw, count ) ) {
+        tmag5273LastFailedRegister = REG_T_MSB_RESULT;
+        tmag5273LastFailedCode = 5;
+        return false;
+    }
+#else
+    if ( bus->requestFrom( dev->address, count ) != count ) {
+        tmag5273LastFailedRegister = REG_T_MSB_RESULT;
+        tmag5273LastFailedCode = 5;
+        return false;
+    }
+    for ( size_t i = 0; i < count; i++ ) {
+        raw[ i ] = (uint8_t)bus->read( );
+    }
+#endif
+    tmag5273Decode( dev, raw, reading );
     return true;
 }

@@ -1,6 +1,10 @@
 // SPDX-License-Identifier: MIT
 #include "Console.h"
 
+#if __has_include( <ch32h4_spi.h> )
+#include "SerialDma.h"
+#endif
+
 Console& console = Console::getInstance( );
 
 struct ConsoleCommand {
@@ -11,9 +15,49 @@ struct ConsoleCommand {
 
 static ConsoleCommand commands[ CONSOLE_MAX_COMMANDS ];
 static int commandCount = 0;
+static ConsoleKeySink keySink = nullptr;
+
+int consoleCommandCount( ) {
+    return commandCount;
+}
+
+bool consoleCommandAt( int index, char* key, const char** help ) {
+    if ( index < 0 || index >= commandCount ) {
+        return false;
+    }
+    *key = commands[ index ].key;
+    *help = commands[ index ].help;
+    return true;
+}
+
+bool consoleRunCommand( char key, Stream* io ) {
+    for ( int i = 0; i < commandCount; i++ ) {
+        if ( commands[ i ].key == key ) {
+            commands[ i ].handler( io );
+            return true;
+        }
+    }
+    return false;
+}
+
+void consoleSetKeySink( ConsoleKeySink sink ) {
+    keySink = sink;
+}
 
 bool consoleAddCommand( char key, const char* help, ConsoleHandler handler ) {
-    if ( commandCount >= CONSOLE_MAX_COMMANDS || handler == nullptr ) {
+    if ( commandCount >= CONSOLE_MAX_COMMANDS ) {
+        // Said out loud: a command that never registered otherwise only
+        // shows as "unknown command" (which is how the table was found full
+        // at 33 on 2026-09-18).
+        Stream* out = console.port( );
+        if ( out != nullptr ) {
+            out->print( "console: the command table is full, '" );
+            out->print( key );
+            out->println( "' not registered - raise CONSOLE_MAX_COMMANDS" );
+        }
+        return false;
+    }
+    if ( handler == nullptr ) {
         return false;
     }
     for ( int i = 0; i < commandCount; i++ ) {
@@ -39,6 +83,9 @@ long consoleReadNumber( Stream* io, const char* prompt, uint32_t timeoutMs ) {
             io->print( (char)c );
         } else if ( c == '\r' || c == '\n' ) {
             ended = true;
+            if ( c == '\r' && io->peek( ) == '\n' ) {
+                io->read( ); // the other half of a CRLF, so it is not read as a key later
+            }
         }
     }
     io->println( );
@@ -77,23 +124,22 @@ void Console::printHelp( ) {
 }
 
 ServiceStatus Console::service( ) {
+#if __has_include( <ch32h4_spi.h> )
+    serialDmaService( ); // the next queued run of console output, if the last ended between writes
+#endif
     if ( io == nullptr || !io->available( ) ) {
         lastStatus = ServiceStatus::IDLE;
         return lastStatus;
     }
     while ( io->available( ) ) {
         char c = (char)io->read( );
+        if ( keySink != nullptr && keySink( c ) ) {
+            continue;
+        }
         if ( c == '\r' || c == '\n' || c == ' ' ) {
             continue;
         }
-        bool found = false;
-        for ( int i = 0; i < commandCount; i++ ) {
-            if ( commands[ i ].key == c ) {
-                commands[ i ].handler( io );
-                found = true;
-                break;
-            }
-        }
+        bool found = consoleRunCommand( c, io );
         if ( !found ) {
             io->print( "unknown command '" );
             io->print( c );

@@ -20,6 +20,10 @@
 #define MAG_BASE_ADDRESS 0x10
 
 #define MAG_I2C_HZ 400000
+// The sensor round-robin runs on the other core (MagSampler.h) and this
+// core only decodes what it left in shared RAM. 0 = read the bus here, as
+// before (the fallback if loop1() gives trouble).
+#define MAG_SAMPLER_CORE1 1
 #define MAG_AVERAGING TMAG5273_AVG_32X // 400 results/s per sensor, the quietest: 22 uT rms on X/Y, 9 uT on Z
 // The narrow range (+/-40 mT on an x1 part, +/-133 on an x2): the probe's magnet
 // is meant to be weak. A sensor that reaches MAG_SATURATED of full scale on any
@@ -46,6 +50,18 @@
 // Frames averaged into the ambient baseline (Earth's field, sensor offsets and
 // whatever steel is nearby) that is subtracted from every reading.
 #define MAG_BASELINE_FRAMES 64
+
+// The zero the board boots with when none is saved (a first boot, or the
+// settings wiped by a chip erase), instead of zeroing blind: a zero taken with
+// the probe lying anywhere near the board eats its field, and every fit after
+// that is wrong (2026-09-19: 0.15 mT off on four sensors, misfit 20-50 %,
+// height 5 mm out, the LEDs white). This one was taken with the probe held
+// well away, and matches the previous night's within 0.02 mT eight hours
+// apart; the slow drift tracking follows the rest. Board frame, mT, per
+// sensor, as `s` prints the zero= lines. `z` zeroes afresh.
+#define MAG_ZERO_AT_BOOT \
+    {                    \
+        { -0.1597f, -0.0650f, -0.0341f }, { 0.0287f, 0.0655f, -0.1608f }, { -0.0366f, -0.0862f, -0.0319f }, { -0.1054f, -0.1093f, -0.0132f }, { -0.0408f, 0.0719f, -0.0923f }, { -0.0034f, -0.0055f, -0.0447f }, { -0.0827f, -0.0397f, -0.0481f }, { -0.0121f, 0.0653f, -0.1025f } }
 
 // The bench wiring is marginal at 400 kHz: now and then a transaction fails and
 // leaves the I2C block wedged, after which nothing answers. So a sensor gets
