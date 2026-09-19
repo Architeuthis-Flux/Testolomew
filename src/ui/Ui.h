@@ -54,7 +54,9 @@ class Ui : public Service {
 
     // Drawn by MagView into its framebuffer: the menu panel when it is open,
     // the log when that screen is up.
-    bool menuOpen( ) const { return menu.open; }
+    bool menuOpen( ) const { return menuShown; }
+    void openMenu( );
+    void closeMenu( );
     void drawMenu( GFXcanvas16* canvas );
     void drawLog( GFXcanvas16* canvas );
 
@@ -81,6 +83,7 @@ class Ui : public Service {
     Ui( ) = default;
 
     uint32_t lastUs = 0;
+    bool menuShown = false;
     int cameraModeChoice = 0;
     int cursorModeChoice = 0;
     int ledLayoutChoice = 0;
@@ -93,7 +96,7 @@ class Ui : public Service {
 
     void buildMenu( );
     void applyChoices( );
-    void runAction( int action, float number, bool withNumber );
+    void runAction( int index );
     void handleMenuKey( MenuKey key, bool repeat );
     void handleScreenEvent( int control, int kind );
 };

@@ -32,12 +32,13 @@
 #define UI_COLOR_TEXT RGB565( 220, 220, 220 )
 #define UI_COLOR_DIM RGB565( 120, 120, 120 )
 #define UI_COLOR_SELECTED RGB565( 255, 200, 60 )
-#define UI_COLOR_EDIT RGB565( 80, 255, 110 )
 
-// Actions above the console's keys: the menu's own.
-#define ACTION_RESET_VIEW 1000
-#define ACTION_CLOSE 1001
-#define ACTION_RESET_SETTINGS 1002
+// The menu's actions: a console command by its key (with the argument typed
+// in ahead of it when the item takes one), and the menu's own.
+static void runConsoleKey( int key, float argument );
+static void runConsoleKeyWithNumber( int key, float argument );
+static void runResetView( int, float );
+static void runResetSettings( int, float );
 
 Ui& ui = Ui::getInstance( );
 
@@ -136,14 +137,14 @@ void Ui::buildMenu( ) {
 
     int camera = menuAddSubmenu( m, MENU_ROOT, "camera" );
     menuAddChoice( m, camera, "mode", &cameraModeChoice, cameraModeNames, CAMERA_MODE_COUNT );
-    menuAddAction( m, camera, "reset view", ACTION_RESET_VIEW, false );
+    menuAddAction( m, camera, "reset view", 0, runResetView, false );
 
 #if MODULE_PROBE_LEDS
     int leds = menuAddSubmenu( m, MENU_ROOT, "LEDs" );
     menuAddChoice( m, leds, "layout", &ledLayoutChoice, ledLayoutNames, 2 );
     if ( probeLeds.strip ) {
         menuAddToggle( m, leds, "chain on", &stripOn );
-        menuAddAction( m, leds, "test chain", 'n', false );
+        menuAddAction( m, leds, "test chain", 'n', runConsoleKey, false );
     }
     menuAddNumber( m, leds, "bright", &probeLeds.style.peak, 0.05f, 1.0f, 0.05f, "" );
     menuAddNumber( m, leds, "strip", &probeLeds.stripBrightness, 0.02f, 1.0f, 0.02f, "" );
@@ -163,10 +164,10 @@ void Ui::buildMenu( ) {
     int rows = menuAddSubmenu( m, MENU_ROOT, "rows" );
     menuAddToggle( m, rows, "row mode", &rowMode );
     menuAddInfo( m, rows, "row", rowInfo );
-    menuAddAction( m, rows, "calibrate 12 taps", 'c', false );
-    menuAddAction( m, rows, "anchor at row", 'R', true );
-    menuAddAction( m, rows, "forget anchors", 'C', false );
-    menuAddAction( m, rows, "hold-still test", 'h', false );
+    menuAddAction( m, rows, "calibrate 12 taps", 'c', runConsoleKey, false );
+    menuAddNumberAction( m, rows, "anchor at row", 'R', runConsoleKeyWithNumber, 1.0f, 60.0f, 1.0f, 1.0f );
+    menuAddAction( m, rows, "forget anchors", 'C', runConsoleKey, true );
+    menuAddAction( m, rows, "hold-still test", 'h', runConsoleKey, false );
 #endif
 
 #if MODULE_PLAY
@@ -177,32 +178,28 @@ void Ui::buildMenu( ) {
     menuAddNumber( m, playPage, "paint bright", &play.paintBright, PLAY_BRIGHT_STEP, 1.0f, PLAY_BRIGHT_STEP, "" ); // nav up/down on the draw screen
     menuAddNumber( m, playPage, "brush", &play.brushSize, 0.0f, (float)PLAY_BRUSH_MAX, 1.0f, "rows" );             // nav left/right there
     menuAddNumber( m, playPage, "touch", &play.touchMm, 0.2f, 5.0f, 0.2f, "mm" );                                  // the point paints below this height
-    menuAddAction( m, playPage, "clear", 'W', false );
+    menuAddAction( m, playPage, "clear", 'W', runConsoleKey, false );
     menuAddInfo( m, playPage, "target", playInfo );
 #endif
 
     // The magnet: k, K, z, o, l.
     int magnet = menuAddSubmenu( m, MENU_ROOT, "magnet" );
     menuAddInfo( m, magnet, "strength", magnetInfo );
-    menuAddAction( m, magnet, "learn strength", 'k', false );
-    menuAddAction( m, magnet, "forget strength", 'K', false );
-    menuAddAction( m, magnet, "re-zero (away!)", 'z', false );
-    menuAddAction( m, magnet, "orientation check", 'o', false );
-    menuAddAction( m, magnet, "latest fix", 'l', false );
+    menuAddAction( m, magnet, "learn strength", 'k', runConsoleKey, false );
+    menuAddAction( m, magnet, "forget strength", 'K', runConsoleKey, true );
+    menuAddAction( m, magnet, "re-zero (away!)", 'z', runConsoleKey, true );
+    menuAddAction( m, magnet, "orientation check", 'o', runConsoleKey, false );
+    menuAddAction( m, magnet, "latest fix", 'l', runConsoleKey, false );
 
     // The sensors and the machine: m, b, p, X, s.
     int sensors = menuAddSubmenu( m, MENU_ROOT, "sensors" );
     menuAddInfo( m, sensors, "sensors", sensorsInfo );
-    menuAddAction( m, sensors, "array status", 'm', false );
-    menuAddAction( m, sensors, "bus check", 'b', false );
-    menuAddAction( m, sensors, "power-cycle", 'p', false );
-    menuAddAction( m, sensors, "service table", 'X', false );
+    menuAddAction( m, sensors, "array status", 'm', runConsoleKey, false );
+    menuAddAction( m, sensors, "bus check", 'b', runConsoleKey, false );
+    menuAddAction( m, sensors, "power-cycle", 'p', runConsoleKey, true );
+    menuAddAction( m, sensors, "service table", 'X', runConsoleKey, false );
 #if MODULE_SETTINGS
-    menuAddAction( m, sensors, "saved settings", 's', false );
-#endif
-
-#if MODULE_ROW_COUNT
-    menuAddToggle( m, MENU_ROOT, "row mode", &rowMode );
+    menuAddAction( m, sensors, "saved settings", 's', runConsoleKey, false );
 #endif
 
     // Every console command, as it is (the ones registered after this menu
@@ -210,11 +207,10 @@ void Ui::buildMenu( ) {
     commandsSubmenu = menuAddSubmenu( m, MENU_ROOT, "commands" );
     addNewCommands( );
 #if MODULE_SETTINGS
-    menuAddAction( m, MENU_ROOT, "reset settings", ACTION_RESET_SETTINGS, false );
-#endif
-    if ( menuAddAction( m, MENU_ROOT, "close", ACTION_CLOSE, false ) < 0 || m->count >= MENU_MAX_ITEMS ) {
+    if ( menuAddAction( m, MENU_ROOT, "reset settings", 0, runResetSettings, true ) < 0 || m->count >= MENU_MAX_ITEMS ) {
         uiStream.println( "menu: the item table is full - raise MENU_MAX_ITEMS (items are being dropped)" );
     }
+#endif
 }
 
 // Console commands not yet in the commands submenu, appended to it: called
@@ -230,7 +226,10 @@ void Ui::addNewCommands( ) {
         if ( !consoleCommandAt( i, &key, &help ) )
             break;
         snprintf( labels[ i ], sizeof( labels[ i ] ), "%c %s", key, help );
-        if ( menuAddAction( m, commandsSubmenu, labels[ i ], key, strstr( help, "<number>" ) != nullptr ) < 0 ) {
+        bool number = strstr( help, "<number>" ) != nullptr;
+        int added = number ? menuAddNumberAction( m, commandsSubmenu, labels[ i ], key, runConsoleKeyWithNumber, 0.0f, 999.0f, 1.0f, 0.0f )
+                           : menuAddAction( m, commandsSubmenu, labels[ i ], key, runConsoleKey, false );
+        if ( added < 0 ) {
             uiStream.println( "menu: the item table is full - raise MENU_MAX_ITEMS (commands are being dropped)" );
             break;
         }
@@ -314,54 +313,73 @@ static void readBack( Ui* u, bool* trackerOn, int* cursorChoice, int* cameraChoi
 #endif
 }
 
-void Ui::runAction( int action, float number, bool withNumber ) {
-    if ( action == ACTION_RESET_VIEW ) {
-        cameraReset( &magView.cam );
-        return;
-    }
-    if ( action == ACTION_CLOSE ) {
-        ::menuClose( &menu );
-        return;
-    }
-#if MODULE_SETTINGS
-    if ( action == ACTION_RESET_SETTINGS ) {
-        // Every menu value back to its default and saved so (the reset
-        // carries the choice items into the modules itself).
-        settings.reset( &uiStream );
-        magView.screen = MAGVIEW_SCREEN_LOG; // it said what it did
-        logScroll = 0;
-        return;
-    }
-#endif
-    if ( action >= 0 && action < 128 ) {
-        // A console command, output to the log (and the serial port). One that
-        // asks for a number gets it typed in ahead of time.
-        if ( withNumber ) {
-            char digits[ 12 ];
-            snprintf( digits, sizeof( digits ), "%ld\n", (long)( number + 0.5f ) );
-            uiStream.inject( digits );
-        }
-        uint32_t before = uiStream.logGeneration( );
-        MagViewScreen screenBefore = magView.screen;
-        consoleRunCommand( (char)action, &uiStream );
-        if ( uiStream.logGeneration( ) != before && magView.screen == screenBefore ) {
-            uiStream.print( "^ " );
-            uiStream.println( (char)action );
-            magView.screen = MAGVIEW_SCREEN_LOG; // it said something (and did not pick a screen itself): show it
-            logScroll = 0;
-        }
+// A console command from the menu: its output goes to the log (and the
+// serial port), and the log screen is shown if it said something (until the
+// shell's Result pane takes this over).
+static void runConsoleKey( int key, float argument ) {
+    (void)argument;
+    uint32_t before = uiStream.logGeneration( );
+    MagViewScreen screenBefore = magView.screen;
+    consoleRunCommand( (char)key, &uiStream );
+    if ( uiStream.logGeneration( ) != before && magView.screen == screenBefore ) {
+        uiStream.print( "^ " );
+        uiStream.println( (char)key );
+        magView.screen = MAGVIEW_SCREEN_LOG; // it said something (and did not pick a screen itself): show it
+        ui.logScroll = 0;
     }
 }
 
-void Ui::handleMenuKey( MenuKey key, bool repeat ) {
-    float number = 0.0f;
-    bool wasEditingAction = menu.editing;
-    int action = menuKey( &menu, key, repeat, &number );
+// ...one that asks for a number gets the item's argument typed in ahead.
+static void runConsoleKeyWithNumber( int key, float argument ) {
+    char digits[ 12 ];
+    snprintf( digits, sizeof( digits ), "%ld\n", (long)( argument + 0.5f ) );
+    uiStream.inject( digits );
+    runConsoleKey( key, argument );
+}
+
+static void runResetView( int, float ) {
+    cameraReset( &magView.cam );
+}
+
+static void runResetSettings( int, float ) {
+#if MODULE_SETTINGS
+    // Every menu value back to its default and saved so (the reset carries
+    // the choice items into the modules itself).
+    settings.reset( &uiStream );
+    magView.screen = MAGVIEW_SCREEN_LOG; // it said what it did
+    ui.logScroll = 0;
+#endif
+}
+
+void Ui::runAction( int index ) {
+    const MenuItem& item = menu.items[ index ];
+    if ( item.run != nullptr ) {
+        item.run( item.tag, item.argument );
+    }
+}
+
+void Ui::openMenu( ) {
+    readBack( this, &trackerOn, &cursorModeChoice, &cameraModeChoice, &ledLayoutChoice, &ledStream, &rowMode );
+    menuShown = true;
     menuEdits++;
+}
+
+void Ui::closeMenu( ) {
+    menuShown = false;
+    menuEdits++;
+}
+
+void Ui::handleMenuKey( MenuKey key, bool repeat ) {
+    int action = menuKey( &menu, key, repeat );
+    menuEdits++;
+    if ( action == MENU_AT_ROOT ) {
+        closeMenu( );
+        return;
+    }
     if ( action >= 0 ) {
         // A command may have changed what the choice items mirror (g, u, r,
         // B, L, v, e...): read the modules back rather than write over them.
-        runAction( action, number, wasEditingAction );
+        runAction( action );
         readBack( this, &trackerOn, &cursorModeChoice, &cameraModeChoice, &ledLayoutChoice, &ledStream, &rowMode );
     } else {
         applyChoices( );
@@ -461,12 +479,12 @@ ServiceStatus Ui::service( ) {
     float dtS = lastUs == 0 ? 0.01f : ( now - lastUs ) * 1e-6f;
     lastUs = now;
 
-    input.uiWantsEnter = menu.open;
+    input.uiWantsEnter = menuShown;
     // The choice items mirror module state that console commands change too
     // (g, u, v, B, L, r): keep the mirrors current, so the menu shows the
     // truth and the settings module saves it. Not while the menu is being
     // edited: the mirror is then the value on its way in.
-    if ( !menu.open ) {
+    if ( !menuShown ) {
         readBack( this, &trackerOn, &cursorModeChoice, &cameraModeChoice, &ledLayoutChoice, &ledStream, &rowMode );
     }
     InputEvent e;
@@ -475,15 +493,14 @@ ServiceStatus Ui::service( ) {
         anything = true;
         // Button A opens and closes the menu from anywhere.
         if ( e.control == IN_BTN_A && e.kind == IN_PRESS ) {
-            if ( menu.open ) {
-                ::menuClose( &menu );
+            if ( menuShown ) {
+                closeMenu( );
             } else {
-                readBack( this, &trackerOn, &cursorModeChoice, &cameraModeChoice, &ledLayoutChoice, &ledStream, &rowMode );
-                ::menuOpen( &menu );
+                openMenu( );
             }
             continue;
         }
-        if ( menu.open ) {
+        if ( menuShown ) {
             bool repeat = e.kind == IN_REPEAT;
             if ( e.kind != IN_PRESS && e.kind != IN_REPEAT )
                 continue;
@@ -529,12 +546,12 @@ ServiceStatus Ui::service( ) {
     // wheel's marker; on the 3D screen it orbits, or zooms with the stick
     // pressed.
 #if MODULE_PLAY
-    if ( !menu.open && magView.screen == MAGVIEW_SCREEN_DRAW && play.mode == PLAY_PAINT && ( input.joyX != 0.0f || input.joyY != 0.0f ) ) {
+    if ( !menuShown && magView.screen == MAGVIEW_SCREEN_DRAW && play.mode == PLAY_PAINT && ( input.joyX != 0.0f || input.joyY != 0.0f ) ) {
         play.movePicker( input.joyX * PLAY_PICK_PER_S * dtS, input.joyY * PLAY_PICK_PER_S * dtS );
         anything = true;
     }
 #endif
-    if ( !menu.open && magView.screen == MAGVIEW_SCREEN_SCENE && ( input.joyX != 0.0f || input.joyY != 0.0f ) ) {
+    if ( !menuShown && magView.screen == MAGVIEW_SCREEN_SCENE && ( input.joyX != 0.0f || input.joyY != 0.0f ) ) {
         if ( input.held( IN_JOY_PRESS ) ) {
             float f = 1.0f + input.joyY * UI_ZOOM_PER_S * dtS;
             cameraZoom( &magView.cam, f );
@@ -559,17 +576,18 @@ static void menuItemValue( const Menu* m, int index, bool selected, char* value,
         snprintf( value, size, ">" );
         break;
     case MENU_TOGGLE:
-        snprintf( value, size, *item.flag ? "on" : "off" );
+        snprintf( value, size, "%s", menuToggleGet( m, index ) ? item.onText : item.offText );
         break;
     case MENU_NUMBER:
         snprintf( value, size, item.step >= 1.0f ? "%.0f%s" : ( item.step >= 0.1f ? "%.1f%s" : "%.2f%s" ), *item.value, item.unit );
         break;
     case MENU_CHOICE:
-        snprintf( value, size, "%s", item.names[ *item.choice ] );
+        snprintf( value, size, "%s", item.names[ menuChoiceGet( m, index ) ] );
         break;
     case MENU_ACTION:
-        if ( item.takesNumber && selected && m->editing ) {
-            snprintf( value, size, "%.0f", m->editValue );
+        (void)selected;
+        if ( item.takesArgument ) {
+            snprintf( value, size, "%.0f", item.argument );
         }
         break;
     case MENU_INFO:
@@ -593,9 +611,9 @@ void Ui::printScreen( Stream* out ) {
     out->println( line );
     snprintf( line, sizeof( line ), "sim: %s%s%s", magLocator.simProbeActive( ) ? "probe " : "", input.simActive( ) ? "input " : "", !magLocator.simProbeActive( ) && !input.simActive( ) ? "-" : "" );
     out->println( line );
-    snprintf( line, sizeof( line ), "panes: %s", menu.open ? ( menu.editing ? "menu edit" : "menu" ) : "-" );
+    snprintf( line, sizeof( line ), "panes: %s", menuShown ? "menu" : "-" );
     out->println( line );
-    if ( menu.open ) {
+    if ( menuShown ) {
         // The page's path from the root, and the cursor.
         char path[ 64 ] = "";
         for ( int d = 0; d < menu.depth; d++ ) {
@@ -698,14 +716,12 @@ static void onUiVerb( int argc, char** argv, Stream* out ) {
     const char* what = argv[ 1 ];
     Menu* m = &ui.menu;
     if ( strcmp( what, "open" ) == 0 ) {
-        if ( !m->open ) {
-            input.simTap( IN_BTN_A ); // as the button does (the menu reads the modules back on opening)
-        }
-        consoleOk( out, "opening" );
+        if ( !ui.menuOpen( ) )
+            ui.openMenu( );
+        consoleOk( out, "open" );
     } else if ( strcmp( what, "close" ) == 0 ) {
-        if ( m->open )
-            menuClose( m );
-        ui.menuEdits++;
+        if ( ui.menuOpen( ) )
+            ui.closeMenu( );
         consoleOk( out, "closed" );
     } else if ( strcmp( what, "back" ) == 0 ) {
         ui.menuKeyFromConsole( MENUKEY_BACK );
@@ -726,7 +742,7 @@ static void onUiVerb( int argc, char** argv, Stream* out ) {
         ui.menuKeyFromConsole( MENUKEY_RIGHT );
         consoleOk( out, "right" );
     } else if ( strcmp( what, "go" ) == 0 && argc >= 3 ) {
-        if ( !m->open ) {
+        if ( !ui.menuOpen( ) ) {
             consoleErr( out, "the menu is not open (:ui open first)" );
             return;
         }
@@ -784,7 +800,7 @@ void Ui::drawMenu( GFXcanvas16* canvas ) {
         const MenuItem& item = menu.items[ index ];
         bool selected = n == menu.cursor;
         int y = y0 + rowH + 2 + r * rowH;
-        uint16_t colour = selected ? ( menu.editing ? UI_COLOR_EDIT : UI_COLOR_SELECTED ) : UI_COLOR_TEXT;
+        uint16_t colour = selected ? UI_COLOR_SELECTED : UI_COLOR_TEXT;
         if ( selected ) {
             fastText( canvas, x0 + 4, y, T, colour, ">" );
         }
@@ -805,7 +821,7 @@ void Ui::drawMenu( GFXcanvas16* canvas ) {
         snprintf( text, sizeof( text ), "%d/%d", menu.cursor + 1, visible );
         fastText( canvas, x0 + w - 4 - charW * (int)strlen( text ), y0 + 3, T, UI_COLOR_DIM, text );
     }
-    fastText( canvas, x0 + 4, y0 + h - 10, 1, UI_COLOR_DIM, menu.editing ? "up/down: change  press: keep  B: cancel" : "press: enter  B: back  A: close" );
+    fastText( canvas, x0 + 4, y0 + h - 10, 1, UI_COLOR_DIM, "left/right: change  press: select  B: back" );
 }
 
 void Ui::drawLog( GFXcanvas16* canvas ) {

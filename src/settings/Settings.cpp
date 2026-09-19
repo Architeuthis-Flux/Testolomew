@@ -32,7 +32,7 @@ static void onReset( Stream* out ) {
 
 // Items that are modes rather than settings: not saved, so the board boots
 // the same way every time (row mode on, the console quiet).
-static const char* const unsaved[] = { "/row mode", "rows/row mode", "LEDs/V5 stream", "LEDs/chain on", "play/mode" };
+static const char* const unsaved[] = { "rows/row mode", "LEDs/V5 stream", "LEDs/chain on", "play/mode" };
 
 static bool isUnsaved( const char* key ) {
     for ( unsigned k = 0; k < sizeof( unsaved ) / sizeof( unsaved[ 0 ] ); k++ ) {
@@ -68,10 +68,10 @@ int SettingsService::record( int step, char* out, int size ) {
             snprintf( value, sizeof( value ), "%.5g", (double)*item.value );
             break;
         case MENU_TOGGLE:
-            snprintf( value, sizeof( value ), "%d", *item.flag ? 1 : 0 );
+            snprintf( value, sizeof( value ), "%d", menuToggleGet( menu, step ) ? 1 : 0 );
             break;
         case MENU_CHOICE:
-            snprintf( value, sizeof( value ), "%d", *item.choice );
+            snprintf( value, sizeof( value ), "%d", menuChoiceGet( menu, step ) );
             break;
         default:
             return 0;
@@ -243,12 +243,12 @@ int SettingsService::apply( const char* text ) {
                             applied++;
                         }
                     } else if ( item.kind == MENU_TOGGLE ) {
-                        *item.flag = strtol( value, nullptr, 10 ) != 0;
+                        menuToggleSet( menu, i, strtol( value, nullptr, 10 ) != 0 ); // an accessor item's setter carries it into its module
                         applied++;
                     } else if ( item.kind == MENU_CHOICE ) {
                         int v = (int)strtol( value, nullptr, 10 );
                         if ( v >= 0 && v < item.choiceCount ) {
-                            *item.choice = v;
+                            menuChoiceSet( menu, i, v );
                             applied++;
                         }
                     }

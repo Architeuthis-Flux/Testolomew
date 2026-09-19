@@ -1,7 +1,7 @@
 // SPDX-License-Identifier: MIT
 // Host-side test of the UI's pure parts: the menu tree (walking it with the
-// four-way keys, editing numbers and choices, running actions, the number
-// prompt) and the camera (modes, the controls, the POV geometry - the camera
+// four-way keys, editing values in place, accessor bindings, actions and
+// their arguments) and the camera (modes, the controls, the POV geometry - the camera
 // at the probe's point looking down its shaft - and the gliding).
 // Run with `pio test -e native`.
 #include <math.h>
@@ -17,87 +17,182 @@ static bool flag;
 static float number;
 static int choice;
 static const char* const choiceNames[ 3 ] = { "under", "pointed", "magnet" };
+// An accessor-bound toggle and choice: a module's value with a side effect.
+static bool moduleFlag;
+static int moduleFlagSets;
+static bool lastFlagSet;
+static bool getModuleFlag( ) {
+    return moduleFlag;
+}
+static void setModuleFlag( bool on ) {
+    moduleFlagSets++;
+    lastFlagSet = on;
+    moduleFlag = on;
+}
+static int moduleChoice;
+static int moduleChoiceSets;
+static int getModuleChoice( ) {
+    return moduleChoice;
+}
+static void setModuleChoice( int c ) {
+    moduleChoiceSets++;
+    moduleChoice = c;
+}
+static int ran, ranTag;
+static float ranArgument;
+static void run( int tag, float argument ) {
+    ran++;
+    ranTag = tag;
+    ranArgument = argument;
+}
 
 void setUp( void ) {
     menuInit( &menu );
     flag = false;
     number = 10.0f;
     choice = 0;
+    moduleFlag = false;
+    moduleFlagSets = 0;
+    moduleChoice = 1;
+    moduleChoiceSets = 0;
+    ran = 0;
 }
 void tearDown( void ) {}
 
+static int settingsPage, commandsPage, anchorItem, layoutItem, cursorItem;
+
 static void buildMenu( ) {
-    int settings = menuAddSubmenu( &menu, MENU_ROOT, "settings" );
-    menuAddToggle( &menu, settings, "tracker", &flag );
-    menuAddNumber( &menu, settings, "surface", &number, 0.0f, 100.0f, 0.5f, "mm" );
-    menuAddChoice( &menu, settings, "cursor", &choice, choiceNames, 3 );
-    int commands = menuAddSubmenu( &menu, MENU_ROOT, "commands" );
-    menuAddAction( &menu, commands, "l  latest fix", 'l', false );
-    menuAddAction( &menu, commands, "R  anchor at row <number>", 'R', true );
-    menuOpen( &menu );
+    settingsPage = menuAddSubmenu( &menu, MENU_ROOT, "settings" );
+    menuAddToggle( &menu, settingsPage, "tracker", &flag );
+    menuAddNumber( &menu, settingsPage, "surface", &number, 0.0f, 100.0f, 0.5f, "mm" );
+    menuAddChoice( &menu, settingsPage, "cursor", &choice, choiceNames, 3 );
+    layoutItem = menuAddToggleAccessor( &menu, settingsPage, "layout", getModuleFlag, setModuleFlag );
+    menuSetToggleText( &menu, layoutItem, "V5", "V6" );
+    cursorItem = menuAddChoiceAccessor( &menu, settingsPage, "mode", getModuleChoice, setModuleChoice, choiceNames, 3 );
+    commandsPage = menuAddSubmenu( &menu, MENU_ROOT, "commands" );
+    menuAddAction( &menu, commandsPage, "l  latest fix", 'l', run, false );
+    anchorItem = menuAddNumberAction( &menu, commandsPage, "anchor at row", 'R', run, 1.0f, 60.0f, 1.0f, 1.0f );
+    menuAddAction( &menu, MENU_ROOT, "reset settings", 'Z', run, true );
 }
 
 void test_menu_walks_the_tree( void ) {
     buildMenu( );
-    float n;
-    TEST_ASSERT_EQUAL( 2, menuVisibleCount( &menu ) );
-    TEST_ASSERT_EQUAL_STRING( "menu", menuTitle( &menu ) );
-    TEST_ASSERT_EQUAL( -1, menuKey( &menu, MENUKEY_ENTER, false, &n ) ); // into settings
-    TEST_ASSERT_EQUAL_STRING( "settings", menuTitle( &menu ) );
     TEST_ASSERT_EQUAL( 3, menuVisibleCount( &menu ) );
-    menuKey( &menu, MENUKEY_ENTER, false, &n ); // toggle tracker
+    TEST_ASSERT_EQUAL_STRING( "menu", menuTitle( &menu ) );
+    TEST_ASSERT_EQUAL( -1, menuKey( &menu, MENUKEY_ENTER, false ) ); // into settings
+    TEST_ASSERT_EQUAL_STRING( "settings", menuTitle( &menu ) );
+    TEST_ASSERT_EQUAL( 5, menuVisibleCount( &menu ) );
+    menuKey( &menu, MENUKEY_ENTER, false ); // the press flips a toggle
     TEST_ASSERT_TRUE( flag );
-    menuKey( &menu, MENUKEY_UP, false, &n ); // wraps to the last
-    TEST_ASSERT_EQUAL( 2, menu.cursor );
-    menuKey( &menu, MENUKEY_BACK, false, &n ); // up a level, cursor restored
+    menuKey( &menu, MENUKEY_UP, false ); // wraps to the last
+    TEST_ASSERT_EQUAL( 4, menu.cursor );
+    menuKey( &menu, MENUKEY_DOWN, false ); // and round again
+    TEST_ASSERT_EQUAL( 0, menu.cursor );
+    menuKey( &menu, MENUKEY_DOWN, false );
+    TEST_ASSERT_EQUAL( -1, menuKey( &menu, MENUKEY_BACK, false ) ); // up a level, the parent's cursor restored
     TEST_ASSERT_EQUAL_STRING( "menu", menuTitle( &menu ) );
     TEST_ASSERT_EQUAL( 0, menu.cursor );
-    menuKey( &menu, MENUKEY_BACK, false, &n ); // closes at the root
-    TEST_ASSERT_FALSE( menu.open );
+    TEST_ASSERT_EQUAL( MENU_AT_ROOT, menuKey( &menu, MENUKEY_BACK, false ) ); // at the root: the caller closes
+    TEST_ASSERT_EQUAL( MENU_MAX_ITEMS - menu.count, menuFree( &menu ) );
 }
 
-void test_menu_edits_a_number_and_a_choice( void ) {
+// Left and right change the value under the cursor, at once, with no mode.
+void test_menu_edits_in_place( void ) {
     buildMenu( );
-    float n;
-    menuKey( &menu, MENUKEY_ENTER, false, &n ); // settings
-    menuKey( &menu, MENUKEY_DOWN, false, &n );  // surface
-    menuKey( &menu, MENUKEY_ENTER, false, &n ); // edit
-    TEST_ASSERT_TRUE( menu.editing );
-    menuKey( &menu, MENUKEY_UP, false, &n );
-    menuKey( &menu, MENUKEY_UP, false, &n );
+    menuKey( &menu, MENUKEY_ENTER, false ); // settings
+    menuKey( &menu, MENUKEY_RIGHT, false ); // tracker: right flips it
+    TEST_ASSERT_TRUE( flag );
+    menuKey( &menu, MENUKEY_LEFT, false ); // and left flips it back
+    TEST_ASSERT_FALSE( flag );
+    menuKey( &menu, MENUKEY_DOWN, false ); // surface
+    menuKey( &menu, MENUKEY_RIGHT, false );
+    menuKey( &menu, MENUKEY_RIGHT, false );
     TEST_ASSERT_FLOAT_WITHIN( 0.01f, 11.0f, number );
+    menuKey( &menu, MENUKEY_LEFT, false );
+    TEST_ASSERT_FLOAT_WITHIN( 0.01f, 10.5f, number );
     for ( int k = 0; k < 12; k++ )
-        menuKey( &menu, MENUKEY_UP, true, &n ); // held: after 8 repeats it steps ten at a time
-    TEST_ASSERT_TRUE( number > 11.0f + 12 * 0.5f );
+        menuKey( &menu, MENUKEY_RIGHT, true ); // held: after 8 repeats it steps ten at a time
+    TEST_ASSERT_TRUE( number > 10.5f + 12 * 0.5f );
     for ( int k = 0; k < 400; k++ )
-        menuKey( &menu, MENUKEY_UP, true, &n );
+        menuKey( &menu, MENUKEY_RIGHT, true );
     TEST_ASSERT_FLOAT_WITHIN( 0.01f, 100.0f, number ); // clamped
-    menuKey( &menu, MENUKEY_ENTER, false, &n );
-    TEST_ASSERT_FALSE( menu.editing );
-    menuKey( &menu, MENUKEY_DOWN, false, &n );  // cursor
-    menuKey( &menu, MENUKEY_ENTER, false, &n ); // edit
-    menuKey( &menu, MENUKEY_DOWN, false, &n );  // wraps backwards
+    for ( int k = 0; k < 400; k++ )
+        menuKey( &menu, MENUKEY_LEFT, true );
+    TEST_ASSERT_FLOAT_WITHIN( 0.01f, 0.0f, number ); // clamped the other way
+    menuKey( &menu, MENUKEY_DOWN, false ); // cursor (a choice)
+    menuKey( &menu, MENUKEY_LEFT, false ); // wraps backwards
     TEST_ASSERT_EQUAL( 2, choice );
-    menuKey( &menu, MENUKEY_UP, false, &n );
+    menuKey( &menu, MENUKEY_RIGHT, false );
     TEST_ASSERT_EQUAL( 0, choice );
-    menuKey( &menu, MENUKEY_BACK, false, &n ); // leaves the editor, stays in the menu
-    TEST_ASSERT_FALSE( menu.editing );
-    TEST_ASSERT_TRUE( menu.open );
+    menuKey( &menu, MENUKEY_ENTER, false ); // the press cycles too
+    TEST_ASSERT_EQUAL( 1, choice );
+    menuKey( &menu, MENUKEY_UP, false ); // up/down never change a value
+    TEST_ASSERT_EQUAL( 1, choice );
+    TEST_ASSERT_FLOAT_WITHIN( 0.01f, 0.0f, number );
 }
 
-void test_menu_runs_actions_and_asks_for_numbers( void ) {
+// An accessor-bound item: the setter runs once, with the new value, and
+// not at all for a value that is already so.
+void test_menu_accessor_set_once_with_the_flipped_value( void ) {
     buildMenu( );
-    float n = -1.0f;
-    menuKey( &menu, MENUKEY_DOWN, false, &n ); // commands
-    menuKey( &menu, MENUKEY_ENTER, false, &n );
-    TEST_ASSERT_EQUAL( 'l', menuKey( &menu, MENUKEY_ENTER, false, &n ) );
-    menuKey( &menu, MENUKEY_DOWN, false, &n );                           // R
-    TEST_ASSERT_EQUAL( -1, menuKey( &menu, MENUKEY_ENTER, false, &n ) ); // asks first
-    TEST_ASSERT_TRUE( menu.editing );
-    for ( int k = 0; k < 30; k++ )
-        menuKey( &menu, MENUKEY_UP, false, &n );
-    TEST_ASSERT_EQUAL( 'R', menuKey( &menu, MENUKEY_ENTER, false, &n ) );
-    TEST_ASSERT_FLOAT_WITHIN( 0.01f, 30.0f, n );
+    menuKey( &menu, MENUKEY_ENTER, false ); // settings
+    for ( int k = 0; k < 3; k++ )
+        menuKey( &menu, MENUKEY_DOWN, false ); // layout
+    TEST_ASSERT_EQUAL( layoutItem, menuCursorItem( &menu ) );
+    TEST_ASSERT_FALSE( menuToggleGet( &menu, layoutItem ) );
+    menuKey( &menu, MENUKEY_RIGHT, false );
+    TEST_ASSERT_EQUAL( 1, moduleFlagSets );
+    TEST_ASSERT_TRUE( lastFlagSet );
+    TEST_ASSERT_TRUE( menuToggleGet( &menu, layoutItem ) );
+    menuToggleSet( &menu, layoutItem, true ); // already so: not written
+    TEST_ASSERT_EQUAL( 1, moduleFlagSets );
+    menuToggleSet( &menu, layoutItem, false );
+    TEST_ASSERT_EQUAL( 2, moduleFlagSets );
+    TEST_ASSERT_FALSE( moduleFlag );
+    menuKey( &menu, MENUKEY_DOWN, false ); // mode (an accessor choice)
+    TEST_ASSERT_EQUAL( 1, menuChoiceGet( &menu, cursorItem ) );
+    menuKey( &menu, MENUKEY_RIGHT, false );
+    TEST_ASSERT_EQUAL( 2, moduleChoice );
+    TEST_ASSERT_EQUAL( 1, moduleChoiceSets );
+    menuKey( &menu, MENUKEY_RIGHT, false ); // wraps
+    TEST_ASSERT_EQUAL( 0, moduleChoice );
+    menuChoiceSet( &menu, cursorItem, 3 ); // 3 wraps to 0: already so, not written
+    TEST_ASSERT_EQUAL( 2, moduleChoiceSets );
+    menuChoiceSet( &menu, cursorItem, -1 ); // -1 wraps to 2
+    TEST_ASSERT_EQUAL( 2, moduleChoice );
+}
+
+// An action is returned to the caller (with its confirm flag), and one
+// that takes a number has it stepped in place beforehand.
+void test_menu_returns_actions_with_their_argument( void ) {
+    buildMenu( );
+    menuKey( &menu, MENUKEY_DOWN, false ); // commands
+    menuKey( &menu, MENUKEY_ENTER, false );
+    int l = menuKey( &menu, MENUKEY_ENTER, false );
+    TEST_ASSERT_TRUE( l >= 0 );
+    TEST_ASSERT_EQUAL( 'l', menu.items[ l ].tag );
+    TEST_ASSERT_FALSE( menu.items[ l ].confirm );
+    menu.items[ l ].run( menu.items[ l ].tag, menu.items[ l ].argument );
+    TEST_ASSERT_EQUAL( 1, ran );
+    TEST_ASSERT_EQUAL( 'l', ranTag );
+    menuKey( &menu, MENUKEY_DOWN, false ); // anchor at row
+    TEST_ASSERT_EQUAL( -1, menuKey( &menu, MENUKEY_LEFT, false ) ); // 1 is the floor
+    TEST_ASSERT_FLOAT_WITHIN( 0.01f, 1.0f, menu.items[ anchorItem ].argument );
+    for ( int k = 0; k < 29; k++ )
+        menuKey( &menu, MENUKEY_RIGHT, false );
+    TEST_ASSERT_FLOAT_WITHIN( 0.01f, 30.0f, menu.items[ anchorItem ].argument );
+    int r = menuKey( &menu, MENUKEY_ENTER, false );
+    TEST_ASSERT_EQUAL( anchorItem, r );
+    menu.items[ r ].run( menu.items[ r ].tag, menu.items[ r ].argument );
+    TEST_ASSERT_EQUAL( 'R', ranTag );
+    TEST_ASSERT_FLOAT_WITHIN( 0.01f, 30.0f, ranArgument );
+    // The destructive one at the root says it wants a confirmation.
+    menuKey( &menu, MENUKEY_BACK, false );
+    menuKey( &menu, MENUKEY_DOWN, false ); // reset settings
+    int z = menuKey( &menu, MENUKEY_ENTER, false );
+    TEST_ASSERT_EQUAL( 'Z', menu.items[ z ].tag );
+    TEST_ASSERT_TRUE( menu.items[ z ].confirm );
+    TEST_ASSERT_EQUAL( 2, ran ); // the two the test ran itself: the menu runs nothing
 }
 
 // ---- camera ------------------------------------------------------------------
@@ -175,8 +270,9 @@ int main( int argc, char** argv ) {
     (void)argv;
     UNITY_BEGIN( );
     RUN_TEST( test_menu_walks_the_tree );
-    RUN_TEST( test_menu_edits_a_number_and_a_choice );
-    RUN_TEST( test_menu_runs_actions_and_asks_for_numbers );
+    RUN_TEST( test_menu_edits_in_place );
+    RUN_TEST( test_menu_accessor_set_once_with_the_flipped_value );
+    RUN_TEST( test_menu_returns_actions_with_their_argument );
     RUN_TEST( test_camera_glides_and_orbits );
     RUN_TEST( test_camera_turns_the_short_way );
     RUN_TEST( test_camera_pov_is_at_the_point_looking_down_the_shaft );

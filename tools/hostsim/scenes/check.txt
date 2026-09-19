@@ -58,6 +58,23 @@
 :screen
 @expect "menu: /tracker cursor 1/"
 @expect "> state"
+# Left/right change the value under the cursor in place: the toggle flips,
+# a number steps.
+:ui down
+:ui down
+:screen
+@expect "> tracker on               on"
+:ui left
+:screen
+@expect "> tracker on               off"
+:ui right
+:screen
+@expect "> tracker on               on"
+:ui down
+:ui right
+:screen
+@expect "> floor                    0.4mm"
+:ui left
 :ui back
 :key b
 @run 300
