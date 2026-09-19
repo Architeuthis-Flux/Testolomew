@@ -85,9 +85,7 @@ void PlayService::begin( ) {
 }
 
 void PlayService::clearPaint( ) {
-    probeLedPaintClear( &paint );
-    for ( int i = 0; i < PROBELED_MAX; i++ )
-        paintBase[ i ] = 0.0f;
+    paintClear( &paint, &stroke );
     targetLed = -1;
 }
 
@@ -150,48 +148,18 @@ void PlayService::tracePlace( float along, float acrossMm, int* x, int* y ) {
     *y = yMid - (int)( acrossMm * pxPerMm + 0.5f );
 }
 
+// A dab of the brush at a place on the board (Paint.h does the rule).
 void PlayService::paintAt( float along, float acrossMm ) {
     const LedLayout& layout = probeLeds.layout;
     int i = ledLayoutNearest( &layout, along, acrossMm, PLAY_WITHIN_ROWS );
     if ( i < 0 )
         return;
-    uint8_t r, g, b;
-    paintColour( &r, &g, &b );
-    int size = (int)( brushSize + 0.5f );
-    if ( size < 0 )
-        size = 0;
-    if ( size > PLAY_BRUSH_MAX )
-        size = PLAY_BRUSH_MAX;
-    float reach = size + 0.1f; // in rows (across at the hole pitch too; the rails are LEDs too)
-    for ( int k = 0; k < layout.count; k++ ) {
-        if ( k == targetLed )
-            continue;
-        float da = layout.along[ k ] - layout.along[ i ];
-        float dc = ( layout.acrossMm[ k ] - layout.acrossMm[ i ] ) / 2.54f;
-        float d = sqrtf( da * da + dc * dc );
-        if ( d > reach )
-            continue;
-        if ( erase ) {
-            paintBase[ k ] = 0.0f;
-            paint.level[ k ] = 0.0f;
-            continue;
-        }
-        // The LED under the point at full, the ring around it softer, the
-        // next softer still: a brush with an edge, not a block. The edge
-        // never paints over a stronger mark (the last tick's centre, say):
-        // a stroke's LEDs come out at full, and a brush passing by leaves
-        // them their colour.
-        float base = d < 0.5f ? 1.0f : ( 0.6f - 0.15f * ( d - 1.0f ) );
-        if ( base < 0.15f )
-            base = 0.15f;
-        if ( base < paintBase[ k ] )
-            continue;
-        paintBase[ k ] = base;
-        paint.level[ k ] = base * paintBright;
-        paint.r[ k ] = r;
-        paint.g[ k ] = g;
-        paint.b[ k ] = b;
-    }
+    PaintBrush brush;
+    brush.size = (int)( brushSize + 0.5f );
+    brush.erase = erase;
+    brush.bright = paintBright;
+    paintColour( &brush.r, &brush.g, &brush.b );
+    paintDab( &paint, &stroke, &layout, i, &brush, targetLed );
 }
 
 void PlayService::newTarget( ) {
@@ -228,7 +196,7 @@ void PlayService::printScore( Stream* out ) const {
     char line[ 200 ];
     int painted = 0;
     for ( int i = 0; i < PROBELED_MAX; i++ )
-        painted += paintBase[ i ] > 0.0f;
+        painted += paint.level[ i ] > 0.0f;
     snprintf( line, sizeof( line ), "play: mode %s, %d LEDs painted (hue %.0f sat %.2f bright %.2f brush %d touch %.1f mm%s); target: %lu hit, %lu missed; mean %.2f s to reach, mean miss %.2f mm; the last %.2f s, %.2f mm",
               playModeNames[ mode ], painted, paintHue, paintSat, paintBright, (int)( brushSize + 0.5f ), touchMm, erase ? ", erasing" : "", (unsigned long)hits, (unsigned long)misses, meanMs * 1e-3f,
               meanMissMm, lastMs * 1e-3f, lastMissMm );
@@ -284,6 +252,11 @@ ServiceStatus PlayService::service( ) {
     bool touching = have && in.heightMm < touchMm + ( wasTouching ? PLAY_TOUCH_RELEASE_MM : 0.0f ); // with hysteresis
 
     if ( mode == PLAY_PAINT ) {
+        if ( touching && !wasTouching ) {
+            paintStrokeBegin( &stroke ); // the point came down: a new stroke, which paints over what is there
+        } else if ( !touching && wasTouching ) {
+            paintStrokeEnd( &stroke );
+        }
         if ( touching ) {
             paintAt( along, across );
         }

@@ -95,10 +95,15 @@ void Input::begin( ) {
     for ( int c = 0; c < IN_CONTROL_COUNT; c++ ) {
         InputButton b = { };
         b.pin = pins[ c ];
-        b.activeLow = true;
+        b.activeLow = true; // the stick's contacts and the buttons: switches to ground on the chip's pull-ups
+        bool pullup = true;
+        if ( c == IN_JOY_PRESS ) {
+            b.activeLow = JOY_PRESS_ACTIVE_LOW != 0; // as wired (BoardPins.h)
+            pullup = JOY_PRESS_PULLUP != 0;
+        }
         buttons[ c ] = b;
         if ( b.pin >= 0 ) {
-            pinMode( b.pin, INPUT_PULLUP ); // ASSUMPTION: switches to ground; the chip's pull-ups are enough
+            pinMode( b.pin, pullup ? INPUT_PULLUP : INPUT );
         }
     }
     joystickFitted = PIN_JOY_X >= 0 && PIN_JOY_Y >= 0;

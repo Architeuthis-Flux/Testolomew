@@ -96,6 +96,12 @@
 #define JOY_X_REVERSED 1
 #define JOY_Y_REVERSED 0
 #define PIN_JOY_PRESS PF2
+// The push switch: closes to ground (1) or to 3.3 V (0), and whether the
+// chip's pull-up is wanted on the pin. Read on the bench 2026-09-19
+// (docs/bench/2026-09-19-nav-trace-and-inputs.txt): the pin is high at
+// rest with the pull-up on, so it is an ordinary switch to ground.
+#define JOY_PRESS_ACTIVE_LOW 1
+#define JOY_PRESS_PULLUP 1
 #define PIN_BTN_A PE14
 #define PIN_BTN_B PD12
 

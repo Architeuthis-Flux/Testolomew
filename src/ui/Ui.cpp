@@ -809,7 +809,9 @@ void Ui::drawMenu( GFXcanvas16* canvas ) {
 }
 
 void Ui::drawLog( GFXcanvas16* canvas ) {
-    const int T = MAGVIEW_TEXT, H = MAGVIEW_LINE_H;
+    // Size-1 text: 6 x 8 px characters, 40 to a line, UI_LOG_ROWS lines and
+    // a one-line footer.
+    const int T = UI_LOG_TEXT, H = 8 * UI_LOG_TEXT;
     int count = uiStream.logCount( );
     int rows = count < UI_LOG_ROWS ? count : UI_LOG_ROWS;
     for ( int r = 0; r < rows; r++ ) {
@@ -820,5 +822,5 @@ void Ui::drawLog( GFXcanvas16* canvas ) {
             continue;
         fastText( canvas, 0, 2 + r * H, T, back == 0 ? UI_COLOR_TEXT : UI_COLOR_DIM, line );
     }
-    fastText( canvas, 0, LCD_HEIGHT - H - 2, T, UI_COLOR_FRAME, logScroll > 0 ? "log (scrolled)" : "log  up/down, press" );
+    fastText( canvas, 0, LCD_HEIGHT - H - 2, T, UI_COLOR_FRAME, logScroll > 0 ? "log (scrolled)  up/down, press: newest" : "log  up/down: scroll" );
 }

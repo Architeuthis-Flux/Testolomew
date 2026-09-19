@@ -33,7 +33,8 @@
 #define UI_ZOOM_PER_S 1.5f       // zoom factor per second at full joystick
 #define UI_PAN_MM 4.0f           // per nav press / repeat
 #define UI_MENU_ROWS 9           // items shown at once (18 px rows of size-2 text)
-#define UI_LOG_ROWS 13           // lines of size-2 text above the footer
+#define UI_LOG_TEXT 1            // the log screen's text size: 1 = 6 x 8 px characters, 40 to a line
+#define UI_LOG_ROWS 28           // lines of it above the footer
 
 class GFXcanvas16;
 

@@ -16,8 +16,8 @@
 // ---------------------------------------------------------------------------
 #include <Arduino.h>
 
-#define UILOG_LINES 60   // lines kept
-#define UILOG_WIDTH 20   // characters per line: what the LCD fits at size 2 (longer lines wrap)
+#define UILOG_LINES 120  // lines kept
+#define UILOG_WIDTH 40   // characters per line: what the LCD fits at size 1 (longer lines wrap)
 #define UISTREAM_KEYS 24 // injected keys waiting to be read
 
 class UiStream : public Stream {

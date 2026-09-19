@@ -7,7 +7,9 @@
 // PAINT: with the point on the board, the LED under it takes the paint
 // colour and keeps it, so a line drawn along a row should come out as that
 // row's LEDs and nothing else; "clear" wipes it (the menu's, W, or the nav
-// stick's centre held on the draw screen). The LCD's draw screen IS the
+// stick's centre held on the draw screen). The brush itself is Paint.h:
+// newest wins - a stroke paints over what was there, and within a stroke
+// the centre beats the edge. The LCD's draw screen IS the
 // paint app: going to it starts painting, leaving it stops, and the drawing
 // stays - off the LEDs while away, back on them on return - until cleared.
 // The draw screen shows the drawing as the LEDs have it - each painted hole
@@ -33,6 +35,7 @@
 #include <Arduino.h>
 
 #include "JumperlOS.h"
+#include "Paint.h"
 #include "ProbeLeds.h"
 
 #define PLAY_PERIOD_US 10000
@@ -42,7 +45,7 @@
 #define PLAY_TRACE_W 240
 #define PLAY_TRACE_H 240
 #define PLAY_TRACE_MID_Y 92    // the channel line's row on the draw screen: the map sits in the upper half, the settings below
-#define PLAY_BRUSH_MAX 3       // rows around the LED under the point
+#define PLAY_BRUSH_MAX PAINT_BRUSH_MAX // rows around the LED under the point
 #define PLAY_BRIGHT_STEP 0.05f // the nav stick's up/down
 #define PLAY_PICK_PER_S 4.0f   // the joystick's marker speed across the wheel, radii a second (rim to rim in half a second at full tilt; the stick's expo keeps small tilts fine)
 
@@ -81,6 +84,7 @@ class PlayService : public Service {
     float touchMm = PLAY_TOUCH_MM; // the point paints below this height above the surface
 
     ProbeLedPaint paint;
+    PaintStroke stroke = { }; // the stroke under way (Paint.h: newest wins within it)
     // The colour as it is now, and the wheel: the marker's place is the colour
     // (x = sat cos hue, y = sat sin hue, y up), so moving it picks the colour.
     void paintColour( uint8_t* r, uint8_t* g, uint8_t* b ) const { playHsvToRgb( paintHue, paintSat, r, g, b ); }
@@ -101,7 +105,6 @@ class PlayService : public Service {
 
   private:
     PlayService( ) = default;
-    float paintBase[ PROBELED_MAX ];                        // how much of the brush each LED got (1 under the point, less at the edge, 0 = not painted): an edge never paints over a centre
     uint8_t targetWasR = 0, targetWasG = 0, targetWasB = 0; // the paint under the target LED, put back when it moves on
     float targetWasLevel = 0.0f;
     bool wasOnDrawScreen = false; // the LCD's draw screen was up at the last tick
