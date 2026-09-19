@@ -28,20 +28,29 @@ static void onStream( Stream* out ) {
 }
 
 static void onStrip( Stream* out ) {
-    probeLeds.strip = !probeLeds.strip;
-    ledStripTouch( &probeLeds.chain );
-    ledStripTouch( &probeLeds.top );
-    if ( !probeLeds.strip ) {
-        ledStripWait( &probeLeds.chain, 50 );
-        ledStripClear( &probeLeds.chain );
-        ledStripShow( &probeLeds.chain );
-        if ( probeLeds.topStrip ) {
-            ledStripWait( &probeLeds.top, 50 );
-            ledStripClear( &probeLeds.top );
-            ledStripShow( &probeLeds.top );
+    probeLeds.setStrip( !probeLeds.strip, out );
+}
+
+void ProbeLedService::setStrip( bool on, Stream* out ) {
+    if ( on == strip ) {
+        return;
+    }
+    strip = on;
+    ledStripTouch( &chain );
+    ledStripTouch( &top );
+    if ( !strip ) {
+        ledStripWait( &chain, 50 );
+        ledStripClear( &chain );
+        ledStripShow( &chain );
+        if ( topStrip ) {
+            ledStripWait( &top, 50 );
+            ledStripClear( &top );
+            ledStripShow( &top );
         }
     }
-    out->println( probeLeds.strip ? "LED strip on" : "LED strip off (cleared)" );
+    if ( out != nullptr ) {
+        out->println( strip ? "LED strip on" : "LED strip off (cleared)" );
+    }
 }
 
 static void onStripTest( Stream* out ) {

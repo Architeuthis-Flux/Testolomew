@@ -9,7 +9,6 @@
 #include "Console.h"
 #include "MagArray.h"
 #include "MagLocator.h"
-#include "Ui.h"
 #include "config.h"
 #if MODULE_ROW_COUNT
 #include "RowCounter.h"
@@ -401,8 +400,7 @@ bool SettingsService::saveNow( ) {
 }
 
 void SettingsService::reset( Stream* out ) {
-    int applied = apply( defaults );
-    ui.settingsLoaded( ); // the choice and toggle items into the modules, as after a boot
+    int applied = apply( defaults ); // through the items' setters: an accessor item's module follows
 #if MODULE_ROW_COUNT
     consoleRunCommand( 'C', out ); // the anchors: back to the grid the firmware boots with
 #endif

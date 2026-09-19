@@ -15,7 +15,7 @@ G = ../../.pio/libdeps/testolomew/Adafruit GFX Library
 B = ../../.pio/libdeps/testolomew/Adafruit BusIO
 CXX ?= g++
 CXXFLAGS ?= -std=c++11 -O1 -g -w -DARDUINO=10808 -MMD -MP
-INC = -I . -I $(S) -I $(S)/common -I $(S)/jos -I $(S)/console -I $(S)/magarray -I $(S)/magfit -I $(S)/rowcount -I $(S)/display -I $(S)/probeled -I $(S)/ui -I $(S)/play -I $(S)/settings -I $(S)/board -I "$(G)" -I "$(B)"
+INC = -I . -I $(S) -I $(S)/common -I $(S)/jos -I $(S)/console -I $(S)/magarray -I $(S)/magfit -I $(S)/rowcount -I $(S)/display -I $(S)/probeled -I $(S)/ui -I $(S)/play -I $(S)/settings -I $(S)/apps -I $(S)/board -I "$(G)" -I "$(B)"
 
 # Every firmware source but the ones the stubs replace.
 DEVICE_ONLY = $(S)/board/BoardPins.cpp $(S)/display/ST7789.cpp $(S)/console/SerialDma.cpp $(S)/magarray/MagSampler.cpp $(S)/probeled/LedStrip.cpp
@@ -61,9 +61,10 @@ check: sim
 	./sim scenes/check.txt -q
 
 screens: sim
+	rm -rf out
 	mkdir -p out
 	./sim scenes/screens.txt -q
-	python3 montage.py ../../docs/screens-simulated.png out/s01*.png out/s02*.png out/s03*.png out/s04*.png out/s05*.png out/s06*.png out/s07*.png out/s08*.png out/s09*.png out/s10*.png out/s11*.png out/s12*.png out/s13*.png out/s14*.png
+	python3 montage.py ../../docs/screens-simulated.png $$(ls out/s*.png | sort)
 
 clean:
 	rm -rf $(O) sim soak pencil navtest out

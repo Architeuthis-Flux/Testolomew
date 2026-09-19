@@ -53,8 +53,18 @@ void RowCounter::begin( ) {
 }
 
 void RowCounter::toggle( Stream* out ) {
-    active = !active;
+    setActive( !active, out );
+}
+
+void RowCounter::setActive( bool on, Stream* out ) {
+    if ( on == active ) {
+        return;
+    }
+    active = on;
     saidNoFix = false;
+    if ( out == nullptr ) {
+        return;
+    }
     if ( !active ) {
         out->println( "row mode off" );
         return;

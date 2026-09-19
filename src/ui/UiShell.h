@@ -58,6 +58,7 @@ struct UiShell {
     int app;         // the app on the screen
     int previousApp; // -1 = none: B goes Home instead
     int settingsCell; // which Home cell is Settings (the others are the apps in table order)
+    const uint8_t* settingsIcon; // its icon (may be nullptr)
     PaneKind stack[ UISHELL_MAX_DEPTH ]; // the overlays, bottom first
     int depth;                           // 0 = the app alone
     HomeGrid home;

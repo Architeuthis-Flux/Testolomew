@@ -24,8 +24,7 @@
 //
 // Not saved: row mode, the V5 console stream, the chain on/off and the play
 // mode. Those are modes, and the board boots into row mode (RowCounter.h),
-// quiet, with the chain on. The UI reads them from the modules before it
-// applies the loaded values (Ui::settingsLoaded).
+// quiet, with the chain on; a reset leaves them alone.
 //
 // Console: s = what is saved (and whether it is what is running now),
 // Z = reset: every setting back to its compile-time default and the row
@@ -58,10 +57,11 @@ class SettingsService : public Service {
     SettingsService( const SettingsService& ) = delete;
     SettingsService& operator=( const SettingsService& ) = delete;
 
-    // Read the saved settings into the menu's variables (and the anchors
-    // into the row counter). Call after the menu is built; the caller then
-    // carries the menu's choice variables into the modules. Returns how
-    // many records were applied, -1 if nothing valid was saved.
+    // Read the saved settings into the menu's values (through the items'
+    // setters, so a module's value follows) and the anchors into the row
+    // counter. Call after the menu is built and every module has begun:
+    // the defaults are what the items read then. Returns how many records
+    // were applied, -1 if nothing valid was saved.
     int begin( Menu* menu );
 
     ServiceStatus service( ) override;
@@ -71,10 +71,10 @@ class SettingsService : public Service {
 
     // Write now, whatever the settle timer says. true if a page was written.
     bool saveNow( );
-    // Everything back to its compile-time default (the values as they were
-    // before the saved ones went in at boot), the row anchors forgotten,
-    // and that saved. The UI must then carry the choice items into the
-    // modules (Ui::settingsLoaded), as after begin().
+    // Everything back to its default (the values as they were before the
+    // saved ones went in at boot), the row anchors forgotten, and that
+    // saved. The modes the modules boot with (row mode, the chain) are not
+    // touched: they are not in the text.
     void reset( Stream* out );
     // What is saved, line by line, and whether it matches what is running.
     void print( Stream* out );

@@ -19,6 +19,7 @@ void uiShellInit( UiShell* s, const UiApp* apps, int appCount, int firstApp, int
     s->app = -1;
     s->previousApp = -1;
     s->settingsCell = settingsCell;
+    s->settingsIcon = nullptr;
     s->depth = 0;
     homeInit( &s->home, appCount + 1 );
     menuInit( &s->menu );

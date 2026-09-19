@@ -99,6 +99,8 @@ class ProbeLedService : public Service {
     float stripLastMa = 0.0f;       // the last frame's estimated current, after scaling
 
     void useV5( bool on );
+    // The chain on or off (off clears it); nothing happens if it is so already.
+    void setStrip( bool on, Stream* out );
     void printCursorLine( Stream* out ) const;
 
   private:

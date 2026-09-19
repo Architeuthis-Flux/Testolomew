@@ -30,7 +30,6 @@
 #endif
 #if MODULE_MAG_VIEW
 #include "Display.h"
-#include "MagView.h"
 #endif
 #if MODULE_ROW_COUNT
 #include "RowCounter.h"
@@ -39,7 +38,9 @@
 #include "ProbeLedService.h"
 #endif
 #if MODULE_UI
+#include "Apps.h"
 #include "Input.h"
+#include "SettingsMenu.h"
 #include "Ui.h"
 #include "UiStream.h"
 #endif
@@ -55,6 +56,9 @@
 #endif
 #if MODULE_MAG_VIEW && !MODULE_MAG_LOCATOR
 #error "MODULE_MAG_VIEW needs MODULE_MAG_LOCATOR"
+#endif
+#if MODULE_UI && !MODULE_PROBE_LEDS
+#error "MODULE_UI needs MODULE_PROBE_LEDS (the LEDs and Draw apps)"
 #endif
 #if MODULE_ROW_COUNT && !MODULE_MAG_LOCATOR
 #error "MODULE_ROW_COUNT needs MODULE_MAG_LOCATOR"
@@ -151,23 +155,21 @@ void setup( ) {
     } else {
         boot.println( "Display: LCD or framebuffer setup failed - running without the display" );
     }
-    magView.begin( );
-    display.drawFn = magViewDraw;
 #endif
 
 #if MODULE_UI
     input.begin( );
     jOS.registerService( &input );
-    ui.begin( ); // after every module: it lists the console commands they registered
+    appsBegin( ); // after every module: the menu lists the console commands they registered
     jOS.registerService( &ui );
 #endif
 
 #if MODULE_SETTINGS
-    // After the menu exists: the saved values go into its variables, and the
-    // UI carries the choice ones into the modules.
-    int loaded = settings.begin( &ui.menu );
-    ui.settingsLoaded( );
-    ui.addNewCommands( ); // s and Z into the menu's commands page
+    // After the menu exists and every module has begun: the saved values go
+    // in through the items (an accessor item's module follows), and what
+    // the items read before that is the default.
+    int loaded = settings.begin( &ui.shell.menu );
+    settingsMenuAddNewCommands( ); // s and Z into the menu's commands page
     jOS.registerService( &settings );
 #if MODULE_MAG_ARRAY
     if ( !magArray.baselineRestored ) {

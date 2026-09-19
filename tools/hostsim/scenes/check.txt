@@ -7,13 +7,15 @@
 @expect ":screen:ascii"
 @expect ":probe"
 @expect ":key"
+@expect ":ui open|menu"
 
-# The screen, as text.
+# The screen, as text: the View app, nothing over it.
 :screen
 @expect "screen{"
-@expect "app: scene"
+@expect "app: View"
 @expect "panes: -"
 @expect "probe: none"
+@expect "camera: fixed target 27.1 22.4 8.0"
 
 # A simulated probe on row 14, hole 3: the tracker, the row counter and the
 # LEDs all see it within a second.
@@ -46,10 +48,31 @@
 :log 3
 @expect "log{"
 
-# The menu from the console: A opens it, :ui walks it, B closes it at the root.
+# Home: A opens it with the cursor on the current app; the apps by name.
 :key a
 @expect "ok{key a tap}"
 @run 300
+:screen
+@expect "panes: home"
+@expect "home: cursor 0 View"
+:ui go leds
+@expect "ok{go LEDs}"
+:screen
+@expect "app: LEDs"
+@expect "panes: -"
+:key b
+@run 300
+:screen
+@expect "app: View"
+:ui go terminal
+@expect "err{go works on Home"
+
+# The Settings menu from Home, walked from the console; left/right change
+# the value under the cursor in place; B backs out and closes at the root.
+:key a
+@run 300
+:ui go settings
+@expect "ok{go Settings}"
 :screen
 @expect "panes: menu"
 @expect "menu: / cursor 1/"
@@ -58,8 +81,6 @@
 :screen
 @expect "menu: /tracker cursor 1/"
 @expect "> state"
-# Left/right change the value under the cursor in place: the toggle flips,
-# a number steps.
 :ui down
 :ui down
 :screen
@@ -81,12 +102,94 @@
 :screen
 @expect "panes: -"
 
-# The joystick from the console orbits the camera.
+# The headline bug: a nav-left held while B closes the menu must not go on
+# panning the View's camera, and nothing is left open.
 :screen
-@expect "camera: fixed"
+@expect "camera: fixed target 27.1 22.4 8.0"
+:key a
+@run 300
+:ui go settings
+:key left down
+@run 300
+:key b
+@run 300
+:key left up
+@run 600
+:screen
+@expect "panes: -"
+@expect "camera: fixed target 27.1 22.4 8.0"
+@expect "swallow: 0x000"
+
+# A held nav-left in the View app does pan (the control reaches the app).
+:key left down
+@run 700
+:key left up
+@run 400
+:screen
+@expect "camera: fixed target 9.6 30.5"
+
+# An action from a page: its output in a Result panel over the page, the
+# app underneath unchanged; B dismisses it, the page is still there.
+:ui menu
+:ui go magnet
+@expect "ok{go magnet}"
+:ui go latest
+@expect "ok{go latest fix}"
+:screen
+@expect "panes: menu result"
+@expect "result: l latest probe fix"
+@expect "app: View"
+:ui back
+:screen
+@expect "panes: menu"
+@expect "menu: /magnet"
+# A destructive one asks first; B says no.
+:ui go forget
+@expect "ok{go forget strength}"
+:screen
+@expect "panes: menu confirm"
+@expect "confirm: forget strength"
+:ui back
+:screen
+@expect "panes: menu"
+:ui close
+
+# The Draw app: going to it starts painting; the joystick's press clicked
+# flips draw/erase on the click, once.
+:key a
+@run 300
+:ui go draw
+@expect "ok{go Draw}"
+:screen
+@expect "app: Draw"
+@expect "play: paint"
+@expect " draw"
+:key jpress
+@run 400
+:screen
+@expect " erase"
+:key a
+@run 300
+:ui go view
+@run 200
+:screen
+@expect "app: View"
+@expect "play: off"
+
+# The joystick from the console orbits the camera.
 :joy 0.8 0 400
 @expect "ok{joy"
 @run 600
+
+# A reset leaves the modes alone: the chain stays on, row mode stays on.
+@strip on
+Z
+@run 500
+:screen
+@expect "row: 14 hole 3"
+:stats
+@expect "strip: no strip on the host"
+@strip off
 
 # The probe goes away: the LEDs go dark within the fade.
 :probe off
@@ -102,6 +205,7 @@ S23\r
 s
 @expect "cursor/surface=23"
 @expect "tracker/floor="
+@expect "tracker/tracker on="
 @expect "smoothing/view Hz="
 @expect "cursor/cursor="
 @expect "camera/mode="

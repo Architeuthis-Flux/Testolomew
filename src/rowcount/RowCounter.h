@@ -139,6 +139,7 @@ class RowCounter : public Service {
     float touchZ = ROWCOUNT_TOUCH_Z_MM;
 
     void toggle( Stream* out );
+    void setActive( bool on, Stream* out ); // row mode on or off; nothing happens if it is so already
     void startHold( RowHoldPurpose purpose, int row, Stream* out );
     void forgetAnchors( Stream* out );
 

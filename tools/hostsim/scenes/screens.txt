@@ -1,12 +1,13 @@
-# The fourteen screens (`make screens` -> out/*.png and the montage).
+# The screens (`make screens` -> out/*.png and the montage). The apps in
+# their order: View, LEDs, Terminal, Draw; `e` steps through them.
 @seed 4
 @magnet row 14 3 0 20
 @run 4000
 l
-:screen:png out/s01_scene_on_row.png
+:screen:png out/s01_view_on_row.png
 @magnet row 14 3 10 20
 @run 1500
-:screen:png out/s02_scene_lifted_pointed.png
+:screen:png out/s02_view_lifted_pointed.png
 e
 :screen:png out/s03_leds_lifted.png
 e
@@ -43,11 +44,11 @@ e
 e
 @dropout 200
 @run 150
-:screen:png out/s08_scene_coasting.png
+:screen:png out/s08_view_coasting.png
 @run 500
 @magnet 27 22 54 0.34 0 0.94
 @run 1500
-:screen:png out/s09_scene_rough.png
+:screen:png out/s09_view_rough.png
 e
 :screen:png out/s10_leds_rough.png
 e
@@ -57,31 +58,37 @@ e
 @run 800
 \t
 @run 300
-:screen:png out/s11_menu_root.png
+:screen:png out/s11_home.png
+:ui go settings
+@run 300
+:screen:png out/s12_menu_root.png
 \r
 @run 300
-:screen:png out/s12_menu_tracker.png
+:screen:png out/s13_menu_tracker.png
 `
-:ui go commands
-@run 300
-:screen:png out/s13_menu_commands.png
-:ui go l
+:ui go magnet
+:ui go latest
 @run 400
-:screen:png out/s14_log_after_l.png
-\t
-e
-e
+:screen:png out/s14_result_after_l.png
+`
+`
+`
+@run 300
 @magnet row 14 3 10 25
 vvvvv
 @run 1500
-:screen:png out/s15_scene_pov.png
+:screen:png out/s15_view_pov.png
 v
 vvv
 @run 1500
-:screen:png out/s16_scene_top.png
+:screen:png out/s16_view_top.png
 vvv
 :joy 0.8 0 800
 @run 900
 @type "\e[C" 6 150
 @run 600
-:screen:png out/s17_scene_orbited.png
+:screen:png out/s17_view_orbited.png
+e
+e
+@run 300
+:screen:png out/s18_terminal.png

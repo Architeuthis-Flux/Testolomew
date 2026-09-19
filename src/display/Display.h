@@ -76,8 +76,11 @@ class Display : public Service {
     uint32_t clearUs[ 2 ] = { 0, 0 }; // a fillScreen of each canvas, timed at begin(): says which memory it landed in
     uint32_t yields = 0;              // draws put off because the LED service was due first
     uint32_t lastDrawStartUs = 0;     // when a draw last ran (the starvation guard)
-    // The slots' times, one line (names may be nullptr: numbered).
+    // The slots' times, one line (names may be nullptr: numbered). The apps
+    // framework sets slotNames / slotCount; :stats uses them.
     void printStats( Stream* out, const char* const* slotNames, int slotCount );
+    const char* const* slotNames = nullptr;
+    int slotCount = DISPLAY_SLOTS;
 
     // The dump contract.
     bool hold = false;

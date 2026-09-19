@@ -48,7 +48,7 @@
 #include "MagArray.h"
 #include "MagFit.h"
 #include "MagLocator.h"
-#include "MagView.h"
+#include "Apps.h"
 #include "Menu.h"
 #include "Play.h"
 #include "ProbeLedService.h"
@@ -467,8 +467,8 @@ int main( int argc, char** argv ) {
     consoleAddVerb( "screen:png", "<file>", "(host) the panel as a PNG", CONSOLE_READS, onScreenPng );
     consoleAddVerb( "screen:verify", "", "(host) the dump path against the panel", CONSOLE_READS, onScreenVerify );
     run( 50 );
-    bool bootOk = rowCounter.active == ROWCOUNT_ROW_MODE_AT_BOOT && ui.menu.count < MENU_MAX_ITEMS - 8;
-    printf( "boot: row mode %s (boots %s), chain %s, menu %d/%d items (%s)\n", rowCounter.active ? "on" : "off", ROWCOUNT_ROW_MODE_AT_BOOT ? "on" : "off", probeLeds.strip ? "on" : "off", ui.menu.count,
+    bool bootOk = rowCounter.active == ROWCOUNT_ROW_MODE_AT_BOOT && ui.shell.menu.count < MENU_MAX_ITEMS - 8;
+    printf( "boot: row mode %s (boots %s), chain %s, menu %d/%d items (%s)\n", rowCounter.active ? "on" : "off", ROWCOUNT_ROW_MODE_AT_BOOT ? "on" : "off", probeLeds.strip ? "on" : "off", ui.shell.menu.count,
             MENU_MAX_ITEMS, bootOk ? "PASS" : "FAIL" );
     if ( !bootOk )
         failures++;

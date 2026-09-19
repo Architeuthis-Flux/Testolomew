@@ -1,29 +1,38 @@
 // SPDX-License-Identifier: MIT
-#include "MagView.h"
-
+// The View app: the sensed magnet in 3D (the scene that was MagView).
+//
+// What is drawn: the board plane as a 10 mm grid, each sensor with its field
+// vector (length is logarithmic - the field spans three decades), and the
+// magnet as a red/blue bar along its axis (red = north) with a drop line and a
+// cross on the board under it, so height reads at a glance. A fading trail
+// follows the magnet. Numbers along the top, status along the bottom. With
+// the row counter in row mode the grid becomes the breadboard's rows, and
+// the counted row is written large.
+//
+// The camera (src/ui/Camera.h) looks at the middle of the array from a fixed
+// viewpoint to start with; the controls orbit, pan and zoom it, and it can
+// sway or spin (parallax is what makes a wireframe read as 3D on a flat
+// panel), look straight down, follow the probe, or ride on its point.
+//
+// Controls: the nav stick pans; its press clicks to the next camera mode
+// and held resets the view; the joystick orbits (yaw/elevation), and with
+// its press held zooms; the joystick's press clicked resets the view, held
+// goes home in the fixed mode. Console: v = next camera mode.
 #include <Adafruit_GFX.h>
 #include <math.h>
 
+#include "Apps.h"
 #include "BoardPins.h"
 #include "Console.h"
 #include "Display.h"
 #include "FastDraw.h"
 #include "MagArray.h"
 #include "MagLocator.h"
-#include "ST7789.h"
+#include "UiLayout.h"
 #include "config.h"
+#include "Input.h"
 #if MODULE_ROW_COUNT
 #include "RowCounter.h"
-#endif
-#if MODULE_PROBE_LEDS
-#include "ProbeLedService.h"
-#endif
-#if MODULE_PLAY
-#include "Play.h"
-#endif
-#if MODULE_UI
-#include "Ui.h"
-#include "UiStream.h"
 #endif
 
 #define COLOR_BACKGROUND RGB565( 0, 0, 0 )
@@ -52,44 +61,50 @@
 #define MAGNET_HALF_LENGTH_MM 5.0f
 #define VIEW_DEG_TO_RAD ( (float)M_PI / 180.0f )
 
-MagView& magView = MagView::getInstance( );
 
-MagView& MagView::getInstance( ) {
-    static MagView instance;
-    return instance;
-}
+#define VIEW_ORBIT_DEG_PER_S 90.0f // full joystick
+#define VIEW_ZOOM_PER_S 1.5f       // zoom factor per second at full joystick
+#define VIEW_PAN_MM 4.0f           // per nav press / repeat
+#define VIEW_ELEVATION_DEG 32.0f   // the home viewpoint
+#define VIEW_YAW_DEG -25.0f
+#define VIEW_TRAIL_POINTS 48
+#define VIEW_TRAIL_PERIOD_MS 40 // a trail point this often, ~2 s of history
+
+Camera viewCamera;
+
+static GFXcanvas16* canvas = nullptr; // the frame being drawn
+// The projection's copy of the camera, taken each frame.
+static Vec3 target = { 0, 0, 0 }; // what the camera looks at
+static float zoom = 2.0f;         // pixels per mm at the target
+static float cameraDistance = 300.0f;
+static float sinYaw = 0, cosYaw = 1, sinElevation = 0, cosElevation = 1;
+static uint32_t lastFrameMs = 0;
+static Vec3 trail[ VIEW_TRAIL_POINTS ];
+static int trailCount = 0;
+static int trailHead = 0;
+static uint32_t lastTrailMs = 0;
+
+static void aimCamera( uint32_t nowMs );
+static bool project( Vec3 world, int* sx, int* sy );
+static void line3d( Vec3 a, Vec3 b, uint16_t color );
+static void drawBoard( );
+static void drawRows( );
+static void drawSensors( );
+static void drawMagnet( );
+static void drawMagnetBar( Vec3 centre, Vec3 axis, bool flipped, float halfLengthMm );
+static void ring( Vec3 centre, float rx, float ry, uint16_t color );
+static void drawText( );
 
 static void onCamera( Stream* out ) {
     (void)out;
-    magView.nextCamera( );
+    cameraNextMode( &viewCamera );
 }
 
-void MagView::nextCamera( ) {
-    cameraNextMode( &cam );
-}
-
-static void onScreen( Stream* out ) {
-    magView.nextScreen( );
-    static const char* names[ MAGVIEW_SCREEN_COUNT ] = { "3D scene", "the breadboard's LEDs", "the log", "the draw screen" };
-    char line[ 160 ];
-    snprintf( line, sizeof( line ), "screen: %s  (%.0f frames/s on the last one)", names[ magView.screen ], display.fps( ) );
-    out->println( line );
-    // The cost of each screen, so a slow one is seen for what it is: the
-    // loop stops for a draw, and the LEDs after it wait.
-    static const char* const slots[ MAGVIEW_SCREEN_COUNT ] = { "scene", "LEDs", "log", "draw" };
-    display.printStats( out, slots, MAGVIEW_SCREEN_COUNT );
-}
-
-void MagView::nextScreen( ) {
-    screen = (MagViewScreen)( ( screen + 1 ) % MAGVIEW_SCREEN_COUNT );
-}
-
-void MagView::begin( ) {
+// Once, after the array is up: the console command and the camera's home
+// viewpoint - the middle of the array, a little above the board, zoomed so
+// the board outline fills most of the panel's width.
+void viewBegin( ) {
     consoleAddCommand( 'v', "next camera mode (fixed / sway / spin / top / follow / POV)", onCamera );
-    consoleAddCommand( 'e', "next screen: 3D scene / breadboard LEDs / log / draw", onScreen );
-
-    // Look at the middle of the array, a little above the board, zoomed so the
-    // board outline fills most of the panel's width.
     float xMin = 1e9f, xMax = -1e9f, yMin = 1e9f, yMax = -1e9f;
     for ( int i = 0; i < magArray.sensorCount( ); i++ ) {
         const Vec3& p = magArray.position[ i ];
@@ -105,17 +120,12 @@ void MagView::begin( ) {
     Vec3 middle = { 0.5f * ( xMin + xMax ), 0.5f * ( yMin + yMax ), 8.0f };
     float span = ( xMax - xMin ) > ( yMax - yMin ) ? ( xMax - xMin ) : ( yMax - yMin );
     span += 2.0f * BOARD_MARGIN_MM + 40.0f;
-    cameraInit( &cam, middle, MAGVIEW_YAW_DEG, MAGVIEW_ELEVATION_DEG, 4.0f * span, LCD_WIDTH / span );
-}
-
-bool magViewDraw( GFXcanvas16* canvas, uint32_t nowMs ) {
-    display.slot = magView.screen;
-    return magView.drawFrame( canvas, nowMs );
+    cameraInit( &viewCamera, middle, VIEW_YAW_DEG, VIEW_ELEVATION_DEG, 4.0f * span, LCD_WIDTH / span );
 }
 
 // ---- camera ----------------------------------------------------------------
 
-void MagView::aimCamera( uint32_t nowMs ) {
+static void aimCamera( uint32_t nowMs ) {
     float dtS = lastFrameMs == 0 ? 0.03f : ( nowMs - lastFrameMs ) * 0.001f;
     lastFrameMs = nowMs;
     // The probe for the follow / POV modes: the track when there is one, else the fix.
@@ -125,19 +135,19 @@ void MagView::aimCamera( uint32_t nowMs ) {
     bool haveProbe = tracked || fix.valid;
     Vec3 tip = tracked ? track.viewTip : fix.tip;
     Vec3 shaft = tracked ? track.shaft : fix.shaft;
-    cameraUpdate( &cam, dtS, nowMs * 0.001f, haveProbe, tip, shaft );
-    target = cam.target;
-    zoom = cam.zoom;
-    cameraDistance = cam.distance;
-    sinYaw = sinf( cam.yawDeg * VIEW_DEG_TO_RAD );
-    cosYaw = cosf( cam.yawDeg * VIEW_DEG_TO_RAD );
-    sinElevation = sinf( cam.elevationDeg * VIEW_DEG_TO_RAD );
-    cosElevation = cosf( cam.elevationDeg * VIEW_DEG_TO_RAD );
+    cameraUpdate( &viewCamera, dtS, nowMs * 0.001f, haveProbe, tip, shaft );
+    target = viewCamera.target;
+    zoom = viewCamera.zoom;
+    cameraDistance = viewCamera.distance;
+    sinYaw = sinf( viewCamera.yawDeg * VIEW_DEG_TO_RAD );
+    cosYaw = cosf( viewCamera.yawDeg * VIEW_DEG_TO_RAD );
+    sinElevation = sinf( viewCamera.elevationDeg * VIEW_DEG_TO_RAD );
+    cosElevation = cosf( viewCamera.elevationDeg * VIEW_DEG_TO_RAD );
 }
 
 // Board frame (mm) -> screen pixel. The camera sits `cameraDistance` from the
 // target, `elevation` above the board plane, swung `yaw` around the vertical.
-bool MagView::project( Vec3 world, int* sx, int* sy ) const {
+static bool project( Vec3 world, int* sx, int* sy ) {
     float dx = world.x - target.x;
     float dy = world.y - target.y;
     float dz = world.z - target.z;
@@ -173,7 +183,7 @@ bool MagView::project( Vec3 world, int* sx, int* sy ) const {
     return inFront;
 }
 
-void MagView::line3d( Vec3 a, Vec3 b, uint16_t color ) {
+static void line3d( Vec3 a, Vec3 b, uint16_t color ) {
     int ax, ay, bx, by;
     bool aFront = project( a, &ax, &ay );
     bool bFront = project( b, &bx, &by );
@@ -185,7 +195,7 @@ void MagView::line3d( Vec3 a, Vec3 b, uint16_t color ) {
 
 // ---- the scene -------------------------------------------------------------
 
-void MagView::drawBoard( ) {
+static void drawBoard( ) {
     float xMin = 1e9f, xMax = -1e9f, yMin = 1e9f, yMax = -1e9f;
     for ( int i = 0; i < magArray.sensorCount( ); i++ ) {
         const Vec3& p = magArray.position[ i ];
@@ -239,7 +249,7 @@ void MagView::drawBoard( ) {
 // row of both halves, from its first hole to its fifth, every fifth row
 // brighter and the counted one white. While calibrating, a ring round the hole
 // that is wanted.
-void MagView::drawRows( ) {
+static void drawRows( ) {
 #if MODULE_ROW_COUNT
     const RowGrid& grid = rowCounter.grid;
     const float inner = ROWGRID_INNER_HOLE_MM - 0.5f * ROWGRID_PITCH_MM;
@@ -270,7 +280,7 @@ void MagView::drawRows( ) {
 #endif
 }
 
-void MagView::drawSensors( ) {
+static void drawSensors( ) {
     for ( int i = 0; i < magArray.sensorCount( ); i++ ) {
         const Vec3& p = magArray.position[ i ];
         bool ok = magArray.sensor( i ).ok;
@@ -296,7 +306,7 @@ void MagView::drawSensors( ) {
 }
 
 // A magnet as a bar along `axis`: north half red, south half blue. `flipped` = its north pole is at the -axis end.
-void MagView::drawMagnetBar( Vec3 centre, Vec3 axis, bool flipped, float halfLengthMm ) {
+static void drawMagnetBar( Vec3 centre, Vec3 axis, bool flipped, float halfLengthMm ) {
     float h = flipped ? -halfLengthMm : halfLengthMm;
     Vec3 north = { centre.x + h * axis.x, centre.y + h * axis.y, centre.z + h * axis.z };
     Vec3 south = { centre.x - h * axis.x, centre.y - h * axis.y, centre.z - h * axis.z };
@@ -314,7 +324,7 @@ void MagView::drawMagnetBar( Vec3 centre, Vec3 axis, bool flipped, float halfLen
 }
 
 // A circle on a horizontal plane, for error bars.
-void MagView::ring( Vec3 centre, float rx, float ry, uint16_t color ) {
+static void ring( Vec3 centre, float rx, float ry, uint16_t color ) {
     const int segments = 20;
     for ( int k = 0; k < segments; k++ ) {
         float a0 = k * 2.0f * (float)M_PI / segments, a1 = ( k + 1 ) * 2.0f * (float)M_PI / segments;
@@ -322,14 +332,14 @@ void MagView::ring( Vec3 centre, float rx, float ry, uint16_t color ) {
     }
 }
 
-void MagView::drawMagnet( ) {
+static void drawMagnet( ) {
     const MagProbeFix& fix = magLocator.fix;
     const MagTrack& track = magLocator.track;
 
     // The trail, oldest first, fading in.
     for ( int n = 1; n < trailCount; n++ ) {
-        int older = ( trailHead - trailCount + n - 1 + 2 * MAGVIEW_TRAIL_POINTS ) % MAGVIEW_TRAIL_POINTS;
-        int newer = ( older + 1 ) % MAGVIEW_TRAIL_POINTS;
+        int older = ( trailHead - trailCount + n - 1 + 2 * VIEW_TRAIL_POINTS ) % VIEW_TRAIL_POINTS;
+        int newer = ( older + 1 ) % VIEW_TRAIL_POINTS;
         uint8_t level = (uint8_t)( 40 + 160 * n / trailCount );
         line3d( trail[ older ], trail[ newer ], RGB565( level, level * 3 / 4, 0 ) );
     }
@@ -399,16 +409,16 @@ void MagView::drawMagnet( ) {
     }
 }
 
-// Text is drawn at MAGVIEW_TEXT (2: 12 x 16 px characters, 20 to a line on
+// Text is drawn at UI_TEXT (2: 12 x 16 px characters, 20 to a line on
 // this panel), the counted row at twice that. Every line is written to fit.
 static void textAt( GFXcanvas16* canvas, int x, int y, int size, uint16_t color, const char* text ) {
     fastText( canvas, x, y, size, color, text );
 }
 
-void MagView::drawText( ) {
+static void drawText( ) {
     const MagProbeFix& fix = magLocator.fix;
     char line[ 48 ];
-    const int T = MAGVIEW_TEXT, H = MAGVIEW_LINE_H;
+    const int T = UI_TEXT, H = UI_LINE_H;
 
     if ( fix.valid ) {
         snprintf( line, sizeof( line ), "x%.1f y%.1f z%.1f", fix.magnet.x, fix.magnet.y, fix.magnet.z );
@@ -493,49 +503,35 @@ void MagView::drawText( ) {
 
     // A simulated probe (:probe) is marked, so a screen shot says so.
     if ( magLocator.simProbeActive( ) ) {
-        textAt( canvas, LCD_WIDTH - 3 * MAGVIEW_CHAR_W - 2, 2, T, COLOR_WARNING, "SIM" );
+        textAt( canvas, LCD_WIDTH - 3 * UI_CHAR_W - 2, 2, T, COLOR_WARNING, "SIM" );
     }
     // Two lines at the bottom: the array and frame rate; the camera, the
     // track's state and the cursor mode.
     static const char* trackNames[ 4 ] = { "-", "rough", "coast", "track" };
     snprintf( line, sizeof( line ), "%d/%d sens %2.0ffps s%.1f", magArray.sensorsOk( ), magArray.sensorCount( ), display.fps( ), magLocator.boardZ ); // s = the surface's height
     textAt( canvas, 2, LCD_HEIGHT - 2 * H - 2, T, COLOR_TEXT_DIM, line );
-    snprintf( line, sizeof( line ), "%s %s %s", cameraModeNames[ cam.mode ], magLocator.track.enabled ? trackNames[ magLocator.track.state ] : "raw",
+    snprintf( line, sizeof( line ), "%s %s %s", cameraModeNames[ viewCamera.mode ], magLocator.track.enabled ? trackNames[ magLocator.track.state ] : "raw",
               magLocator.track.cursorMode == MAGCURSOR_UNDER ? "under" : "aim" );
     textAt( canvas, 2, LCD_HEIGHT - H - 2, T, COLOR_TEXT_DIM, line );
 }
 
-bool MagView::drawFrame( GFXcanvas16* into, uint32_t nowMs ) {
-    canvas = into;
-    const MagProbeFix& fix = magLocator.fix;
-#if MODULE_UI
-    // The log screen is all text, which GFX draws slowly (a full screen of
-    // it measured 30 ms): only redraw it when something changed, and no more
-    // than every MAGVIEW_LOG_REDRAW_MS even then (a CSV stream into the log
-    // would otherwise hold the loop most of the time). A change of screen,
-    // of the menu or of the scroll always redraws.
-    if ( screen == MAGVIEW_SCREEN_LOG ) {
-        uint32_t stamp = uiStream.logGeneration( ) + 7919u * (uint32_t)ui.logScroll + 104729u * ui.menuEdits + ( ui.menuOpen( ) ? 1u : 0u );
-        bool sameScreen = lastDrawnScreen == (int)screen;
-        if ( sameScreen && ( stamp == lastLogStamp || nowMs - lastLogDrawMs < MAGVIEW_LOG_REDRAW_MS ) ) {
-            return false;
-        }
-        lastLogStamp = stamp;
-        lastLogDrawMs = nowMs;
-    }
-    lastDrawnScreen = (int)screen;
-#endif
 
+// ---- the app -----------------------------------------------------------------------
+
+void viewDraw( GFXcanvas16* into ) {
+    canvas = into;
+    uint32_t nowMs = millis( );
+    const MagProbeFix& fix = magLocator.fix;
     // Keep the trail: a point per period while there is a fix, and let it
     // drain away at the same rate once there is not.
-    if ( nowMs - lastTrailMs >= MAGVIEW_TRAIL_PERIOD_MS ) {
+    if ( nowMs - lastTrailMs >= VIEW_TRAIL_PERIOD_MS ) {
         lastTrailMs = nowMs;
         const MagTrack& track = magLocator.track;
         bool tracked = track.enabled && ( track.state == MAGTRACK_TRACKING || track.state == MAGTRACK_COASTING );
         if ( tracked || fix.valid ) {
             trail[ trailHead ] = tracked ? track.viewPosition : fix.magnet;
-            trailHead = ( trailHead + 1 ) % MAGVIEW_TRAIL_POINTS;
-            if ( trailCount < MAGVIEW_TRAIL_POINTS ) {
+            trailHead = ( trailHead + 1 ) % VIEW_TRAIL_POINTS;
+            if ( trailCount < VIEW_TRAIL_POINTS ) {
                 trailCount++;
             }
         } else if ( trailCount > 0 ) {
@@ -544,199 +540,58 @@ bool MagView::drawFrame( GFXcanvas16* into, uint32_t nowMs ) {
     }
 
     aimCamera( nowMs );
-    canvas->fillScreen( COLOR_BACKGROUND );
-    if ( screen == MAGVIEW_SCREEN_LEDS ) {
-        drawLedScreen( );
-    } else if ( screen == MAGVIEW_SCREEN_DRAW ) {
-        drawTraceScreen( );
-    } else if ( screen == MAGVIEW_SCREEN_LOG ) {
-#if MODULE_UI
-        ui.drawLog( canvas );
-#endif
+    drawBoard( );
+    drawSensors( );
+    drawMagnet( );
+    drawText( );
+}
+
+// The joystick, continuously: orbit, or zoom with the stick pressed.
+void viewTick( float dtS, float joyX, float joyY ) {
+    if ( joyX == 0.0f && joyY == 0.0f )
+        return;
+    if ( input.held( IN_JOY_PRESS ) ) {
+        float f = 1.0f + joyY * VIEW_ZOOM_PER_S * dtS;
+        cameraZoom( &viewCamera, f );
     } else {
-        drawBoard( );
-        drawSensors( );
-        drawMagnet( );
-        drawText( );
+        cameraOrbit( &viewCamera, joyX * VIEW_ORBIT_DEG_PER_S * dtS, joyY * VIEW_ORBIT_DEG_PER_S * dtS );
     }
-#if MODULE_UI
-    if ( ui.menuOpen( ) ) {
-        ui.drawMenu( canvas );
-    }
-#endif
-    return true;
 }
 
-// The drawing over the board from above: every hole a dot, the painted
-// ones squares in their colour at their level (as the LEDs have them), the
-// brush's ring round the point as hollow squares in the paint colour, the
-// point itself a cross. The map is the LED screen's: 7 px a row.
-void MagView::drawTraceScreen( ) {
-#if MODULE_PLAY
-    const LedLayout& layout = probeLeds.layout;
-    const ProbeLedFrame& frame = probeLeds.frame;
-    const ProbeLedBrush& brush = probeLeds.brush;
-    for ( int i = 0; i < layout.count; i++ ) {
-        if ( layout.kind[ i ] != PROBELED_HOLE )
-            continue;
-        int x, y;
-        PlayService::tracePlace( layout.along[ i ], layout.acrossMm[ i ], &x, &y );
-        float painted = play.paint.level[ i ];
-        if ( painted > 0.0f ) {
-            // As lit: the paint's colour at its level (the LEDs' own gamma
-            // is theirs; the panel shows the level as it is).
-            float k = painted > 1.0f ? 1.0f : painted;
-            fastFillRect( canvas, x - 2, y - 2, 5, 5, RGB565( (uint8_t)( play.paint.r[ i ] * k ), (uint8_t)( play.paint.g[ i ] * k ), (uint8_t)( play.paint.b[ i ] * k ) ) );
-        } else {
-            fastFillRect( canvas, x, y, 1, 1, COLOR_GRID );
+bool viewEvent( const InputEvent* e ) {
+    bool press = e->kind == IN_PRESS || e->kind == IN_REPEAT;
+    switch ( e->control ) {
+    case IN_NAV_LEFT:
+        if ( press )
+            cameraPan( &viewCamera, -VIEW_PAN_MM, 0.0f );
+        return true;
+    case IN_NAV_RIGHT:
+        if ( press )
+            cameraPan( &viewCamera, VIEW_PAN_MM, 0.0f );
+        return true;
+    case IN_NAV_UP:
+        if ( press )
+            cameraPan( &viewCamera, 0.0f, VIEW_PAN_MM );
+        return true;
+    case IN_NAV_DOWN:
+        if ( press )
+            cameraPan( &viewCamera, 0.0f, -VIEW_PAN_MM );
+        return true;
+    case IN_NAV_PRESS:
+        if ( e->kind == IN_CLICK )
+            cameraNextMode( &viewCamera );
+        else if ( e->kind == IN_HOLD )
+            cameraReset( &viewCamera );
+        return true;
+    case IN_JOY_PRESS:
+        if ( e->kind == IN_CLICK ) {
+            cameraReset( &viewCamera );
+        } else if ( e->kind == IN_HOLD ) {
+            cameraReset( &viewCamera );
+            cameraSetMode( &viewCamera, CAMERA_FIXED );
         }
-        // The brush ring (what the LED renderer is showing as the cursor).
-        if ( brush.active && frame.target[ i ] > 0.0f && frame.target[ i ] != painted ) {
-            fastRect( canvas, x - 3, y - 3, 7, 7, RGB565( brush.r, brush.g, brush.b ) );
-        }
+        return true;
+    default:
+        return false;
     }
-    const ProbeLedInput& in = probeLeds.input;
-    if ( in.state != PROBELED_NONE ) {
-        int x, y;
-        PlayService::tracePlace( in.haveUnder ? in.underAlong : in.along, in.haveUnder ? in.underAcrossMm : in.acrossMm, &x, &y );
-        uint16_t c = in.heightMm < play.touchMm ? COLOR_SURE : COLOR_SHADOW;
-        fastFillRect( canvas, x - 4, y, 9, 1, c );
-        fastFillRect( canvas, x, y - 4, 1, 9, c );
-    }
-    char line[ 40 ];
-    snprintf( line, sizeof( line ), "%s: %s", playModeNames[ play.mode ], in.state == PROBELED_NONE ? "no probe" : ( in.heightMm < play.touchMm ? "touching" : "lifted" ) ); // 20 columns
-    textAt( canvas, 2, 2, MAGVIEW_TEXT, COLOR_TEXT_DIM, line );
-    if ( play.mode == PLAY_PAINT ) {
-        drawColourWheel( );
-    }
-    if ( play.mode == PLAY_TARGET ) {
-        snprintf( line, sizeof( line ), "%lu hit %.2fs %.1fmm", (unsigned long)play.hits, play.meanMs * 1e-3f, play.meanMissMm );
-        textAt( canvas, 2, LCD_HEIGHT - MAGVIEW_LINE_H - 2, MAGVIEW_TEXT, COLOR_TEXT_DIM, line );
-    }
-#else
-    textAt( canvas, 4, 4, MAGVIEW_TEXT, COLOR_TEXT_DIM, "MODULE_PLAY is off" );
-#endif
-}
-
-// The paint's colour wheel, bottom right of the draw screen: hue round it,
-// saturation out from the white centre, the marker where the paint colour
-// is (the joystick moves it), a swatch of the colour at its brightness, and
-// the brush and draw/erase state. The wheel's pixels are worked out once.
-#define WHEEL_R 26
-#define WHEEL_CX ( LCD_WIDTH - WHEEL_R - 4 )
-#define WHEEL_CY ( LCD_HEIGHT - WHEEL_R - 4 )
-#define WHEEL_PANEL_Y ( LCD_HEIGHT - 5 * MAGVIEW_LINE_H ) // the settings, five lines to the wheel's left (the map is above, PLAY_TRACE_MID_Y)
-static uint16_t wheelPixels[ ( 2 * WHEEL_R + 1 ) * ( 2 * WHEEL_R + 1 ) ];
-static bool wheelReady = false;
-
-void MagView::drawColourWheel( ) {
-#if MODULE_PLAY
-    if ( !wheelReady ) {
-        for ( int dy = -WHEEL_R; dy <= WHEEL_R; dy++ ) {
-            for ( int dx = -WHEEL_R; dx <= WHEEL_R; dx++ ) {
-                float r = sqrtf( (float)( dx * dx + dy * dy ) ) / WHEEL_R;
-                uint16_t c = 0;
-                if ( r <= 1.0f ) {
-                    float hue = atan2f( (float)-dy, (float)dx ) * ( 180.0f / 3.14159265f ); // y up
-                    uint8_t cr, cg, cb;
-                    playHsvToRgb( hue, r, &cr, &cg, &cb );
-                    c = RGB565( cr, cg, cb );
-                    if ( c == 0 )
-                        c = 1; // 0 is the "outside" mark
-                }
-                wheelPixels[ ( dy + WHEEL_R ) * ( 2 * WHEEL_R + 1 ) + dx + WHEEL_R ] = c;
-            }
-        }
-        wheelReady = true;
-    }
-    uint16_t* buffer = canvas->getBuffer( );
-    for ( int dy = -WHEEL_R; dy <= WHEEL_R; dy++ ) {
-        int y = WHEEL_CY + dy;
-        if ( y < 0 || y >= LCD_HEIGHT )
-            continue;
-        for ( int dx = -WHEEL_R; dx <= WHEEL_R; dx++ ) {
-            uint16_t c = wheelPixels[ ( dy + WHEEL_R ) * ( 2 * WHEEL_R + 1 ) + dx + WHEEL_R ];
-            int x = WHEEL_CX + dx;
-            if ( c != 0 && x >= 0 && x < LCD_WIDTH )
-                buffer[ y * LCD_WIDTH + x ] = c;
-        }
-    }
-    // The marker: a ring where the colour is.
-    float rad = play.paintHue * ( 3.14159265f / 180.0f );
-    int mx = WHEEL_CX + (int)( play.paintSat * WHEEL_R * cosf( rad ) + 0.5f );
-    int my = WHEEL_CY - (int)( play.paintSat * WHEEL_R * sinf( rad ) + 0.5f );
-    fastRect( canvas, mx - 3, my - 3, 7, 7, RGB565( 0, 0, 0 ) );
-    fastRect( canvas, mx - 2, my - 2, 5, 5, RGB565( 255, 255, 255 ) );
-    // Every setting of the play page, to the wheel's left: the colour, the
-    // brush's brightness and width, draw or erase (with the swatch: the
-    // colour as it will be painted), and how to clear. What the controls do
-    // is in the README; the joystick, its click and the nav stick are it.
-    uint8_t r, g, b;
-    play.paintColour( &r, &g, &b );
-    float k = play.erase ? 0.0f : play.paintBright;
-    char line[ 24 ];
-    int y = WHEEL_PANEL_Y;
-    snprintf( line, sizeof( line ), "hue %3d sat %.2f", (int)( play.paintHue + 0.5f ) % 360, play.paintSat );
-    textAt( canvas, 2, y, MAGVIEW_TEXT, COLOR_TEXT_DIM, line );
-    y += MAGVIEW_LINE_H;
-    snprintf( line, sizeof( line ), "bright %3d%%", (int)( play.paintBright * 100.0f + 0.5f ) );
-    textAt( canvas, 2, y, MAGVIEW_TEXT, COLOR_TEXT_DIM, line );
-    y += MAGVIEW_LINE_H;
-    snprintf( line, sizeof( line ), "brush %d", (int)( play.brushSize + 0.5f ) );
-    textAt( canvas, 2, y, MAGVIEW_TEXT, COLOR_TEXT_DIM, line );
-    int sx = 2 + 7 * MAGVIEW_CHAR_W + 8, sy = y + 2; // the swatch after "brush 1", then draw / ERASE
-    fastFillRect( canvas, sx, sy, 12, 12, RGB565( (uint8_t)( r * k ), (uint8_t)( g * k ), (uint8_t)( b * k ) ) );
-    fastRect( canvas, sx - 1, sy - 1, 14, 14, play.erase ? COLOR_SHADOW : COLOR_TEXT_DIM );
-    textAt( canvas, sx + 18, y, MAGVIEW_TEXT, play.erase ? COLOR_SHADOW : COLOR_TEXT, play.erase ? "ERASE" : "draw" );
-    y += MAGVIEW_LINE_H;
-    snprintf( line, sizeof( line ), "touch %.1f mm", play.touchMm );
-    textAt( canvas, 2, y, MAGVIEW_TEXT, COLOR_TEXT_DIM, line );
-    y += MAGVIEW_LINE_H;
-    textAt( canvas, 2, y, MAGVIEW_TEXT, COLOR_TEXT_DIM, "hold nav: clear" );
-#endif
-}
-
-// The breadboard's LEDs from above: rows along the panel, holes across it,
-// each LED a square in the colour it would be lit, as the probe cursor
-// renderer has it. Rows 1-30 at the top, 31-60 below the channel.
-void MagView::drawLedScreen( ) {
-#if MODULE_PROBE_LEDS
-    const LedLayout& layout = probeLeds.layout;
-    const ProbeLedFrame& frame = probeLeds.frame;
-    const int cell = LCD_WIDTH / ( PROBELED_ROWS + 2 ); // 7 px per row
-    const float pxPerMm = cell / 2.54f;
-    const int x0 = ( LCD_WIDTH - PROBELED_ROWS * cell ) / 2;
-    const int yMid = LCD_HEIGHT / 2 + 8;
-    for ( int i = 0; i < layout.count; i++ ) {
-        int x = x0 + (int)( ( layout.along[ i ] - 1.0f ) * cell );
-        int y = yMid - (int)( layout.acrossMm[ i ] * pxPerMm );
-        // The LCD is not an LED: no gamma, so the dim end of the bell shows.
-        float level = frame.level[ i ] > 1.0f ? 1.0f : frame.level[ i ];
-        uint8_t r = (uint8_t)( frame.r[ i ] * level ), g = (uint8_t)( frame.g[ i ] * level ), b = (uint8_t)( frame.b[ i ] * level );
-        uint16_t colour = level > 0.02f ? RGB565( r, g, b ) : ( layout.kind[ i ] == PROBELED_RAIL ? RGB565( 24, 20, 20 ) : RGB565( 28, 32, 40 ) );
-        fastFillRect( canvas, x, y - cell / 2 + 1, cell - 1, cell - 1, colour );
-    }
-    fastFillRect( canvas, x0, yMid, PROBELED_ROWS * cell, 1, COLOR_GRID );
-    textAt( canvas, x0, (int)( yMid - 8 * pxPerMm * 2.54f - 28 ), MAGVIEW_TEXT, COLOR_TEXT_DIM, "1" );
-    textAt( canvas, x0 + 28 * cell, (int)( yMid - 8 * pxPerMm * 2.54f - 28 ), MAGVIEW_TEXT, COLOR_TEXT_DIM, "30" );
-
-    char line[ 60 ];
-    const ProbeLedInput& in = probeLeds.input;
-    static const char* names[ 4 ] = { "no probe", "far away", "coasting", "tracking" };
-    if ( in.state == PROBELED_NONE ) {
-        textAt( canvas, 2, 2, MAGVIEW_TEXT, COLOR_TEXT_DIM, names[ 0 ] );
-    } else {
-        int rowNumber = (int)floorf( in.along + 0.5f ) + ( in.acrossMm < 0.0f ? PROBELED_ROWS : 0 );
-        snprintf( line, sizeof( line ), "%s row %d", names[ in.state ], rowNumber );
-        textAt( canvas, 2, 2, MAGVIEW_TEXT, COLOR_TEXT, line );
-        snprintf( line, sizeof( line ), "+-%.2f %.0f%% up %.0fmm%s", in.sigmaRows, in.confidence * 100.0f, in.heightMm, in.haveUnder ? " *" : "" );
-        textAt( canvas, 2, 2 + MAGVIEW_LINE_H, MAGVIEW_TEXT, COLOR_TEXT_DIM, line );
-    }
-    snprintf( line, sizeof( line ), "%s %d LEDs %2.0f fps", probeLeds.v5 ? "V5" : "V6", layout.count, display.fps( ) );
-    textAt( canvas, 2, LCD_HEIGHT - MAGVIEW_LINE_H - 2, MAGVIEW_TEXT, COLOR_TEXT_DIM, line );
-#else
-    canvas->setCursor( 4, 4 );
-    canvas->setTextColor( COLOR_TEXT_DIM );
-    canvas->print( "MODULE_PROBE_LEDS is off" );
-#endif
 }

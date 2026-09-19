@@ -7,7 +7,9 @@
 // PAINT: with the point on the board, the LED under it takes the paint
 // colour and keeps it, so a line drawn along a row should come out as that
 // row's LEDs and nothing else; "clear" wipes it (the menu's, W, or the nav
-// stick's centre held on the draw screen). The brush itself is Paint.h:
+// stick's centre held in the Draw app). The Draw app (src/apps/AppDraw.cpp)
+// IS the paint app: going to it starts painting, leaving it stops, and the
+// drawing stays. The brush itself is Paint.h:
 // newest wins - a stroke paints over what was there, and within a stroke
 // the centre beats the edge. The LCD's draw screen IS the
 // paint app: going to it starts painting, leaving it stops, and the drawing
@@ -107,7 +109,6 @@ class PlayService : public Service {
     PlayService( ) = default;
     uint8_t targetWasR = 0, targetWasG = 0, targetWasB = 0; // the paint under the target LED, put back when it moves on
     float targetWasLevel = 0.0f;
-    bool wasOnDrawScreen = false; // the LCD's draw screen was up at the last tick
     uint32_t layoutSeen = 0;      // probeLeds.layoutGeneration the paint was made for
     void releaseTarget( );
     bool wasTouching = false;

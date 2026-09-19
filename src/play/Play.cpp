@@ -6,9 +6,6 @@
 #include "Console.h"
 #include "ProbeLedService.h"
 #include "config.h"
-#if MODULE_MAG_VIEW
-#include "MagView.h"
-#endif
 
 PlayService& play = PlayService::getInstance( );
 
@@ -204,20 +201,6 @@ void PlayService::printScore( Stream* out ) const {
 }
 
 ServiceStatus PlayService::service( ) {
-#if MODULE_MAG_VIEW
-    // The draw screen is the paint app: going to it starts painting (unless
-    // the target game is on), leaving it stops - the drawing stays, off the
-    // LEDs while away and back on them on return.
-    bool onDrawScreen = magView.screen == MAGVIEW_SCREEN_DRAW;
-    if ( onDrawScreen != wasOnDrawScreen ) {
-        wasOnDrawScreen = onDrawScreen;
-        if ( onDrawScreen && mode == PLAY_OFF ) {
-            mode = PLAY_PAINT;
-        } else if ( !onDrawScreen && mode == PLAY_PAINT ) {
-            mode = PLAY_OFF;
-        }
-    }
-#endif
     if ( layoutSeen != probeLeds.layoutGeneration ) {
         // The layout was rebuilt (B): the LED numbers mean other LEDs now.
         layoutSeen = probeLeds.layoutGeneration;

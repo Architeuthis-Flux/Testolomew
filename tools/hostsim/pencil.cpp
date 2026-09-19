@@ -4,10 +4,8 @@
 // lag (the delay of the truth that best matches each output) of each
 // output, the shaft's angle error at rest and while turning, and the
 // jitter at rest. The numbers to tune the smoothing levers by.
-#define private public
 #include "MagArray.h"
 #include "MagLocator.h"
-#undef private
 #include "Console.h"
 #include <vector>
 #include <string.h>

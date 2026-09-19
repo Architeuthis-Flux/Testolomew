@@ -9,7 +9,6 @@
 #include "config.h"
 #if MODULE_MAG_VIEW
 #include "Display.h"
-#include "MagView.h"
 #include "ST7789.h"
 #endif
 #if MODULE_PROBE_LEDS
@@ -493,8 +492,7 @@ static void onStats( int argc, char** argv, Stream* out ) {
     jOS.printStats( out );
     char line[ 200 ];
 #if MODULE_MAG_VIEW
-    static const char* const slots[ MAGVIEW_SCREEN_COUNT ] = { "scene", "LEDs", "log", "draw" };
-    display.printStats( out, slots, MAGVIEW_SCREEN_COUNT );
+    display.printStats( out, display.slotNames, display.slotCount );
 #endif
 #if MODULE_PROBE_LEDS
     if ( probeLeds.strip ) {

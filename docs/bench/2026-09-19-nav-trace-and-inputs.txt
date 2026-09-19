@@ -22,3 +22,5 @@
     0.0   (none yet)
     0.0 nav stick contact changes, oldest first (ms since the previous one; up down left right, push):
     0.0   (none yet)
+    0.0 nav stick contact changes, oldest first (ms since the previous one; up down left right, push):
+    0.0   (none yet)
