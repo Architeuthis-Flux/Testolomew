@@ -5,14 +5,34 @@ Written 2026-09-19 (midday) as the hand-over for a new chat, after the night of 
 ## 1. How settings work
 
 - **Every NUMBER, TOGGLE and CHOICE item on the on-screen menu is saved** to the flash tail by `src/settings` (the core's EEPROM library), keyed by `page/label`, and put back at boot. Change it in the menu or with a console command; two seconds after it stops changing it is written. `s` prints what is saved, `Z` (menu: "reset settings") puts everything back to the compile-time defaults and forgets the row anchors.
-- **Not saved** (modes, in `unsaved[]` in `Settings.cpp`): row mode, the LED chain on/off, the V5 console stream, the play mode. They come up as the firmware boots them: row mode on, chain on, stream off, play off. The UI reads them from the modules before applying loaded values (`Ui::settingsLoaded`), because for a day every boot had switched row mode and the chain off through this path.
+- **Not saved** (modes, in `unsaved[]` in `Settings.cpp`): row mode, the LED chain on/off, the V5 console stream, the play mode. They come up as the firmware boots them: row mode on, chain on, stream off, play off. The settings module captures every item's default from its getter after the modules have begun, and a reset writes through the setters only what differs, so neither a load nor a reset forces a mode (for a day every boot had switched row mode and the chain off through the old mirror variables).
 - **Renaming an item retires its saved value** (the old key is dropped, the default takes). `SETTINGS_TUNING_VERSION` (3) does the same for the tracker and smoothing pages and `play/touch` when their defaults improve.
 - Also saved, not menu items: the array's **zero** (eight `zero=` lines) and the last good **magnet** fix (for `Y`). The row **anchors** too (none saved at the moment).
 - A chip **erase** (not a flash) wipes all of it. Then the board boots with the compiled-in zero `MAG_ZERO_AT_BOOT` (this morning's clean one) rather than zeroing blind - a blind zero with the probe near the board eats its field and every fit after it is wrong (07:36 this morning: misfit 20-50 %, height 5 mm out, LEDs white).
 
-## 2. The menu, page by page
+## 2. Home, the apps and the Settings menu
 
-Button A opens and closes the menu; nav stick up/down moves, right/enter edits, left/back leaves; the joystick doubles as a four-way in the menu. Items marked *(saved)* persist; *(mode)* does not.
+The screen is one of nine things from the **Home** grid (button A): **View** (the 3D scene), **LEDs** (the breadboard's LEDs as the cursor lights them), **Terminal** (the console's log, 40 x 28), **Draw** (the paint app: going to it starts painting, leaving stops), **Target** (the target game, likewise), **Rows** (the counted row, large, with how sure), **Calibrate** (the twelve taps; leaving cancels), **Settings** (the pages below, over the app), **Info** (the build, the sensors, the frame rate, the service table). The probe, the LEDs and the paint go on underneath whatever is open.
+
+The controls mean the same everywhere (the shell, `src/ui/UiShell.cpp`, is the one owner of them):
+
+| control | in an app | Home | a Settings page | Confirm / Result |
+|---|---|---|---|---|
+| nav / joystick up-down | the app's own | move | move the cursor (wraps) | scroll the result |
+| nav / joystick left-right | the app's own | move | **change the value in place**: a toggle flips, a choice cycles, a number steps (x10 after eight repeats), a number-taking action steps its argument | - |
+| analog joystick | the app's own (once centred after a change of focus) | - | - | - |
+| nav press / joystick press (click) | the app's own | select | enter the page / run the action / flip / cycle | yes / dismiss |
+| **A** click | Home | select | select | yes / dismiss |
+| **A** hold | Settings | - | - | - |
+| **B** click | the previous app, else Home | close | back a page (the parent's cursor kept); at the root: close | no / dismiss |
+| **B** hold | Home | - | close everything, Home | cancel, Home |
+| 20 s idle | - | close (cursor kept) | close (page and cursor kept) | cancel |
+
+A and B never reach an app. A control still held when a pane closes (a nav-left held while B backs out of the menu) is swallowed until it is released, so it never goes on into the app underneath; the joystick is the app's again only once it has been centred. An action run from a Settings page (a console command) shows its output in a **Result** panel over the page - the app underneath never changes - and the destructive ones (`reset settings`, `forget anchors`, `forget strength`, `re-zero`, `power-cycle`) ask first. There is no edit mode: what is shown is what is set, and the settings module writes it two seconds after it stops changing.
+
+From the console the same is driven with `:ui open|menu|close|back|enter|up|down|left|right|go <label>`, `:key <control> [tap|down|up|hold]` and `:joy`; `:screen` prints the app, the panes, the menu page with its items and values, and the probe/play/camera state; `:screen:ascii` and `tools/screendump.py` show the picture.
+
+The pages, item by item. Items marked *(saved)* persist; *(mode)* does not. Every label is the settings module's key, so it stays as it is.
 
 ### tracker
 | item | what it does | default |
@@ -45,7 +65,7 @@ All of these were set on the bench (`tools/hostsim/pencil.cpp`): a hand writing 
 | reach | the pointer never reaches further from the tip than this (mm) | 40 |
 
 ### camera
-`mode` fixed / sway / spin / top / follow / POV (also `v`), `reset view`. The joystick orbits the scene, zooms with the stick pressed (note: the stick's push reads pressed at rest on this board - wiring); the nav stick pans; joystick press = next mode, hold = reset.
+`mode` fixed / sway / spin / top / follow / POV (also `v`), `reset view`. In the View app the joystick orbits the scene and zooms with its press held; the nav stick pans; the nav press clicked steps the camera mode and held resets the view; the joystick's press clicked resets the view, held goes home in the fixed mode.
 
 ### LEDs
 | item | what it does | default |
@@ -65,26 +85,26 @@ All of these were set on the bench (`tools/hostsim/pencil.cpp`): a hand writing 
 | V5 stream *(mode)* | the cursor as CSV on the console for a V5 to follow (`L`) | off |
 
 ### rows
-`row mode` *(mode)* (`r`; on at boot) - which breadboard row the probe is over, on the LCD and console; `row` info; `calibrate 12 taps` (`c`); `anchor at row` (`R<row>`: probe in that row's hole next to the channel); `forget anchors` (`C`); `hold-still test` (`h`). A tap or a hold now lets a second go by while the hand settles, then measures two seconds. The grid the board boots with is `ROWCOUNT_GRID_AT_BOOT` (the 2026-09-17 calibration); the breadboard has moved since - it reads ~1.7 rows off at row 20 and puts a touching tip in the channel near the centre line - **anchoring is still to do**: `R20` in row 20's channel-side hole, `R50` likewise.
+`row mode` *(mode)* (`r`; on at boot) - which breadboard row the probe is over, on the LCD (the View and Rows apps) and console; `row` info; `calibrate 12 taps` (opens the Calibrate app; `c` on the console); `anchor at row` (the row stepped in place with left/right, then the press: `R<row>` with the probe in that row's hole next to the channel); `forget anchors` (`C`, asks first); `hold-still test` (`h`). A tap or a hold now lets a second go by while the hand settles, then measures two seconds. The grid the board boots with is `ROWCOUNT_GRID_AT_BOOT` (the 2026-09-17 calibration); the breadboard has moved since - it reads ~1.7 rows off at row 20 and puts a touching tip in the channel near the centre line - **anchoring is still to do**: `R20` in row 20's channel-side hole, `R50` likewise.
 
 ### play
 | item | what it does | default |
 |---|---|---|
-| mode *(mode)* | off / paint / target (`y0`/`y1`/`y2`). The draw screen (`e`) turns paint on when you go to it and off when you leave; the drawing stays in RAM and shows again on return | off |
+| mode *(mode)* | off / paint / target (`y0`/`y1`/`y2`). The Draw app turns paint on when you go to it and off when you leave, the Target app likewise; the drawing stays in RAM and shows again on return | off |
 | hue / sat | the brush colour: degrees round the wheel, and 0 (white centre) to 1 (rim). The draw screen's wheel sets them with the joystick | 0 / 1.0 |
-| paint bright | the brush's level, 5 % steps; nav up/down on the draw screen. The brush's only: what is painted keeps the level it got | 0.5 |
-| brush | 0-3 rows around the LED under the point, with a soft edge that never paints over a stronger mark; nav left/right on the draw screen | 0 |
-| touch | the height (mm above the surface) below which the point paints, with 0.7 mm of hysteresis; also on the draw screen | 2.0 |
-| clear | wipes the paint (`W`; the nav stick's centre held on the draw screen does too) | - |
+| paint bright | the brush's level, 5 % steps; nav up/down in the Draw app. The brush's only: what is painted keeps the level it got | 0.5 |
+| brush | 0-3 rows around the LED under the point, with a soft edge. **Newest wins** (`src/play/Paint.h`): a stroke paints over what was there, colour and level; within a stroke the centre beats an earlier edge and an edge never dims a centre; nav left/right in the Draw app | 0 |
+| touch | the height (mm above the surface) below which the point paints, with 0.7 mm of hysteresis; also in the Draw app | 2.0 |
+| clear | wipes the paint (`W`; the nav press held in the Draw app does too) | - |
 | target | info: the target game's tally (`w` prints it) | - |
 
-Draw-screen controls, in paint mode: **joystick** moves the wheel's marker (4 radii/s at full tilt; expo on the stick), **joystick click** toggles draw / ERASE (on this board it fires on the release, the push reads inverted), **nav up/down** brightness, **nav left/right** brush, **nav held** clear. The panel under the map shows every value; the map shows the drawing as the LEDs have it, and the brush ring (the LEDs just outside what a touch would paint) as hollow squares. In paint mode the LED cursor *is* that ring: no glow, bloom, sparkle or height colour, no fade.
+Draw app controls, in paint mode: **joystick** moves the wheel's marker (4 radii/s at full tilt; expo on the stick), **joystick click** toggles draw / ERASE (a click: on the release of a short press, never on a hold), **nav up/down** brightness, **nav left/right** brush, **nav press held** clear. The panel under the map shows every value; the map shows the drawing as the LEDs have it, and the brush ring (the LEDs just outside what a touch would paint) as hollow squares. In paint mode the LED cursor *is* that ring: no glow, bloom, sparkle or height colour, no fade.
 
 ### magnet, sensors
 `strength` info, `learn strength` (`k`: hold the fit to this magnet's strength), `forget strength` (`K`), `re-zero (away!)` (`z`: the probe well clear of the board), `orientation check` (`o`), `latest fix` (`l`). `sensors` info, `array status` (`m`), `bus check` (`b`), `power-cycle` (`p`), `service table` (`X`), `saved settings` (`s`).
 
 ### root
-`row mode` (again, for reach), `commands` (every console command as a menu action), `reset settings`, `close`.
+`commands` (every console command as a menu action, but for `e v y B N r g u`, which have an item of their own or change the app), `reset settings` (asks first; the modes - row mode, the chain - are left as they are).
 
 ## 3. Console commands not on a page
 
@@ -131,7 +151,7 @@ Values are the ones in the tree now. "Where" is the header.
 ## 5. Things to know that are not knobs
 
 - The V3F (core 0, 100 MHz) has no instruction cache and its `micros()` has no sub-millisecond part; code it runs in a loop goes in ITCM, and `millis()` is its clock. A `static const` table read per LED on the main core is a flash data read the I-cache does not help with.
-- The joystick's push reads pressed at rest on this board (`j` shows it): the click's edge is on the release. Probably active-high wiring; `Input.cpp`'s button table is the place to flip it.
+- The joystick's push read high at rest on the bench of 2026-09-19 (`j` shows it): an ordinary switch to ground, `JOY_PRESS_ACTIVE_LOW 1` in `BoardPins.h`. A click is the release of a press shorter than 500 ms (`src/ui/ButtonTracker.h`); a hold fires at 500 ms and is never also a click.
 - `m` pauses the sampler for a 2 ms diagnostic read; `X` is the service table (runs, avg/max µs, overruns) - the first place to look when anything feels slow.
 - The pencil bench: `tools/hostsim/pencil.cpp` (`far` for a hovering hand); the screens simulator `tools/hostsim/screens.cpp` renders every screen to PNG and checks the settings and the paint; `tools/fixstats.py` reads a `d` stream's rest statistics.
 - Unit tests: `pio test -e native`. The LED tests encode today's glow rule (the widest bell fades), not last night's (the widest bell keeps a full LED).

@@ -134,7 +134,7 @@ static uint32_t xorshift( uint32_t* s ) {
     return x;
 }
 
-// The LED screen's mapping (MagView::drawLedScreen): 7 px a row along the
+// The LED screen's mapping (the LEDs app): 7 px a row along the
 // panel, rows 1-30 above the channel line at yMid, the 31-60 half below.
 void PlayService::tracePlace( float along, float acrossMm, int* x, int* y ) {
     const int cell = PLAY_TRACE_W / ( PROBELED_ROWS + 2 );

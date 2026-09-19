@@ -8,7 +8,7 @@
 // st7789PushRows() sends a band of rows in one DMA SPI transfer and waits;
 // st7789PushRowsStart() / st7789PushBusy() / st7789PushFinish() send one
 // without waiting, so the loop reads sensors while the wire is busy (a whole
-// 240x240 frame is 115 KB = 26 ms on the wire). MagView sends the frame in
+// 240x240 frame is 115 KB = 26 ms on the wire). The Display sends the frame in
 // two such bands. 240x240x2 bytes = 115 KB of the ~700 KB heap.
 //
 // The panel here is the one wuxx's demo targets: 1.54" 240x240. Other panels

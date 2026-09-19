@@ -8,7 +8,7 @@
 // 200 us (every pixel goes through startWrite / writePixel / the virtual
 // drawPixel / the rotation switch), so a log screen of 280 characters held
 // the loop for 45-60 ms and the 3D scene's few thousand line pixels took
-// 12-18 ms. The same store from a plain loop measures 40 ns (MagView's
+// 12-18 ms. The same store from a plain loop measures 40 ns (the Display's
 // boot benchmark). These write straight into the canvas buffer: the same
 // classic 5x7 font (GFX's own table, glcdfont.c), the same origin (top
 // left) and 6 x 8 cell scaled by `size`, the same Bresenham as GFX's

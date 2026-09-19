@@ -4,7 +4,7 @@
 // ---------------------------------------------------------------------------
 // The 3D view's camera: where it looks (the target), from which direction
 // (yaw round the vertical, elevation above the board), how far, and how many
-// pixels a millimetre at the target gets (zoom). MagView's projection takes
+// pixels a millimetre at the target gets (zoom). The View app's projection takes
 // exactly these five numbers; this decides them.
 //
 // Modes: FIXED (the user's own viewpoint: orbit, pan and zoom by the
@@ -66,7 +66,7 @@ struct Camera {
 
 extern const char* const cameraModeNames[ CAMERA_MODE_COUNT ];
 
-// The home viewpoint (what MagView worked out from the array's extent).
+// The home viewpoint (what the View app works out from the array's extent).
 void cameraInit( Camera* c, Vec3 target, float yawDeg, float elevationDeg, float distance, float zoom );
 void cameraSetMode( Camera* c, CameraMode mode );
 void cameraNextMode( Camera* c );
@@ -82,7 +82,7 @@ void cameraReset( Camera* c );                          // back to home
 void cameraUpdate( Camera* c, float dtS, float tS, bool haveProbe, Vec3 tip, Vec3 shaft );
 
 // The direction the camera looks along, for the given yaw and elevation: the
-// same convention as MagView's projection (depth axis). For tests.
+// same convention as the View app's projection (depth axis). For tests.
 Vec3 cameraLookDirection( float yawDeg, float elevationDeg );
 
 #endif // CAMERA_H

@@ -11,7 +11,7 @@
 //
 // Takes MagLocator's fixes and the row grid and keeps `reading`: the row, how
 // far into it, which hole, the error bar in rows and the chance the row is
-// right. MagView shows it large while row mode is on.
+// right. The View and Rows apps show it large while row mode is on.
 //
 // Two positions are in play, and they are kept apart on purpose:
 //  - the RAW fix of each frame, which is the one the fit's error bar describes.
@@ -143,7 +143,7 @@ class RowCounter : public Service {
     void startHold( RowHoldPurpose purpose, int row, Stream* out );
     void forgetAnchors( Stream* out );
 
-    // The guided calibration, for the console and for MagView's prompt.
+    // The guided calibration, for the console and for the Calibrate app's prompt.
     void startCalibration( Stream* out ); // or cancel it, if it is running
     bool calibrating( ) const { return calibrationStep >= 0; }
     int calibrationStepNumber( ) const { return calibrationStep; }

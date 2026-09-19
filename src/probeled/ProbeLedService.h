@@ -4,7 +4,7 @@
 // ---------------------------------------------------------------------------
 // Keeps the breadboard-LED picture of the probe up to date (ProbeLeds.h) from
 // the tracker, fifty times a second. The test bed has no breadboard LEDs, so
-// the picture is shown on the LCD (MagView's LED screen) and, for a V5 that
+// the picture is shown on the LCD (the LEDs app) and, for a V5 that
 // does have them, streamed over the console as one line per update that the
 // JumperlOS module in ports/jumperlos/ProbeCursor turns into pixels.
 //
@@ -21,7 +21,7 @@
 // nothing there - PIN_LED_STRIP_TOP is for that.
 //
 // This service runs at HIGH priority, before the display: a late LED frame
-// is seen on the breadboard, a late LCD frame is not. MagView also puts a
+// is seen on the breadboard, a late LCD frame is not. The Display also puts a
 // draw off when this service is due before the draw would be over.
 //
 // Console: L = stream the cursor for a V5 (toggle), B = board layout V6/V5,
