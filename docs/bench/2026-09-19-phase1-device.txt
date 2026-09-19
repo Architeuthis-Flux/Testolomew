@@ -1,0 +1,300 @@
+    0.0 :help
+    0.0 help{
+    0.0   :help                                    R  this list (R reads, W changes something)
+    0.0   :probe <x> <y> <z> [ms] [sigma s] [shaft dx dy  W  a simulated probe fed to the tracker in place of the fit
+    0.0   :key <control> [tap|down|up|hold|xN]     W  a control from here: up down left right press jup jdown jleft jright jpress a b
+    0.0   :joy <x> <y> [ms] | off                  W  the joystick from here, -1..1 each way, in place of the stick
+    0.1   :screen                                  R  what the screen shows, as text: screen, panes, menu page and items, play, probe, camera
+    0.1   :log [n]                                 R  the last n lines of the log (20)
+    0.1   :ui open|close|back|enter|up|down|left|right|go W  drive the menu
+    0.1   :stats                                   R  service table, display draw times, LED strip statistics
+    0.1   :screen:ascii [colour]                   R  the frame as 80x60 characters (a grey ramp, or hue letters)
+    0.1   :screen:dump [rle|b64] [step]            R  every row of the frame as RGB565 (tools/screendump.py makes a PNG)
+    0.1   :leds                                    R  the breadboard's LEDs as a grid of hue letters, with the cursor
+    0.1   :leds:hex                                R  every LED's colour as sent, 20 a line
+    0.1   :leds:map                                R  the LED layout: index, along, across, kind, row, hole
+    0.1 }
+    0.0 :screen
+    0.0 screen{
+    0.0 app: scene
+    0.0 sim: -
+    0.0 panes: -
+    0.0 play: off hue 355 sat 1.00 bright 0.90 brush 2 draw
+    0.0 probe: none
+    0.0 camera: POV target 27.1 22.4 8.0 yaw -25 el 32 zoom 1.93
+    0.0 }
+    0.0 :leds
+    0.0 leds{
+    0.0 layout V5 400 LEDs cursor: none
+    0.0         1    5    10   15   20   25   30
+    0.0  +24.1r  ..... ..... ..... ..... .....
+    0.0  +21.6r  ..... ..... ..... ..... .....
+    0.0  +14.0  ..............................
+    0.0  +11.4  ..............................
+    0.0   +8.9  ..............................
+    0.0   +6.3  ..............................
+    0.0   +3.8  ..............................
+    0.0   -3.8  ..............................
+    0.1   -6.3  ..............................
+    0.1   -8.9  ..............................
+    0.1  -11.4  ..............................
+    0.1  -14.0  ..............................
+    0.1  -21.6r  ..... ..... ..... ..... .....
+    0.1  -24.1r  ..... ..... ..... ..... .....
+    0.1 }
+    0.0 :probe row 14 3
+    0.0 ok{probe sim: magnet 22.8 28.8 16.5 shaft 0.00 0.00 1.00 sigma 0.30}
+    0.0 row  14   this fix  14.00 (+0.00) hole 3  +/-0.12 rows  100 % sure  track  14.00 +/-0.13 100 %   x 22.8 y 28.8 z 15.5 down  misfit 2 %  seen by 8+0 faint
+    0.5 row  14   this fix  14.00 (+0.00) hole 3  +/-0.12 rows  100 % sure  track  14.00 +/-0.13 100 %   x 22.8 y 28.8 z 15.5 down  misfit 2 %  seen by 8+0 faint
+    1.1 row  14   this fix  14.00 (+0.00) hole 3  +/-0.12 rows  100 % sure  track  14.00 +/-0.13 100 %   x 22.8 y 28.8 z 15.5 down  misfit 2 %  seen by 8+0 faint
+    1.6 row  14   this fix  14.00 (+0.00) hole 3  +/-0.12 rows  100 % sure  track  14.00 +/-0.13 100 %   x 22.8 y 28.8 z 15.5 down  misfit 2 %  seen by 8+0 faint
+    2.1 row  14   this fix  14.00 (+0.00) hole 3  +/-0.12 rows  100 % sure  track  14.00 +/-0.13 100 %   x 22.8 y 28.8 z 15.5 down  misfit 2 %  seen by 8+0 faint
+    2.6 row  14   this fix  14.00 (+0.00) hole 3  +/-0.12 rows  100 % sure  track  14.00 +/-0.13 100 %   x 22.8 y 28.8 z 15.5 down  misfit 2 %  seen by 8+0 faint
+    0.0 aint
+    0.0 :leds
+    0.0 leds{
+    0.0 layout V5 400 LEDs cursor: tracking row 14 along 14.00 across 8.9 +-0.13 rows 1
+    0.0         1    5    10   15   20   25   30
+    0.0  +24.1r  ..... ..... ..... ..... .....
+    0.0  +21.6r  ..... ..... ..... ..... .....
+    0.0  +14.0  ..............................
+    0.0  +11.4  ..............................
+    0.0   +8.9  .............W................
+    0.0   +6.3  ..............................
+    0.0   +3.8  ..............................
+    0.0   -3.8  ..............................
+    0.1   -6.3  ..............................
+    0.1   -8.9  ..............................
+    0.1  -11.4  ..............................
+    0.1  -14.0  ..............................
+    0.1  -21.6r  ..... ..... ..... ..... .....
+    0.1  -24.1r  ..... ..... ..... ..... .....
+    0.1 }
+    0.3 row  14   this fix  14.00 (+0.00) hole 3  +/-0.12 rows  100 % sure  track  14.00 +/-0.13 100 %   x 22.8 y 28.8 z 15.5 down  misfit 2 %  seen by 8+0 faint
+    0.7 row  14   this fix  14.00 (+0.00) hole 3  +/-0.12 rows  100 % sure  track  14.00 +/-0.13 100 %   x 22.8 y 28.8 z 15.5 down  misfit 2 %  seen by 8+0 faint
+    1.2 row  14   this fix  14.00 (+0.00) hole 3  +/-0.12 rows  100 % sure  track  14.00 +/-0.13 100 %   x 22.8 y 28.8 z 15.5 down  misfit 2 %  seen by 8+0 faint
+    1.8 row  14   this fix  14.00 (+0.00) hole 3  +/-0.12 rows  100 % sure  track  14.00 +/-0.13 100 %   x 22.8 y 28.8 z 15.5 down  misfit 2 %  seen by 8+0 faint
+    2.3 row  14   this fix  14.00 (+0.00) hole 3  +/-0.12 rows  100 % sure  track  14.00 +/-0.13 100 %   x 22.8 y 28.8 z 15.5 down  misfit 2 %  seen by 8+0 faint
+    2.8 row  14   this fix  14.00 (+0.00) hole 3  +/-0.12 rows  100 % sure  track  14.00 +/-0.13 100 %   x 22.8 y 28.8 z 15.5 down  misfit 2 %  seen by 8+0 faint
+    0.0 row  14   this fix  14.00 (+0.00) hole 3  +/-0.12 rows  100 % sure  track  14.00 +/-0.13 100 %   x 22.8 y 28.8 z 15.5 down  misfit 2 %  seen by 8+0 faint
+    0.0 :key a
+    0.0 ok{key a tap}
+    0.3 row  14   this fix  14.00 (+0.00) hole 3  +/-0.12 rows  100 % sure  track  14.00 +/-0.13 100 %   x 22.8 y 28.8 z 15.5 down  misfit 2 %  seen by 8+0 faint
+    0.8 row  14   this fix  14.00 (+0.00) hole 3  +/-0.12 rows  100 % sure  track  14.00 +/-0.13 100 %   x 22.8 y 28.8 z 15.5 down  misfit 2 %  seen by 8+0 faint
+    1.3 row  14   this fix  14.00 (+0.00) hole 3  +/-0.12 rows  100 % sure  track  14.00 +/-0.13 100 %   x 22.8 y 28.8 z 15.5 down  misfit 2 %  seen by 8+0 faint
+    1.9 row  14   this fix  14.00 (+0.00) hole 3  +/-0.12 rows  100 % sure  track  14.00 +/-0.13 100 %   x 22.8 y 28.8 z 15.5 down  misfit 2 %  seen by 8+0 faint
+    2.4 row  14   this fix  14.00 (+0.00) hole 3  +/-0.12 rows  100 % sure  track  14.00 +/-0.13 100 %   x 22.8 y 28.8 z 15.5 down  misfit 2 %  seen by 8+0 faint
+    2.9 row  14   this fix  14.00 (+0.00) hole 3  +/-0.12 rows  100 % sure  track  14.00 +/-0.13 100 %   x 22.8 y 28.8 z 15.5 down  misfit 2 %  seen by 8+0 faint
+    0.0 row  14   this fix  14.00 (+0.00) hole 3  +/-0.12 rows  100 % sure  track  14.00 +/-0.13 100 %   x 22.8 y 28.8 z 15.5 down  misfit 2 %  seen by 8+0 faint
+    0.0 :screen
+    0.0 screen{
+    0.0 app: scene
+    0.0 sim: probe 
+    0.0 panes: menu
+    0.0 menu: / cursor 1/13
+    0.0 > tracker                  >
+    0.0   smoothing                >
+    0.0   cursor                   >
+    0.0   camera                   >
+    0.0   LEDs                     >
+    0.0   rows                     >
+    0.0   play                     >
+    0.0   magnet                   >
+    0.1   sensors                  >
+    0.1   row mode                 on
+    0.1   commands                 >
+    0.1   reset settings           
+    0.1   close                    
+    0.1 play: off hue 355 sat 1.00 bright 0.90 brush 2 draw
+    0.1 probe: track x 22.8 y 28.8 z 16.5 tilt 0 cursor 22.8 28.8
+    0.1 row: 14 hole 3 100%
+    0.1 camera: POV target 22.8 28.8 1.0 yaw -25 el 90 zoom 5.00
+    0.1 }
+    0.5 row  14   this fix  14.00 (+0.00) hole 3  +/-0.12 rows  100 % sure  track  14.00 +/-0.13 100 %   x 22.8 y 28.8 z 15.5 down  misfit 2 %  seen by 8+0 faint
+    1.0 row  14   this fix  14.00 (+0.00) hole 3  +/-0.12 rows  100 % sure  track  14.00 +/-0.13 100 %   x 22.8 y 28.8 z 15.5 down  misfit 2 %  seen by 8+0 faint
+    1.5 row  14   this fix  14.00 (+0.00) hole 3  +/-0.12 rows  100 % sure  track  14.00 +/-0.13 100 %   x 22.8 y 28.8 z 15.5 down  misfit 2 %  seen by 8+0 faint
+    2.0 row  14   this fix  14.00 (+0.00) hole 3  +/-0.12 rows  100 % sure  track  14.00 +/-0.13 100 %   x 22.8 y 28.8 z 15.5 down  misfit 2 %  seen by 8+0 faint
+    2.5 row  14   this fix  14.00 (+0.00) hole 3  +/-0.12 rows  100 % sure  track  14.00 +/-0.13 100 %   x 22.8 y 28.8 z 15.5 down  misfit 2 %  seen by 8+0 faint
+    0.0 t
+    0.0 :ui go tracker
+    0.0 ok{go tracker}
+    0.2 row  14   this fix  14.00 (+0.00) hole 3  +/-0.12 rows  100 % sure  track  14.00 +/-0.13 100 %   x 22.8 y 28.8 z 15.5 down  misfit 2 %  seen by 8+0 faint
+    0.8 row  14   this fix  14.00 (+0.00) hole 3  +/-0.12 rows  100 % sure  track  14.00 +/-0.13 100 %   x 22.8 y 28.8 z 15.5 down  misfit 2 %  seen by 8+0 faint
+    1.3 row  14   this fix  14.00 (+0.00) hole 3  +/-0.12 rows  100 % sure  track  14.00 +/-0.13 100 %   x 22.8 y 28.8 z 15.5 down  misfit 2 %  seen by 8+0 faint
+    1.8 row  14   this fix  14.00 (+0.00) hole 3  +/-0.12 rows  100 % sure  track  14.00 +/-0.13 100 %   x 22.8 y 28.8 z 15.5 down  misfit 2 %  seen by 8+0 faint
+    2.3 row  14   this fix  14.00 (+0.00) hole 3  +/-0.12 rows  100 % sure  track  14.00 +/-0.13 100 %   x 22.8 y 28.8 z 15.5 down  misfit 2 %  seen by 8+0 faint
+    2.8 row  14   this fix  14.00 (+0.00) hole 3  +/-0.12 rows  100 % sure  track  14.00 +/-0.13 100 %   x 22.8 y 28.8 z 15.5 down  misfit 2 %  seen by 8+0 faint
+    0.0 row  14   this fix  14.00 (+0.00) hole 3  +/-0.12 rows  100 % sure  track  14.00 +/-0.13 100 %   x 22.8 y 28.8 z 15.5 down  misfit 2 %  seen by 8+0 faint
+    0.0 :screen
+    0.0 screen{
+    0.0 app: scene
+    0.0 sim: probe 
+    0.0 panes: menu
+    0.0 menu: /tracker cursor 1/7
+    0.0 > state                    track 1673
+    0.0   fix                      23 29 16
+    0.0   tracker on               on
+    0.0   floor                    0.3mm
+    0.0   gate                     4.0sd
+    0.0   presence                 0.04mT
+    0.0   far hold                 2.5s
+    0.0 play: off hue 355 sat 1.00 bright 0.90 brush 2 draw
+    0.0 probe: track x 22.8 y 28.8 z 16.5 tilt 0 cursor 22.8 28.8
+    0.0 row: 14 hole 3 100%
+    0.1 camera: POV target 22.8 28.8 1.0 yaw -25 el 90 zoom 5.00
+    0.1 }
+    0.3 row  14   this fix  14.00 (+0.00) hole 3  +/-0.12 rows  100 % sure  track  14.00 +/-0.13 100 %   x 22.8 y 28.8 z 15.5 down  misfit 2 %  seen by 8+0 faint
+    0.8 row  14   this fix  14.00 (+0.00) hole 3  +/-0.12 rows  100 % sure  track  14.00 +/-0.13 100 %   x 22.8 y 28.8 z 15.5 down  misfit 2 %  seen by 8+0 faint
+    1.4 row  14   this fix  14.00 (+0.00) hole 3  +/-0.12 rows  100 % sure  track  14.00 +/-0.13 100 %   x 22.8 y 28.8 z 15.5 down  misfit 2 %  seen by 8+0 faint
+    1.9 row  14   this fix  14.00 (+0.00) hole 3  +/-0.12 rows  100 % sure  track  14.00 +/-0.13 100 %   x 22.8 y 28.8 z 15.5 down  misfit 2 %  seen by 8+0 faint
+    2.4 row  14   this fix  14.00 (+0.00) hole 3  +/-0.12 rows  100 % sure  track  14.00 +/-0.13 100 %   x 22.8 y 28.8 z 15.5 down  misfit 2 %  seen by 8+0 faint
+    2.9 row  14   this fix  14.00 (+0.00) hole 3  +/-0.12 rows  100 % sure  track  14.00 +/-0.13 100 %   x 22.8 y 28.8 z 15.5 down  misfit 2 %  seen by 8+0 faint
+    0.0 :key b hold
+    0.0 ok{key b hold}
+    0.0 row  14   this fix  14.00 (+0.00) hole 3  +/-0.12 rows  100 % sure  track  14.00 +/-0.13 100 %   x 22.8 y 28.8 z 15.5 down  misfit 2 %  seen by 8+0 faint
+    0.5 row  14   this fix  14.00 (+0.00) hole 3  +/-0.12 rows  100 % sure  track  14.00 +/-0.13 100 %   x 22.8 y 28.8 z 15.5 down  misfit 2 %  seen by 8+0 faint
+    1.1 row  14   this fix  14.00 (+0.00) hole 3  +/-0.12 rows  100 % sure  track  14.00 +/-0.13 100 %   x 22.8 y 28.8 z 15.5 down  misfit 2 %  seen by 8+0 faint
+    1.6 row  14   this fix  14.00 (+0.00) hole 3  +/-0.12 rows  100 % sure  track  14.00 +/-0.13 100 %   x 22.8 y 28.8 z 15.5 down  misfit 2 %  seen by 8+0 faint
+    2.1 row  14   this fix  14.00 (+0.00) hole 3  +/-0.12 rows  100 % sure  track  14.00 +/-0.13 100 %   x 22.8 y 28.8 z 15.5 down  misfit 2 %  seen by 8+0 faint
+    2.6 row  14   this fix  14.00 (+0.00) hole 3  +/-0.12 rows  100 % sure  track  14.00 +/-0.13 100 %   x 22.8 y 28.8 z 15.5 down  misfit 2 %  seen by 8+0 faint
+    3.1 row  14   this fix  14.00 (+0.00) hole 3  +/-0.12 rows  100 % sure  track  14.00 +/-0.13 100 %   x 22.8 y 28.8 z 15.5 down  misfit 2 %  seen by 8+0 faint
+    3.6 row  14   this fix  14.00 (+0.00) hole 3  +/-0.12 rows  100 % sure  track  14.00 +/-0.13 100 %   x 22.8 y 28.8 z 15.5 down  misfit 2 %  seen by 8+0 faint
+    0.0 +0 faint
+    0.0 :screen
+    0.0 screen{
+    0.0 app: scene
+    0.0 sim: probe 
+    0.0 panes: menu
+    0.0 menu: / cursor 1/13
+    0.0 > tracker                  >
+    0.0   smoothing                >
+    0.0   cursor                   >
+    0.0   camera                   >
+    0.0   LEDs                     >
+    0.0   rows                     >
+    0.0   play                     >
+    0.0   magnet                   >
+    0.0   sensors                  >
+    0.0   row mode                 on
+    0.0   commands                 >
+    0.0   reset settings           
+    0.0   close                    
+    0.1 play: off hue 355 sat 1.00 bright 0.90 brush 2 draw
+    0.1 probe: track x 22.8 y 28.8 z 16.5 tilt 0 cursor 22.8 28.8
+    0.1 row: 14 hole 3 100%
+    0.1 camera: POV target 22.8 28.8 1.0 yaw -25 el 90 zoom 5.00
+    0.1 }
+    0.2 row  14   this fix  14.00 (+0.00) hole 3  +/-0.12 rows  100 % sure  track  14.00 +/-0.13 100 %   x 22.8 y 28.8 z 15.5 down  misfit 2 %  seen by 8+0 faint
+    0.7 row  14   this fix  14.00 (+0.00) hole 3  +/-0.12 rows  100 % sure  track  14.00 +/-0.13 100 %   x 22.8 y 28.8 z 15.5 down  misfit 2 %  seen by 8+0 faint
+    1.2 row  14   this fix  14.00 (+0.00) hole 3  +/-0.12 rows  100 % sure  track  14.00 +/-0.13 100 %   x 22.8 y 28.8 z 15.5 down  misfit 2 %  seen by 8+0 faint
+    1.8 row  14   this fix  14.00 (+0.00) hole 3  +/-0.12 rows  100 % sure  track  14.00 +/-0.13 100 %   x 22.8 y 28.8 z 15.5 down  misfit 2 %  seen by 8+0 faint
+    2.3 row  14   this fix  14.00 (+0.00) hole 3  +/-0.12 rows  100 % sure  track  14.00 +/-0.13 100 %   x 22.8 y 28.8 z 15.5 down  misfit 2 %  seen by 8+0 faint
+    2.8 row  14   this fix  14.00 (+0.00) hole 3  +/-0.12 rows  100 % sure  track  14.00 +/-0.13 100 %   x 22.8 y 28.8 z 15.5 down  misfit 2 %  seen by 8+0 faint
+    0.0 row  14   this fix  14.00 (+0.00) hole 3  +/-0.12 rows  100 % sure  track  14.00 +/-0.13 100 %   x 22.8 y 28.8 z 15.5 down  misfit 2 %  seen by 8+0 faint
+    0.0 :screen:ascii
+    0.0 screen:ascii{
+    0.0 w 80 h 60 cell 3x4 grey
+    0.0      :-. :-.     :-.         :-. :-.     :-.          :   --    .---::  :::-  . 
+    0.0 .:........................................................................::... 
+    0.0  . .    .   .                                                 :.   .. :. ...: . 
+    0.0 .:.:::.:::.:.:.. :                                            ..  ..  ..  .:. . 
+    0.1  ...::.::... :...-                                            :: ..   :: ...: . 
+    0.1  .      .                                                     ..      ..  ..  . 
+    0.1  : ::   =             ::                                                  -.  . 
+    0.1  .  .-.-+-:=-- :-..---::-..---:=--                                         :: . 
+    0.1  .  -.  =:::  .-=::: ::=: :=--::                                          .-  . 
+    0.1  . :    ....   :-- :-..... :-...                                          :   . 
+    0.1  .                      : ..    :                                         :   . 
+    0.1 :-     :==.=.. :=. :=..=*=::=. :: ..=. :=.                                .=  . 
+    0.1 :-    .==.::++:: +:: +  + :+ +  + :+ +:::#                                 :: . 
+    0.1 :-    .===::++.===.===  ==:: + :*.:: + ::+                                =.  . 
+    0.1 :-                                     :=.                                    . 
+    0.1 :-                                                                        =.  . 
+    0.1  .    .===:: +:+==.===.===:+==                                             :: . 
+    0.2  .    :: :::.*::   :==:: +::                                              .=  . 
+    0.2  .     :=. :::..  .==. :=...                                              :   :-
+    0.2  :                                                                        :   :.
+    0.2  .     :=. :: .=.. :=...=. ::                                             .=  .-
+    0.2  .    :: : :+:::++:+=*:+ : :+:                                             :: :.
+    0.2  .    .===.=++::++.==.::  .=++                                            =.  . 
+    0.2  .                                                                            . 
+    0.2  .    ::  :+==:+==                                                        =.  . 
+    0.2  .    ::  :+=.:: +.===                                                     :: . 
+    0.2  .    ::  ::  :: + :==                                                    .=  . 
+    0.2  .    .===.===.==..==.                                                    :   . 
+    0.2  .                                                                        :   . 
+    0.2  .    ..=. :=... : :==                                                    .=  . 
+    0.2  .    :+ ::: +:::+.==.                                                     :: . 
+    0.3  .    ::  .===.===.===                                                    =.  . 
+    0.3  .                                                                            . 
+    0.3  .         :+                                                             =.  . 
+    0.3  .    :+==  +  :=.:: +                                                     :: . 
+    0.3  .    :+==  + .=+: :=*                                                    .=  . 
+    0.3  .    ::   :=. :==.===                                                    :   . 
+    0.3  .                          :                                             :   . 
+    0.3  .    .=.. ::  :=...=. :=..=*=                                            .=  ..
+    0.3  .    ::++ :+::::#:+ +:+=*  +                                              :: . 
+    0.3  .    ::++.=++ ::+:: +.==.  ==                                            =.  . 
+    0.3  .             :=.                                                            . 
+    0.3  .                                                                        =.  . 
+    0.3  .    .===.===:+==.===.===:+==.===                                         :: . 
+    0.4  .     :==:+==:: + :==:: +::   :==                                        .=  . 
+    0.4  .    .==. :=... :.==. :=...  .==.                                        :   . 
+    0.4  .                                                                            . 
+    0.4  ...........     ....:....    .:.   .. . ...    ...    . . .....              . 
+    0.4  .... .:.:.:    .:. ...:.     ...   ...:....    ...   .. ....:.:              . 
+    0.4   ............................................................................  
+    0.4                                                                                 
+    0.4  .:      .:                               .               .       .  :::    .:::
+    0.4 .. :   :.. :     .:: .:   :  .::     .:. .:   :.  :  .::   . .:: .: .::     .:: 
+    0.4 .::: ..  :::     :: .::-.: : ::     .:::  :  .- .= : ::     .::   :    :       :
+    0.4  :::     :::     ::: :: .. : :::      .. .-   : ..:  :::    .::: .-  :::  =. :::
+    0.4  ::  .:    .      .            .              .              .                 .
+    0.4 .. :.. :.. :     :-:  :  ..  .: :.       ..  ..  :                             -
+    0.5 .:: .. :.. :      : .: . .:... ..:.      .:.  : ..::                            
+    0.5 ..   ::: .:       ::..   ::- :::.::      ::: .- ..::           .                
+    0.5 row  14   this fix  14.00 (+0.00) hole 3  +/-0.12 rows  100 % sure  track  14.00 +/-0.13 100 %   x 22.8 y 28.8 z 15.5 down  misfit 2 %  seen by 8+0 faint
+    0.5                                                                                 
+    0.5 }
+    0.8 row  14   this fix  14.00 (+0.00) hole 3  +/-0.12 rows  100 % sure  track  14.00 +/-0.13 100 %   x 22.8 y 28.8 z 15.5 down  misfit 2 %  seen by 8+0 faint
+    1.3 row  14   this fix  14.00 (+0.00) hole 3  +/-0.12 rows  100 % sure  track  14.00 +/-0.13 100 %   x 22.8 y 28.8 z 15.5 down  misfit 2 %  seen by 8+0 faint
+    1.8 row  14   this fix  14.00 (+0.00) hole 3  +/-0.12 rows  100 % sure  track  14.00 +/-0.13 100 %   x 22.8 y 28.8 z 15.5 down  misfit 2 %  seen by 8+0 faint
+    2.3 row  14   this fix  14.00 (+0.00) hole 3  +/-0.12 rows  100 % sure  track  14.00 +/-0.13 100 %   x 22.8 y 28.8 z 15.5 down  misfit 2 %  seen by 8+0 faint
+    2.8 row  14   this fix  14.00 (+0.00) hole 3  +/-0.12 rows  100 % sure  track  14.00 +/-0.13 100 %   x 22.8 y 28.8 z 15.5 down  misfit 2 %  seen by 8+0 faint
+    3.4 row  14   this fix  14.00 (+0.00) hole 3  +/-0.12 rows  100 % sure  track  14.00 +/-0.13 100 %   x 22.8 y 28.8 z 15.5 down  misfit 2 %  seen by 8+0 faint
+    3.9 row  14   this fix  14.00 (+0.00) hole 3  +/-0.12 rows  100 % sure  track  14.00 +/-0.13 100 %   x 22.8 y 28.8 z 15.5 down  misfit 2 %  seen by 8+0 faint
+    4.4 row  14   this fix  14.00 (+0.00) hole 3  +/-0.12 rows  100 % sure  track  14.00 +/-0.13 100 %   x 22.8 y 28.8 z 15.5 down  misfit 2 %  seen by 8+0 faint
+    4.9 row  14   this fix  14.00 (+0.00) hole 3  +/-0.12 rows  100 % sure  track  14.00 +/-0.13 100 %   x 22.8 y 28.8 z 15.5 down  misfit 2 %  seen by 8+0 faint
+    5.4 row  14   this fix  14.00 (+0.00) hole 3  +/-0.12 rows  100 % sure  track  14.00 +/-0.13 100 %   x 22.8 y 28.8 z 15.5 down  misfit 2 %  seen by 8+0 faint
+    5.9 row  14   this fix  14.00 (+0.00) hole 3  +/-0.12 rows  100 % sure  track  14.00 +/-0.13 100 %   x 22.8 y 28.8 z 15.5 down  misfit 2 %  seen by 8+0 faint
+    0.0 :probe off
+    0.0 ok{probe sim off}
+    1.0 row: no fix
+    0.0 :stats
+    0.0 stats{
+    0.0 service          prio  period_us      runs   last_us    max_us    avg_us  overruns
+    0.0 Console             0       5000     29031       103      4800        17         0
+    0.0 Input               0       5000     28986        77       232        94         0
+    0.0 MagArray            1       2500     52956        15       372        77         0
+    0.0 MagLocator          1       2000     64144         4       339        24         0
+    0.1 ProbeLeds           1      20000      7678      1625      5364      1779         0
+    0.1 Ui                  1      10000     14843        21        79        19         0
+    0.1 RowCounter          2       4000     35066         9      2063        33         0
+    0.1 Play                2      10000     14785         7        48         6         0
+    0.1 MagView             2       3000     47535       868      7145       620      1538
+    0.1 Heartbeat           3     500000       309         6        19         6         0
+    0.1 Settings            3     100000      1537        14      3344      1167         0
+    0.1 Dump                3       5000     29049         6       394         4         0
+    0.1 passes: 6624087
+    0.1 display: 41 fps, draw us avg/max scene 3597/7117 leds 0/0 log 0/0 draw 0/0, 998 yields, hold 0
+    0.1 strip: SPI1: 661 frames of 400 LEDs (4800 bytes, 12.3 ms on the wire), 0 shows refused (wire busy), 7017 skipped (nothing changed); gap between frames 20.0 ms last, 2; last 0 mA of 1900 budget, 0 fra
+    0.1 dump: 1 done, max 394 us a tick
+    0.1 }
+
+# Dump tick timing after the block-write fix (ascii, then a full RLE dump of the row-mode scene):
+    0.1 ProbeLeds           1      20000       593      2090      4355      1993         0
+    0.1 Dump                3       5000      2107        13       216        11         0
+    0.1 dump: 1 done, max 216 us a tick; the last dump's row build 162 us, print 44 us (since boot 162 / 44)
+    0.1 ProbeLeds           1      20000      1469      2118      4355      2036         0
+    0.1 Dump                3       5000      5242        11       251        30         0
+    0.1 dump: 2 done, max 251 us a tick; the last dump's row build 201 us, print 59 us (since boot 201 / 59)

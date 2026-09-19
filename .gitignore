@@ -11,3 +11,11 @@ compile_commands.json
 
 # Claude Code session memory
 .remember/
+
+# host simulator build products (tools/hostsim: make clean)
+tools/hostsim/build/
+tools/hostsim/out/
+tools/hostsim/sim
+tools/hostsim/soak
+tools/hostsim/pencil
+tools/hostsim/navtest

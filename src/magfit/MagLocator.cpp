@@ -2,9 +2,15 @@
 #include "MagLocator.h"
 
 #include <math.h>
+#include <stdlib.h>
+#include <string.h>
 
 #include "Console.h"
 #include "MagArray.h"
+#include "config.h"
+#if MODULE_ROW_COUNT
+#include "RowCounter.h" // the :probe row form places the probe on the row grid
+#endif
 
 #define STREAM_EVERY_N_FIXES 5 // 20 Hz of CSV
 
@@ -108,8 +114,165 @@ static void onTracker( Stream* out ) {
     out->println( t.enabled ? "tracker on: fixes filtered, gated and carried through gaps" : "tracker off: every fix shown as it comes" );
 }
 
+// ---- the simulated probe --------------------------------------------------------
+
+void MagLocator::simProbeSet( Vec3 position, Vec3 shaft, float sigmaMm, bool rough, uint32_t ms ) {
+    float n = sqrtf( shaft.x * shaft.x + shaft.y * shaft.y + shaft.z * shaft.z );
+    if ( n < 1e-6f ) {
+        shaft = { 0, 0, 1 };
+    } else {
+        shaft = { shaft.x / n, shaft.y / n, shaft.z / n };
+    }
+    if ( shaft.z < 0.0f ) {
+        shaft = { -shaft.x, -shaft.y, -shaft.z }; // a probe is not held upside down
+    }
+    sim.on = true;
+    sim.position = position;
+    sim.shaft = shaft;
+    sim.sigmaMm = sigmaMm > 0.05f ? sigmaMm : 0.05f;
+    sim.rough = rough;
+    uint32_t until = millis( ) + ms;
+    sim.untilMs = ms == 0 ? 0 : ( until == 0 ? 1 : until );
+}
+
+void MagLocator::simProbeOff( ) {
+    sim.on = false;
+    fix.valid = false;
+    fix.present = false;
+    result.valid = false; // the real fit starts cold
+    haveSmoothed = false;
+    misses = 0;
+}
+
+// One frame from the simulated probe: `fix` as a fit would leave it, and
+// the tracker's input.
+ServiceStatus MagLocator::simFrame( MagTrackInput* in ) {
+    uint32_t nowMs = millis( );
+    lastPresentMs = nowMs == 0 ? 1 : nowMs; // no drift tracking while it is "here"
+    roughOnlySinceMs = 0;
+    fix.present = true;
+    fix.rough = sim.rough;
+    fix.valid = !sim.rough;
+    fix.magnet = fix.rawMagnet = sim.position;
+    fix.axis = sim.shaft;
+    fix.shaft = sim.shaft;
+    fix.tiltDeg = acosf( fix.shaft.z > 1.0f ? 1.0f : fix.shaft.z ) * 180.0f / (float)M_PI;
+    fix.strength = lastGoodStrength > 0.0f ? lastGoodStrength : 4200.0f;
+    fix.residual = 0.0f;
+    fix.misfit = 0.02f;
+    fix.sigma = { sim.sigmaMm, sim.sigmaMm, sim.sigmaMm };
+    fix.errorXyMm = sqrtf( 2.0f ) * sim.sigmaMm;
+    fix.errorMm = sqrtf( 3.0f ) * sim.sigmaMm;
+    fix.peakMt = 1.0f;
+    fix.seenBy = magArray.sensorCount( );
+    fix.faintBy = 0;
+    fix.fitUs = 0;
+    fix.tip = { fix.magnet.x - tipOffsetMm * fix.shaft.x, fix.magnet.y - tipOffsetMm * fix.shaft.y, fix.magnet.z - tipOffsetMm * fix.shaft.z };
+    fix.rawTip = fix.tip;
+    fix.pointer = pointerOf( fix.tip, fix.shaft );
+    fix.rawPointer = fix.pointer;
+    fix.count++;
+    in->valid = !sim.rough;
+    in->rough = sim.rough;
+    in->position = sim.position;
+    in->sigma = fix.sigma;
+    in->alpha = 1.0f;
+    in->shaft = sim.shaft;
+    in->haveShaft = !sim.rough;
+    result.valid = false; // the real fit starts cold when the simulation ends
+    haveSmoothed = false;
+    return ServiceStatus::BUSY;
+}
+
+// :probe <x> <y> <z> [ms] [sigma s] [shaft dx dy dz] [rough]
+// :probe row <r> <h> [up mm] [ms] [lean deg]   (the point in that hole)
+// :probe off | :probe
+static void onProbeVerb( int argc, char** argv, Stream* out ) {
+    char line[ 160 ];
+    MagLocator::ProbeSim& sim = magLocator.sim;
+    if ( argc == 1 ) {
+        if ( sim.on ) {
+            snprintf( line, sizeof( line ), "probe sim on: magnet %.1f %.1f %.1f shaft %.2f %.2f %.2f sigma %.2f%s%s", sim.position.x, sim.position.y, sim.position.z, sim.shaft.x, sim.shaft.y,
+                      sim.shaft.z, sim.sigmaMm, sim.rough ? " rough" : "", sim.untilMs != 0 ? " timed" : "" );
+        } else {
+            snprintf( line, sizeof( line ), "probe sim off" );
+        }
+        consoleOk( out, line );
+        return;
+    }
+    if ( strcmp( argv[ 1 ], "off" ) == 0 ) {
+        magLocator.simProbeOff( );
+        consoleOk( out, "probe sim off" );
+        return;
+    }
+    Vec3 position = { 0, 0, 0 };
+    Vec3 shaft = { 0, 0, 1 };
+    float sigma = 0.3f;
+    bool rough = false;
+    uint32_t ms = 0;
+    int next;
+    if ( strcmp( argv[ 1 ], "row" ) == 0 ) {
+#if MODULE_ROW_COUNT
+        if ( argc < 4 ) {
+            consoleErr( out, "usage: :probe row <1-60> <hole 1-6> [up mm] [ms] [lean deg]" );
+            return;
+        }
+        int row = atoi( argv[ 2 ] ), hole = atoi( argv[ 3 ] );
+        if ( row < 1 || row > 2 * ROWGRID_ROWS_PER_HALF || hole < 1 || hole > 6 ) {
+            consoleErr( out, "row 1-60, hole 1-6" );
+            return;
+        }
+        float up = argc >= 5 ? atof( argv[ 4 ] ) : 0.0f;
+        ms = argc >= 6 ? (uint32_t)atol( argv[ 5 ] ) : 0;
+        float lean = argc >= 7 ? atof( argv[ 6 ] ) : 0.0f;
+        RowPlace place = rowGridHolePlace( row, hole );
+        Vec3 tip = rowGridToBoard( &rowCounter.grid, place.along, place.acrossMm );
+        tip.z = magLocator.boardZ + up;
+        float leanRad = lean * (float)M_PI / 180.0f;
+        shaft = { sinf( leanRad ), 0.0f, cosf( leanRad ) };
+        position = { tip.x + magLocator.tipOffsetMm * shaft.x, tip.y + magLocator.tipOffsetMm * shaft.y, tip.z + magLocator.tipOffsetMm * shaft.z };
+        next = argc; // nothing more to parse
+#else
+        consoleErr( out, "no row counter in this build" );
+        return;
+#endif
+    } else {
+        if ( argc < 4 ) {
+            consoleErr( out, "usage: :probe <x> <y> <z> [ms] [sigma s] [shaft dx dy dz] [rough] | row <r> <h> [up mm] [ms] | off" );
+            return;
+        }
+        position = { (float)atof( argv[ 1 ] ), (float)atof( argv[ 2 ] ), (float)atof( argv[ 3 ] ) };
+        next = 4;
+        if ( next < argc && ( ( argv[ next ][ 0 ] >= '0' && argv[ next ][ 0 ] <= '9' ) ) ) {
+            ms = (uint32_t)atol( argv[ next++ ] );
+        }
+    }
+    while ( next < argc ) {
+        if ( strcmp( argv[ next ], "sigma" ) == 0 && next + 1 < argc ) {
+            sigma = atof( argv[ next + 1 ] );
+            next += 2;
+        } else if ( strcmp( argv[ next ], "shaft" ) == 0 && next + 3 < argc ) {
+            shaft = { (float)atof( argv[ next + 1 ] ), (float)atof( argv[ next + 2 ] ), (float)atof( argv[ next + 3 ] ) };
+            next += 4;
+        } else if ( strcmp( argv[ next ], "rough" ) == 0 ) {
+            rough = true;
+            next++;
+        } else {
+            snprintf( line, sizeof( line ), "did not understand '%s' (sigma <s>, shaft <dx dy dz>, rough)", argv[ next ] );
+            consoleErr( out, line );
+            return;
+        }
+    }
+    magLocator.simProbeSet( position, shaft, sigma, rough, ms );
+    snprintf( line, sizeof( line ), "probe sim: magnet %.1f %.1f %.1f shaft %.2f %.2f %.2f sigma %.2f%s%s", magLocator.sim.position.x, magLocator.sim.position.y, magLocator.sim.position.z,
+              magLocator.sim.shaft.x, magLocator.sim.shaft.y, magLocator.sim.shaft.z, magLocator.sim.sigmaMm, rough ? " rough" : "", ms != 0 ? " timed" : "" );
+    consoleOk( out, line );
+}
+
 void MagLocator::begin( ) {
     magTrackInit( &track, boardZ, tipOffsetMm );
+    consoleAddVerb( "probe", "<x> <y> <z> [ms] [sigma s] [shaft dx dy dz] [rough] | row <r> <h> [up mm] [ms] [lean deg] | off", "a simulated probe fed to the tracker in place of the fit", CONSOLE_CHANGES,
+                    onProbeVerb );
     consoleAddCommand( 'd', "stream probe fixes as CSV (toggle)", onStream );
     consoleAddCommand( 'l', "latest probe fix", onLatest );
     consoleAddCommand( 'o', "orientation check: hold a magnet 1-2 cm over the array first", onOrientation );
@@ -297,7 +460,10 @@ ServiceStatus MagLocator::service( ) {
     lastTrackUs = nowUs;
     MagTrackInput in = { };
     in.alpha = 1.0f;
-    lastStatus = fitFrame( &in );
+    if ( sim.on && sim.untilMs != 0 && (int32_t)( millis( ) - sim.untilMs ) >= 0 ) {
+        simProbeOff( );
+    }
+    lastStatus = sim.on ? simFrame( &in ) : fitFrame( &in );
     learnFloor( millis( ) );
     track.surfaceZ = boardZ;
     track.tipOffsetMm = tipOffsetMm;

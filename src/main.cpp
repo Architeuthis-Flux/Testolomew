@@ -18,6 +18,7 @@
 
 #include "BoardPins.h"
 #include "Console.h"
+#include "DumpService.h"
 #include "JumperlOS.h"
 #include "config.h"
 
@@ -181,6 +182,10 @@ void setup( ) {
         boot.println( "settings: none saved, defaults (the menu's values are kept in flash from now on)" );
     }
 #endif
+
+    // The dumps (:screen:ascii, :leds...) go out a row a tick from here.
+    dump.begin( );
+    jOS.registerService( &dump );
 
     console.printHelp( );
     boardLed( PIN_LED_BLUE, false );

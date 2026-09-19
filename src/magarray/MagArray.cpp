@@ -410,6 +410,16 @@ Vec3 MagArray::sensorFrameField( int i ) const {
 
 void MagArray::startBaseline( ) {
     baselineRestored = false;
+    if ( simulatedFrames ) {
+        // No frames of the bus to average: the zero is zero, at once.
+        for ( int i = 0; i < MAG_SENSOR_COUNT; i++ ) {
+            baseline[ i ] = zeroed[ i ] = { 0, 0, 0 };
+        }
+        baselineLeft = 0;
+        baselineCount++;
+        zeroedAt++;
+        return;
+    }
     for ( int i = 0; i < MAG_SENSOR_COUNT; i++ ) {
         baselineSum[ i ] = { 0, 0, 0 };
         baselineFrames[ i ] = 0;
@@ -634,8 +644,27 @@ void MagArray::publishFrame( ) {
     frameCount++;
 }
 
+void MagArray::useSimulatedFrames( ) {
+    simulatedFrames = true;
+    samplerOn = false;
+    for ( int i = 0; i < MAG_SENSOR_COUNT; i++ ) {
+        sensors[ i ].ok = true;
+        sensors[ i ].trouble = nullptr;
+        fresh[ i ] = true;
+    }
+    baselineLeft = 0;
+    if ( baselineCount == 0 ) {
+        baselineCount = 1;
+    }
+}
+
 ServiceStatus MagArray::service( ) {
     uint32_t now = millis( );
+
+    if ( simulatedFrames ) {
+        lastStatus = ServiceStatus::BUSY; // the world publishes the frames
+        return lastStatus;
+    }
 
     if ( magSamplerParked( ) ) {
         return ServiceStatus::IDLE; // F: the other core is parked for a flash; nothing to read, nothing to recover

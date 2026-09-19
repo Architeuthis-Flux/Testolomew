@@ -86,10 +86,12 @@ struct InputButton {
     bool raw, state; // last raw read, debounced state
     uint32_t changedMs, pressedMs, nextRepeatMs;
     bool holdFired;
-    bool emulated;          // pressed from the console
+    bool emulated;          // pressed from the console (a tap being played)
     uint32_t emulatedUntil; // ...until this time
     int taps;               // typed presses waiting to be played (each is a press and a release)
     uint32_t nextTapMs;     // not before this
+    bool simDown;           // held by simPress() / simHold()
+    uint32_t simUntil;      // ...until this time (0 = until simRelease())
 };
 
 class Input : public Service {
@@ -122,6 +124,22 @@ class Input : public Service {
 
     // From the console's key sink.
     bool takeKey( char c );
+
+    // The simulation surface: what the typed keys, the :key / :joy verbs and
+    // the host simulator drive. A simulated control counts exactly as the
+    // physical one (the same debounce, repeat and hold), and while a
+    // simulated joystick is active the real one is not read.
+    void simPress( InputControl c );                   // down until simRelease()
+    void simRelease( InputControl c );
+    void simTap( InputControl c );                     // a press and a release; several queue up and play one after another
+    void simHold( InputControl c, uint32_t ms );       // down for this long
+    void simJoystick( float x, float y, uint32_t ms ); // -1..1 each way; ms 0 = until the next call
+    void simJoystickOff( );
+    bool simActive( ) const;
+    // For the host tests: which pin (and polarity) a control reads.
+    void setPin( InputControl c, int pin, bool activeLow );
+    // Bit c set while control c is down (debounced).
+    uint32_t heldMask( ) const;
     // Set by the UI while a menu is open: Enter on the console is then the
     // nav press (otherwise it stays the console's).
     bool uiWantsEnter = false;
@@ -146,8 +164,9 @@ class Input : public Service {
     uint8_t navTraceLast = 0;
     uint32_t navTraceMs[ INPUT_NAV_TRACE ];
     int navTraceHead = 0, navTraceCount = 0;
-    float emulatedJoyX = 0.0f, emulatedJoyY = 0.0f;
-    uint32_t emulatedJoyUntil = 0;
+    float simJoyX = 0.0f, simJoyY = 0.0f;
+    bool simJoyOn = false;
+    uint32_t simJoyUntil = 0; // 0 = until simJoystickOff()
 
     void post( InputControl c, InputEventKind k );
     void feed( InputControl c, bool down, uint32_t now );

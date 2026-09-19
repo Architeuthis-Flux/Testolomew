@@ -6,12 +6,12 @@
 #include "ProbeLedService.h"
 #undef private
 #include "Console.h"
-uint32_t simMillis = 0; Stream Serial; TwoWire Wire;
-bool boardVioIs3V3(void) { return true; } void boardLedsInit(void) {} void boardLed(int, bool) {}
+
+
 static float gauss(float s){ float u1=(rand()+1.0f)/((float)RAND_MAX+2.0f), u2=(rand()+1.0f)/((float)RAND_MAX+2.0f); return s*sqrtf(-2*logf(u1))*cosf(2*M_PI*u2);}
 static float frand(float a, float b){ return a + (b-a)*rand()/(float)RAND_MAX; }
 static bool bad(float v){ return v != v || v > 1e6f || v < -1e6f; }
-int main(){ console.begin(&Serial); magArray.begin(); for(int i=0;i<MAG_SENSOR_COUNT;i++) magArray.sensors[i].ok=true; magArray.baselineLeft=0; magArray.baselineCount=1;
+int main(){ console.begin(&Serial); magArray.begin(); magArray.useSimulatedFrames();
   magLocator.begin(); rowCounter.begin(); probeLeds.begin(); srand(11);
   Vec3 p={27,22,25}, v={0,0,0}, goal=p; Vec3 shaft={0,0,1}; float lean=0.2f, az=0;
   long frames=0, nanCount=0, lostInRange=0, roughInRange=0, tracking=0, coasting=0, rough=0, none=0, dropped=0, reinits=0; double err2=0; long errN=0; float worst=0;
@@ -24,7 +24,7 @@ int main(){ console.begin(&Serial); magArray.begin(); for(int i=0;i<MAG_SENSOR_C
     p={p.x+v.x*0.01f, p.y+v.y*0.01f, p.z+v.z*0.01f}; if (p.z<17.5f) p.z=17.5f;
     shaft={sinf(lean)*cosf(az), sinf(lean)*sinf(az), cosf(lean)};
     bool dropout = (f % 1000) > 985; // 140 ms every 10 s
-    simMillis += 10; Vec3 m = { 4200*shaft.x, 4200*shaft.y, 4200*shaft.z };
+    simMicros += 10000; Vec3 m = { 4200*shaft.x, 4200*shaft.y, 4200*shaft.z };
     for (int i=0;i<MAG_SENSOR_COUNT;i++){ magArray.field[i]=magFitDipoleField(magArray.position[i],p,m); magArray.field[i].x+=gauss(0.005f)+ (rand()%40==0? gauss(0.3f):0); magArray.field[i].y+=gauss(0.005f); magArray.field[i].z+=gauss(0.005f); magArray.fresh[i]=!dropout; }
     magArray.frameCount++; magLocator.service(); rowCounter.service(); probeLeds.lastUs=0; probeLeds.service();
     const MagTrack& t = magLocator.track; frames++;

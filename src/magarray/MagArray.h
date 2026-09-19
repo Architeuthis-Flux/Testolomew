@@ -123,6 +123,12 @@ class MagArray : public Service {
     bool streaming = false;   // CSV frames to the console
     bool identifying = false; // print the strongest sensor
 
+    // The host simulator: no bus, no sampler; whoever runs the world writes
+    // field[] and fresh[] and bumps frameCount itself. Every sensor is
+    // called ok and the baseline ready.
+    void useSimulatedFrames( );
+    bool simulatedFrames = false;
+
   private:
     MagArray( ) = default;
 

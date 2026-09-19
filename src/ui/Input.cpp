@@ -1,6 +1,9 @@
 // SPDX-License-Identifier: MIT
 #include "Input.h"
 
+#include <stdlib.h>
+#include <string.h>
+
 #include "BoardPins.h"
 #include "Console.h"
 
@@ -21,6 +24,68 @@ static void onInputs( Stream* out ) {
 
 static void onNavTrace( Stream* out ) {
     input.printNavTrace( out );
+}
+
+// :key <control> [tap|down|up|hold|xN] and :joy <x> <y> [ms] | off: the
+// controls from the console, through the same path as the physical ones.
+static const char* const controlNames[ IN_CONTROL_COUNT ] = { "up", "down", "left", "right", "press", "jup", "jdown", "jleft", "jright", "jpress", "a", "b" };
+
+static int controlByName( const char* name ) {
+    for ( int c = 0; c < IN_CONTROL_COUNT; c++ ) {
+        if ( strcmp( controlNames[ c ], name ) == 0 )
+            return c;
+    }
+    return -1;
+}
+
+static void onKeyVerb( int argc, char** argv, Stream* out ) {
+    if ( argc < 2 ) {
+        consoleErr( out, "usage: :key <up|down|left|right|press|jup|jdown|jleft|jright|jpress|a|b> [tap|down|up|hold|xN]" );
+        return;
+    }
+    int c = controlByName( argv[ 1 ] );
+    if ( c < 0 ) {
+        consoleErr( out, "no such control (up down left right press jup jdown jleft jright jpress a b)" );
+        return;
+    }
+    const char* how = argc >= 3 ? argv[ 2 ] : "tap";
+    char line[ 64 ];
+    if ( strcmp( how, "tap" ) == 0 ) {
+        input.simTap( (InputControl)c );
+    } else if ( strcmp( how, "down" ) == 0 ) {
+        input.simPress( (InputControl)c );
+    } else if ( strcmp( how, "up" ) == 0 ) {
+        input.simRelease( (InputControl)c );
+    } else if ( strcmp( how, "hold" ) == 0 ) {
+        input.simHold( (InputControl)c, INPUT_HOLD_MS + 200 );
+    } else if ( how[ 0 ] == 'x' && how[ 1 ] >= '0' && how[ 1 ] <= '9' ) {
+        int n = atoi( how + 1 );
+        for ( int k = 0; k < n && k < 64; k++ )
+            input.simTap( (InputControl)c );
+    } else {
+        consoleErr( out, "the second word is tap, down, up, hold or xN" );
+        return;
+    }
+    snprintf( line, sizeof( line ), "key %s %s", controlNames[ c ], how );
+    consoleOk( out, line );
+}
+
+static void onJoyVerb( int argc, char** argv, Stream* out ) {
+    if ( argc >= 2 && strcmp( argv[ 1 ], "off" ) == 0 ) {
+        input.simJoystickOff( );
+        consoleOk( out, "joy off" );
+        return;
+    }
+    if ( argc < 3 ) {
+        consoleErr( out, "usage: :joy <x> <y> [ms] (-1..1 each way; no ms = until :joy off) | :joy off" );
+        return;
+    }
+    float x = atof( argv[ 1 ] ), y = atof( argv[ 2 ] );
+    uint32_t ms = argc >= 4 ? (uint32_t)atol( argv[ 3 ] ) : 0;
+    input.simJoystick( x, y, ms );
+    char line[ 64 ];
+    snprintf( line, sizeof( line ), "joy %.2f %.2f %lu ms", x, y, (unsigned long)ms );
+    consoleOk( out, line );
 }
 
 void Input::begin( ) {
@@ -49,6 +114,69 @@ void Input::begin( ) {
     consoleSetKeySink( keySink );
     consoleAddCommand( 'j', "the controls as read: joystick raw and scaled, nav stick contacts, buttons", onInputs );
     consoleAddCommand( 'J', "the nav stick's last 32 contact changes, with timing (press it first, then J)", onNavTrace );
+    consoleAddVerb( "key", "<control> [tap|down|up|hold|xN]", "a control from here: up down left right press jup jdown jleft jright jpress a b", CONSOLE_CHANGES, onKeyVerb );
+    consoleAddVerb( "joy", "<x> <y> [ms] | off", "the joystick from here, -1..1 each way, in place of the stick", CONSOLE_CHANGES, onJoyVerb );
+}
+
+// ---- the simulation surface ------------------------------------------------------
+
+void Input::simPress( InputControl c ) {
+    buttons[ c ].simDown = true;
+    buttons[ c ].simUntil = 0;
+}
+
+void Input::simRelease( InputControl c ) {
+    buttons[ c ].simDown = false;
+    buttons[ c ].simUntil = 0;
+}
+
+void Input::simHold( InputControl c, uint32_t ms ) {
+    uint32_t until = millis( ) + ms;
+    buttons[ c ].simDown = true;
+    buttons[ c ].simUntil = until == 0 ? 1 : until;
+}
+
+// A tap: pressed, then released a moment later. Several in a row are played
+// one after another, so "down down down" is three presses.
+void Input::simTap( InputControl c ) {
+    buttons[ c ].taps++;
+}
+
+void Input::simJoystick( float x, float y, uint32_t ms ) {
+    simJoyX = x < -1.0f ? -1.0f : ( x > 1.0f ? 1.0f : x );
+    simJoyY = y < -1.0f ? -1.0f : ( y > 1.0f ? 1.0f : y );
+    simJoyOn = true;
+    uint32_t until = millis( ) + ms;
+    simJoyUntil = ms == 0 ? 0 : ( until == 0 ? 1 : until );
+}
+
+void Input::simJoystickOff( ) {
+    simJoyOn = false;
+    simJoyX = simJoyY = 0.0f;
+}
+
+bool Input::simActive( ) const {
+    if ( simJoyOn )
+        return true;
+    for ( int c = 0; c < IN_CONTROL_COUNT; c++ ) {
+        if ( buttons[ c ].simDown || buttons[ c ].emulated || buttons[ c ].taps > 0 )
+            return true;
+    }
+    return false;
+}
+
+void Input::setPin( InputControl c, int pin, bool activeLow ) {
+    buttons[ c ].pin = pin;
+    buttons[ c ].activeLow = activeLow;
+}
+
+uint32_t Input::heldMask( ) const {
+    uint32_t mask = 0;
+    for ( int c = 0; c < IN_CONTROL_COUNT; c++ ) {
+        if ( buttons[ c ].state )
+            mask |= 1u << c;
+    }
+    return mask;
 }
 
 void Input::printNavTrace( Stream* out ) const {
@@ -134,12 +262,10 @@ void Input::feed( InputControl c, bool down, uint32_t now ) {
     }
 }
 
-// A typed key: a tap - pressed, then released a moment later (the console
-// cannot say when a key goes up). Several typed in a row are played one
-// after another, so "down down down" is three presses.
+// A typed key: a tap (the console cannot say when a key goes up).
 void Input::emulate( InputControl c, uint32_t now ) {
     (void)now;
-    buttons[ c ].taps++;
+    simTap( c );
 }
 
 bool Input::takeKey( char c ) {
@@ -197,20 +323,16 @@ bool Input::takeKey( char c ) {
         emulate( IN_JOY_PRESS, now );
         return true;
     case ',':
-        emulatedJoyX = -0.8f;
-        emulatedJoyUntil = now + INPUT_EMULATED_NUDGE_MS;
+        simJoystick( -0.8f, simJoyOn ? simJoyY : 0.0f, INPUT_EMULATED_NUDGE_MS );
         return true;
     case '.':
-        emulatedJoyX = 0.8f;
-        emulatedJoyUntil = now + INPUT_EMULATED_NUDGE_MS;
+        simJoystick( 0.8f, simJoyOn ? simJoyY : 0.0f, INPUT_EMULATED_NUDGE_MS );
         return true;
     case ';':
-        emulatedJoyY = -0.8f;
-        emulatedJoyUntil = now + INPUT_EMULATED_NUDGE_MS;
+        simJoystick( simJoyOn ? simJoyX : 0.0f, -0.8f, INPUT_EMULATED_NUDGE_MS );
         return true;
     case '\'':
-        emulatedJoyY = 0.8f;
-        emulatedJoyUntil = now + INPUT_EMULATED_NUDGE_MS;
+        simJoystick( simJoyOn ? simJoyX : 0.0f, 0.8f, INPUT_EMULATED_NUDGE_MS );
         return true;
     default:
         return false;
@@ -230,8 +352,15 @@ static float deadZone( float v ) {
 ServiceStatus Input::service( ) {
     uint32_t now = millis( );
 
-    // The joystick: real if fitted, else whatever was typed.
-    if ( joystickFitted ) {
+    // The joystick: a simulated one while there is one, else the real one if
+    // fitted, else centred.
+    if ( simJoyOn && simJoyUntil != 0 && (int32_t)( now - simJoyUntil ) >= 0 ) {
+        simJoystickOff( );
+    }
+    if ( simJoyOn ) {
+        joyX = simJoyX;
+        joyY = simJoyY;
+    } else if ( joystickFitted ) {
         // ASSUMPTION: centre at half scale (`j` shows the raw readings).
         float half = 0.5f * joyFullScale;
         float x = ( analogRead( PIN_JOY_X ) - half ) / half;
@@ -243,11 +372,7 @@ ServiceStatus Input::service( ) {
         joyX = deadZone( x );
         joyY = deadZone( y );
     } else {
-        if ( (int32_t)( now - emulatedJoyUntil ) >= 0 ) {
-            emulatedJoyX = emulatedJoyY = 0.0f;
-        }
-        joyX = emulatedJoyX;
-        joyY = emulatedJoyY;
+        joyX = joyY = 0.0f;
     }
 
     // The nav stick: its four contacts as one pattern, decoded once it has
@@ -365,6 +490,12 @@ ServiceStatus Input::service( ) {
                 b.emulated = false;
                 b.nextTapMs = now + INPUT_DEBOUNCE_MS + 30;
             }
+        }
+        if ( b.simDown && b.simUntil != 0 && (int32_t)( now - b.simUntil ) >= 0 ) {
+            b.simDown = false;
+        }
+        if ( b.simDown ) {
+            down = true;
         }
         feed( (InputControl)c, down, now );
     }

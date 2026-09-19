@@ -258,6 +258,25 @@ class MagLocator : public Service {
 
     void printFix( Stream* out ) const;
 
+    // A simulated probe (the :probe verb, the host simulator): the tracker
+    // is fed this magnet position and shaft instead of a fit - the array and
+    // its sampler keep running, the fit is skipped - and `fix` is filled as
+    // a fit would fill it, so everything downstream (rows, LEDs, paint, the
+    // scene with its SIM mark) sees a probe that is exactly where it is said
+    // to be. ms 0 = until simProbeOff().
+    struct ProbeSim {
+        bool on;
+        uint32_t untilMs; // 0 = no end
+        Vec3 position;    // the magnet's centre
+        Vec3 shaft;       // unit, up the probe
+        float sigmaMm;
+        bool rough;
+    };
+    ProbeSim sim = { };
+    void simProbeSet( Vec3 position, Vec3 shaft, float sigmaMm, bool rough, uint32_t ms );
+    void simProbeOff( );
+    bool simProbeActive( ) const { return sim.on; }
+
     // The magnet strength the fit is held to (0 = free), and learning it.
     float knownStrength = MAGLOC_MAGNET_STRENGTH;
     void startLearningStrength( );
@@ -303,6 +322,14 @@ class MagLocator : public Service {
     // the parts are on and how one package is turned picks the line.
     void printOrientationCheck( Stream* out ) const;
 
+    // The field smoothing as it stands, for the reports and the pencil bench
+    // (tools/hostsim/pencil.cpp): the track's speed over the last
+    // MAGLOC_SPEED_WINDOW frames, the alpha last applied (1 = none), and the
+    // jitter lever.
+    float smoothSpeed = 0.0f;
+    float smoothAlpha = 1.0f;
+    float speedJitterK = MAGLOC_SPEED_JITTER_K;
+
   private:
     MagLocator( ) = default;
 
@@ -323,15 +350,13 @@ class MagLocator : public Service {
     uint32_t checkedBaseline = 0;          // magArray.baselineCount last checked
     uint32_t roughOnlySinceMs = 0;         // when "present without a fit" began (0 = not now)
     uint32_t lastPresentMs = 0;            // when a magnet was last present (the drift hold-off)
-    float smoothSpeed = 0.0f;              // the track's speed over the last MAGLOC_SPEED_WINDOW frames, for the field smoothing rule
     Vec3 speedRing[ MAGLOC_SPEED_WINDOW ]; // the track's position, the last MAGLOC_SPEED_WINDOW frames
     int speedRingCount = 0;
-    float smoothAlpha = 1.0f;                   // the field smoothing as last applied (1 = none), for the reports
-    float speedJitterK = MAGLOC_SPEED_JITTER_K; // a lever for the bench
     int baselineRetakes = 0;
     uint32_t retakeBaselineAtMs = 0;
     void checkBaseline( );
     ServiceStatus fitFrame( MagTrackInput* in );
+    ServiceStatus simFrame( MagTrackInput* in );
     void offerRough( MagTrackInput* in, const MagFitResult* r ) const;
 
     Vec3 pointerOf( Vec3 tip, Vec3 shaft ) const;

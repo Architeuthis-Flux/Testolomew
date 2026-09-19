@@ -10,3 +10,7 @@
     0.0   (none yet)
     0.0 joystick raw x 2030 y 2055 of 4095 (centre 2048)  ->  x +0.00 y +0.00 (dead zone 5 %)  press up
     0.0 nav stick contacts up 0 down 0 left 0 right 0 push 0 (stable pattern 0x0, decoded: )  buttons A up B up
+    0.0 nav stick contact changes, oldest first (ms since the previous one; up down left right, push):
+    0.0   (none yet)
+    0.0 nav stick contact changes, oldest first (ms since the previous one; up down left right, push):
+    0.0   (none yet)

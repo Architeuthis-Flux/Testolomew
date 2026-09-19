@@ -11,8 +11,8 @@
 #include "Console.h"
 #include <vector>
 #include <string.h>
-uint32_t simMillis = 0; Stream Serial; TwoWire Wire;
-bool boardVioIs3V3(void) { return true; } void boardLedsInit(void) {} void boardLed(int, bool) {}
+
+
 static float gauss(float s){ float u1=(rand()+1.0f)/((float)RAND_MAX+2.0f), u2=(rand()+1.0f)/((float)RAND_MAX+2.0f); return s*sqrtf(-2*logf(u1))*cosf(2*M_PI*u2);}
 static float frand(float a, float b){ return a + (b-a)*rand()/(float)RAND_MAX; }
 struct Sample { Vec3 truth, shaftTruth, track, view, cursorTruth, cursor; Vec3 shaft; bool tracking, moving, turning; };
@@ -25,7 +25,7 @@ static void lagOf(const std::vector<Sample>& s, Vec3 Sample::*truth, Vec3 Sample
   double e0=0; long n0=0; for (size_t i=0;i<s.size();i++){ if(!s[i].tracking||!s[i].moving) continue; float e=dist(s[i].*out, s[i].*truth); e0+=e*e; n0++; }
   printf("  %-8s moving: error %.2f mm rms against the truth now, %.2f against the truth %d frames (%d ms) ago (the lag)\n", name, n0?sqrt(e0/n0):0, bestErr, bestLag, bestLag*10);
 }
-int main(int argc, char** argv){ console.begin(&Serial); magArray.begin(); for(int i=0;i<MAG_SENSOR_COUNT;i++) magArray.sensors[i].ok=true; magArray.baselineLeft=0; magArray.baselineCount=1;
+int main(int argc, char** argv){ console.begin(&Serial); magArray.begin(); magArray.useSimulatedFrames();
   magLocator.begin(); srand(5);
   MagTrack& tr = magLocator.track;
   // levers from the command line: viewHz viewBeta cursorHz cursorBeta shaftHz shaftBeta [accel]
@@ -50,7 +50,7 @@ int main(int argc, char** argv){ console.begin(&Serial); magArray.begin(); for(i
     lean += fmaxf(-turn, fminf(turn, leanGoal-lean)); float daz=azGoal-az; while(daz>M_PI)daz-=2*M_PI; while(daz<-M_PI)daz+=2*M_PI; az += fmaxf(-turn, fminf(turn, daz));
     Vec3 shaft={sinf(lean)*cosf(az), sinf(lean)*sinf(az), cosf(lean)};
     bool moving = sqrtf(v.x*v.x+v.y*v.y+v.z*v.z) > 5.0f; bool turning = fabsf(leanGoal-lean)>0.02f || fabsf(daz)>0.02f;
-    simMillis += 10; Vec3 m = { 4200*shaft.x, 4200*shaft.y, 4200*shaft.z };
+    simMicros += 10000; Vec3 m = { 4200*shaft.x, 4200*shaft.y, 4200*shaft.z };
     for (int i=0;i<MAG_SENSOR_COUNT;i++){ magArray.field[i]=magFitDipoleField(magArray.position[i],p,m); magArray.field[i].x+=gauss(0.006f); magArray.field[i].y+=gauss(0.006f); magArray.field[i].z+=gauss(0.004f); magArray.fresh[i]=true; }
     magArray.frameCount++; magLocator.service();
     // the cursor's truth: down the shaft to the surface plane (17.5), as the tracker defines it

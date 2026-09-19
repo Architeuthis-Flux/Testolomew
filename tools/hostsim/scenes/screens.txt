@@ -1,0 +1,87 @@
+# The fourteen screens (`make screens` -> out/*.png and the montage).
+@seed 4
+@magnet row 14 3 0 20
+@run 4000
+l
+:screen:png out/s01_scene_on_row.png
+@magnet row 14 3 10 20
+@run 1500
+:screen:png out/s02_scene_lifted_pointed.png
+e
+:screen:png out/s03_leds_lifted.png
+e
+e
+@run 200
+@type "." 8 200
+@type "'" 5 200
+\e[A
+\e[A
+\e[C
+@magnet row 14 3 0 20
+@run 200
+@move 20 0 0 800
+@run 200
+:screen:png out/s04_draw_paint.png
+/
+:screen:png out/s05_draw_erase.png
+/
+\e[C
+e
+e
+@run 400
+:screen:png out/s06_leds_brush.png
+W
+@magnet row 14 3 10 20
+@run 500
+u
+@run 600
+:screen:png out/s07_leds_under.png
+u
+@move 18 0 0 600
+e
+e
+e
+@dropout 200
+@run 150
+:screen:png out/s08_scene_coasting.png
+@run 500
+@magnet 27 22 54 0.34 0 0.94
+@run 1500
+:screen:png out/s09_scene_rough.png
+e
+:screen:png out/s10_leds_rough.png
+e
+e
+e
+@magnet row 14 3 0 20
+@run 800
+\t
+@run 300
+:screen:png out/s11_menu_root.png
+\r
+@run 300
+:screen:png out/s12_menu_tracker.png
+`
+:ui go commands
+@run 300
+:screen:png out/s13_menu_commands.png
+:ui go l
+@run 400
+:screen:png out/s14_log_after_l.png
+\t
+e
+e
+@magnet row 14 3 10 25
+vvvvv
+@run 1500
+:screen:png out/s15_scene_pov.png
+v
+vvv
+@run 1500
+:screen:png out/s16_scene_top.png
+vvv
+:joy 0.8 0 800
+@run 900
+@type "\e[C" 6 150
+@run 600
+:screen:png out/s17_scene_orbited.png

@@ -3,11 +3,11 @@
 #include "Input.h"
 #undef private
 #include "Console.h"
-uint32_t simMillis = 0; Stream Serial; int simPinLevel[64];
+
 static const char* names[] = {"UP","DOWN","LEFT","RIGHT","PRESS","JUP","JDOWN","JLEFT","JRIGHT","JPRESS","A","B"};
 static const char* kinds[] = {"press","release","repeat","hold"};
 static int fails = 0;
-static void run(const char* what, int ms) { for (int t = 0; t < ms; t += 5) { simMillis += 5; input.service(); } (void)what; }
+static void run(const char* what, int ms) { for (int t = 0; t < ms; t += 5) { simMicros += 5000; input.service(); } (void)what; }
 static void drain(const char* stage, const char* expect) {
     char got[256] = ""; InputEvent e;
     while (input.next(&e)) { if (e.kind == IN_REPEAT || e.kind == IN_HOLD) continue; char b[32]; snprintf(b, sizeof b, "%s:%s ", names[e.control], kinds[e.kind]); strncat(got, b, sizeof got - strlen(got) - 1); }

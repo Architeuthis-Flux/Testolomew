@@ -40,6 +40,32 @@ size_t UiStream::write( uint8_t c ) {
         port->write( c );
 #endif
     }
+    logChar( c );
+    return 1;
+}
+
+// A block: one call into the DMA ring (a dump's kilobyte row byte by byte
+// through write(c) was most of the dump service's tick), then the log.
+size_t UiStream::write( const uint8_t* buffer, size_t size ) {
+    if ( port != nullptr ) {
+#if UISTREAM_SERIAL_DMA
+        serialDmaWrite( buffer, size );
+#else
+        port->write( buffer, size );
+#endif
+    }
+    if ( logToScreen ) {
+        for ( size_t i = 0; i < size; i++ ) {
+            logChar( buffer[ i ] );
+        }
+    }
+    return size;
+}
+
+void UiStream::logChar( uint8_t c ) {
+    if ( !logToScreen ) {
+        return;
+    }
     if ( c == '\n' ) {
         newLine( );
     } else if ( c == '\r' ) {
@@ -54,14 +80,6 @@ size_t UiStream::write( uint8_t c ) {
         lines[ head ][ column ] = 0;
         generation++;
     }
-    return 1;
-}
-
-size_t UiStream::write( const uint8_t* buffer, size_t size ) {
-    for ( size_t i = 0; i < size; i++ ) {
-        write( buffer[ i ] );
-    }
-    return size;
 }
 
 int UiStream::available( ) {

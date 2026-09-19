@@ -1,0 +1,100 @@
+# The regression set: `make check`. Every line's output is checked with
+# @expect against what the firmware printed for that line.
+
+# The verbs are there.
+:help
+@expect "help{"
+@expect ":screen:ascii"
+@expect ":probe"
+@expect ":key"
+
+# The screen, as text.
+:screen
+@expect "screen{"
+@expect "app: scene"
+@expect "panes: -"
+@expect "probe: none"
+
+# A simulated probe on row 14, hole 3: the tracker, the row counter and the
+# LEDs all see it within a second.
+:probe row 14 3
+@expect "ok{probe sim"
+@run 800
+:screen
+@expect "sim: probe"
+@expect "probe: track"
+@expect "row: 14 hole 3"
+:leds
+@expect "leds{"
+@expect "cursor: tracking row 14"
+
+# The dump path un-swaps exactly what the panel received.
+:screen:verify
+@expect "ok{verify"
+
+# A screen dump, in each shape, closes its frame.
+:screen:ascii
+@expect "screen:ascii{"
+@expect "w 80 h 60 cell 3x4 grey"
+@expect "}"
+:screen:dump rle 4
+@expect "screen:dump{"
+@expect "w 240 h 240 step 4 rle"
+@expect "}"
+
+# The log.
+:log 3
+@expect "log{"
+
+# The menu from the console: A opens it, :ui walks it, B closes it at the root.
+:key a
+@expect "ok{key a tap}"
+@run 300
+:screen
+@expect "panes: menu"
+@expect "menu: / cursor 1/"
+:ui go tracker
+@expect "ok{go tracker}"
+:screen
+@expect "menu: /tracker cursor 1/"
+@expect "> state"
+:ui back
+:key b
+@run 300
+:screen
+@expect "panes: -"
+
+# The joystick from the console orbits the camera.
+:screen
+@expect "camera: fixed"
+:joy 0.8 0 400
+@expect "ok{joy"
+@run 600
+
+# The probe goes away: the LEDs go dark within the fade.
+:probe off
+@run 3000
+:leds
+@expect "cursor: none"
+
+# A console command that changes a saved value is written after it settles
+# (2 s), and the saved text carries every page's keys. (With the probe gone:
+# a resting probe would have pulled the surface back down to where it rests.)
+S23\r
+@run 4000
+s
+@expect "cursor/surface=23"
+@expect "tracker/floor="
+@expect "smoothing/view Hz="
+@expect "cursor/cursor="
+@expect "camera/mode="
+@expect "LEDs/layout="
+@expect "play/hue="
+
+# The real fit on simulated fields: a magnet in row 20 lands on row 20.
+@magnet row 20 2 0 20
+@run 3000
+:screen
+@expect "row: 20 hole 2" 2000
+@magnet off
+@run 1000

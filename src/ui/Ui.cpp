@@ -2,6 +2,7 @@
 #include "Ui.h"
 
 #include <Adafruit_GFX.h>
+#include <stdlib.h>
 #include <string.h>
 
 #include "Console.h"
@@ -39,6 +40,10 @@
 #define ACTION_RESET_SETTINGS 1002
 
 Ui& ui = Ui::getInstance( );
+
+static void onScreenVerb( int argc, char** argv, Stream* out );
+static void onLogVerb( int argc, char** argv, Stream* out );
+static void onUiVerb( int argc, char** argv, Stream* out );
 
 Ui& Ui::getInstance( ) {
     static Ui instance;
@@ -238,6 +243,9 @@ void Ui::begin( ) {
     cursorModeChoice = magLocator.track.cursorMode == MAGCURSOR_UNDER ? 0 : 1;
     cameraModeChoice = magView.cam.mode;
     buildMenu( );
+    consoleAddVerb( "screen", "", "what the screen shows, as text: screen, panes, menu page and items, play, probe, camera", CONSOLE_READS, onScreenVerb );
+    consoleAddVerb( "log", "[n]", "the last n lines of the log (20)", CONSOLE_READS, onLogVerb );
+    consoleAddVerb( "ui", "open|close|back|enter|up|down|left|right|go <label>", "drive the menu", CONSOLE_CHANGES, onUiVerb );
 }
 
 void Ui::settingsLoaded( ) {
@@ -542,6 +550,211 @@ ServiceStatus Ui::service( ) {
 
 // ---- drawing ---------------------------------------------------------------------
 
+// An item's value as the menu shows it (drawMenu and :screen use the same).
+static void menuItemValue( const Menu* m, int index, bool selected, char* value, int size ) {
+    const MenuItem& item = m->items[ index ];
+    value[ 0 ] = '\0';
+    switch ( item.kind ) {
+    case MENU_SUBMENU:
+        snprintf( value, size, ">" );
+        break;
+    case MENU_TOGGLE:
+        snprintf( value, size, *item.flag ? "on" : "off" );
+        break;
+    case MENU_NUMBER:
+        snprintf( value, size, item.step >= 1.0f ? "%.0f%s" : ( item.step >= 0.1f ? "%.1f%s" : "%.2f%s" ), *item.value, item.unit );
+        break;
+    case MENU_CHOICE:
+        snprintf( value, size, "%s", item.names[ *item.choice ] );
+        break;
+    case MENU_ACTION:
+        if ( item.takesNumber && selected && m->editing ) {
+            snprintf( value, size, "%.0f", m->editValue );
+        }
+        break;
+    case MENU_INFO:
+        item.info( value, size );
+        break;
+    }
+}
+
+void Ui::menuKeyFromConsole( MenuKey key ) {
+    handleMenuKey( key, false );
+}
+
+// ---- :screen, :log, :ui ------------------------------------------------------------
+
+static const char* const screenNames[ MAGVIEW_SCREEN_COUNT ] = { "scene", "leds", "log", "draw" };
+
+void Ui::printScreen( Stream* out ) {
+    char line[ 120 ];
+    out->println( "screen{" );
+    snprintf( line, sizeof( line ), "app: %s", screenNames[ magView.screen ] );
+    out->println( line );
+    snprintf( line, sizeof( line ), "sim: %s%s%s", magLocator.simProbeActive( ) ? "probe " : "", input.simActive( ) ? "input " : "", !magLocator.simProbeActive( ) && !input.simActive( ) ? "-" : "" );
+    out->println( line );
+    snprintf( line, sizeof( line ), "panes: %s", menu.open ? ( menu.editing ? "menu edit" : "menu" ) : "-" );
+    out->println( line );
+    if ( menu.open ) {
+        // The page's path from the root, and the cursor.
+        char path[ 64 ] = "";
+        for ( int d = 0; d < menu.depth; d++ ) {
+            int page = d + 1 < menu.depth ? menu.stack[ d + 1 ] : menu.current;
+            strncat( path, "/", sizeof( path ) - strlen( path ) - 1 );
+            strncat( path, page == MENU_ROOT ? "" : menu.items[ page ].label, sizeof( path ) - strlen( path ) - 1 );
+        }
+        if ( menu.depth == 0 ) {
+            strncpy( path, "/", sizeof( path ) );
+        }
+        int visible = menuVisibleCount( &menu );
+        snprintf( line, sizeof( line ), "menu: %s cursor %d/%d", path, menu.cursor + 1, visible );
+        out->println( line );
+        for ( int n = 0; n < visible; n++ ) {
+            int index = menuVisibleItem( &menu, n );
+            if ( index < 0 )
+                break;
+            char value[ 24 ];
+            menuItemValue( &menu, index, n == menu.cursor, value, sizeof( value ) );
+            snprintf( line, sizeof( line ), "%c %-24s %s", n == menu.cursor ? '>' : ' ', menu.items[ index ].label, value );
+            out->println( line );
+        }
+    }
+#if MODULE_PLAY
+    snprintf( line, sizeof( line ), "play: %s hue %.0f sat %.2f bright %.2f brush %d %s", playModeNames[ play.mode ], play.paintHue, play.paintSat, play.paintBright, (int)( play.brushSize + 0.5f ),
+              play.erase ? "erase" : "draw" );
+    out->println( line );
+#endif
+    {
+        const MagTrack& t = magLocator.track;
+        const MagProbeFix& f = magLocator.fix;
+        static const char* names[ 4 ] = { "none", "rough", "coast", "track" };
+        if ( t.enabled && t.state != MAGTRACK_NONE ) {
+            snprintf( line, sizeof( line ), "probe: %s x %.1f y %.1f z %.1f tilt %.0f cursor %.1f %.1f", names[ t.state ], t.position.x, t.position.y, t.position.z, t.tiltDeg, t.cursor.x, t.cursor.y );
+        } else if ( f.valid ) {
+            snprintf( line, sizeof( line ), "probe: fix x %.1f y %.1f z %.1f tilt %.0f", f.magnet.x, f.magnet.y, f.magnet.z, f.tiltDeg );
+        } else {
+            snprintf( line, sizeof( line ), "probe: none" );
+        }
+        out->println( line );
+#if MODULE_ROW_COUNT
+        const RowReading& r = rowCounter.reading;
+        if ( rowCounter.active && r.valid ) {
+            snprintf( line, sizeof( line ), "row: %d hole %d %.0f%%", r.row, r.hole, 100.0f * ( r.tracked ? r.trackConfidence : r.confidence ) );
+            out->println( line );
+        }
+#endif
+    }
+    snprintf( line, sizeof( line ), "camera: %s target %.1f %.1f %.1f yaw %.0f el %.0f zoom %.2f", cameraModeNames[ magView.cam.mode ], magView.cam.target.x, magView.cam.target.y, magView.cam.target.z,
+              magView.cam.yawDeg, magView.cam.elevationDeg, magView.cam.zoom );
+    out->println( line );
+    out->println( "}" );
+}
+
+static void onScreenVerb( int argc, char** argv, Stream* out ) {
+    (void)argc;
+    (void)argv;
+    bool was = uiStream.logToScreen;
+    uiStream.logToScreen = false;
+    ui.printScreen( out );
+    uiStream.logToScreen = was;
+}
+
+static void onLogVerb( int argc, char** argv, Stream* out ) {
+    int n = argc >= 2 ? atoi( argv[ 1 ] ) : 20;
+    if ( n < 1 )
+        n = 1;
+    if ( n > uiStream.logCount( ) )
+        n = uiStream.logCount( );
+    bool was = uiStream.logToScreen;
+    uiStream.logToScreen = false;
+    out->println( "log{" );
+    for ( int back = n - 1; back >= 0; back-- ) {
+        const char* line = uiStream.logLine( back );
+        out->println( line == nullptr ? "" : line );
+    }
+    out->println( "}" );
+    uiStream.logToScreen = was;
+}
+
+static bool labelMatches( const char* label, const char* wanted ) {
+    // A case-insensitive prefix, so "go track" finds "tracker".
+    for ( int i = 0; wanted[ i ] != '\0'; i++ ) {
+        char a = label[ i ], b = wanted[ i ];
+        if ( a >= 'A' && a <= 'Z' )
+            a = (char)( a - 'A' + 'a' );
+        if ( b >= 'A' && b <= 'Z' )
+            b = (char)( b - 'A' + 'a' );
+        if ( a != b )
+            return false;
+    }
+    return true;
+}
+
+static void onUiVerb( int argc, char** argv, Stream* out ) {
+    if ( argc < 2 ) {
+        consoleErr( out, "usage: :ui open|close|back|enter|up|down|left|right|go <label>" );
+        return;
+    }
+    const char* what = argv[ 1 ];
+    Menu* m = &ui.menu;
+    if ( strcmp( what, "open" ) == 0 ) {
+        if ( !m->open ) {
+            input.simTap( IN_BTN_A ); // as the button does (the menu reads the modules back on opening)
+        }
+        consoleOk( out, "opening" );
+    } else if ( strcmp( what, "close" ) == 0 ) {
+        if ( m->open )
+            menuClose( m );
+        ui.menuEdits++;
+        consoleOk( out, "closed" );
+    } else if ( strcmp( what, "back" ) == 0 ) {
+        ui.menuKeyFromConsole( MENUKEY_BACK );
+        consoleOk( out, "back" );
+    } else if ( strcmp( what, "enter" ) == 0 ) {
+        ui.menuKeyFromConsole( MENUKEY_ENTER );
+        consoleOk( out, "enter" );
+    } else if ( strcmp( what, "up" ) == 0 ) {
+        ui.menuKeyFromConsole( MENUKEY_UP );
+        consoleOk( out, "up" );
+    } else if ( strcmp( what, "down" ) == 0 ) {
+        ui.menuKeyFromConsole( MENUKEY_DOWN );
+        consoleOk( out, "down" );
+    } else if ( strcmp( what, "left" ) == 0 ) {
+        ui.menuKeyFromConsole( MENUKEY_LEFT );
+        consoleOk( out, "left" );
+    } else if ( strcmp( what, "right" ) == 0 ) {
+        ui.menuKeyFromConsole( MENUKEY_RIGHT );
+        consoleOk( out, "right" );
+    } else if ( strcmp( what, "go" ) == 0 && argc >= 3 ) {
+        if ( !m->open ) {
+            consoleErr( out, "the menu is not open (:ui open first)" );
+            return;
+        }
+        // The label may be several words: join the rest of the line.
+        char wanted[ 48 ] = "";
+        for ( int i = 2; i < argc; i++ ) {
+            if ( i > 2 )
+                strncat( wanted, " ", sizeof( wanted ) - strlen( wanted ) - 1 );
+            strncat( wanted, argv[ i ], sizeof( wanted ) - strlen( wanted ) - 1 );
+        }
+        int visible = menuVisibleCount( m );
+        for ( int n = 0; n < visible; n++ ) {
+            int index = menuVisibleItem( m, n );
+            if ( index >= 0 && labelMatches( m->items[ index ].label, wanted ) ) {
+                m->cursor = n;
+                ui.menuKeyFromConsole( MENUKEY_ENTER );
+                char line[ 80 ];
+                snprintf( line, sizeof( line ), "go %s", m->items[ index ].label );
+                consoleOk( out, line );
+                return;
+            }
+        }
+        consoleErr( out, "no item with that label on this page (:screen lists them)" );
+    } else {
+        consoleErr( out, "usage: :ui open|close|back|enter|up|down|left|right|go <label>" );
+    }
+}
+
 void Ui::drawMenu( GFXcanvas16* canvas ) {
     // Size-2 text: 12 px characters, 20 to a line; a panel of UI_MENU_ROWS
     // rows of 18 px with a title above and a one-line hint below.
@@ -576,28 +789,7 @@ void Ui::drawMenu( GFXcanvas16* canvas ) {
             fastText( canvas, x0 + 4, y, T, colour, ">" );
         }
         char value[ 24 ] = "";
-        switch ( item.kind ) {
-        case MENU_SUBMENU:
-            snprintf( value, sizeof( value ), ">" );
-            break;
-        case MENU_TOGGLE:
-            snprintf( value, sizeof( value ), *item.flag ? "on" : "off" );
-            break;
-        case MENU_NUMBER:
-            snprintf( value, sizeof( value ), item.step >= 1.0f ? "%.0f%s" : ( item.step >= 0.1f ? "%.1f%s" : "%.2f%s" ), *item.value, item.unit );
-            break;
-        case MENU_CHOICE:
-            snprintf( value, sizeof( value ), "%s", item.names[ *item.choice ] );
-            break;
-        case MENU_ACTION:
-            if ( item.takesNumber && selected && menu.editing ) {
-                snprintf( value, sizeof( value ), "%.0f", menu.editValue );
-            }
-            break;
-        case MENU_INFO:
-            item.info( value, sizeof( value ) );
-            break;
-        }
+        menuItemValue( &menu, index, selected, value, sizeof( value ) );
         // The label gets what the value leaves: the value is right-aligned.
         int valueChars = (int)strlen( value );
         int labelChars = columns - 1 - valueChars - ( valueChars > 0 ? 1 : 0 );

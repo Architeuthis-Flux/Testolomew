@@ -41,6 +41,10 @@ class UiStream : public Stream {
     const char* logLine( int back ) const;
     int logCount( ) const { return count; }
     uint32_t logGeneration( ) const { return generation; } // bumps on every change
+    // Off: what is printed goes to the serial port only, not into the log
+    // (a screen dump or a :log listing is not something the screen should
+    // show back).
+    bool logToScreen = true;
 
   private:
     Stream* port = nullptr;
@@ -52,6 +56,7 @@ class UiStream : public Stream {
     char keys[ UISTREAM_KEYS ];
     int keyHead = 0, keyCount = 0;
     void newLine( );
+    void logChar( uint8_t c ); // the log side of write()
 };
 
 extern UiStream uiStream;

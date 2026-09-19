@@ -598,6 +598,10 @@ void MagView::drawText( ) {
     }
 #endif
 
+    // A simulated probe (:probe) is marked, so a screen shot says so.
+    if ( magLocator.simProbeActive( ) ) {
+        textAt( canvas, LCD_WIDTH - 3 * MAGVIEW_CHAR_W - 2, 2, T, COLOR_WARNING, "SIM" );
+    }
     // Two lines at the bottom: the array and frame rate; the camera, the
     // track's state and the cursor mode.
     static const char* trackNames[ 4 ] = { "-", "rough", "coast", "track" };
@@ -882,6 +886,19 @@ bool MagView::tryDraw( ) {
     return true;
 }
 
+void MagView::copyShownRow( int y, uint16_t* dst ) const {
+    if ( shown == nullptr || y < 0 || y >= LCD_HEIGHT ) {
+        for ( int x = 0; x < LCD_WIDTH; x++ )
+            dst[ x ] = 0;
+        return;
+    }
+    const uint16_t* src = shown->getBuffer( ) + (size_t)y * LCD_WIDTH;
+    for ( int x = 0; x < LCD_WIDTH; x++ ) {
+        uint16_t c = src[ x ];
+        dst[ x ] = shownPushed ? (uint16_t)( ( c << 8 ) | ( c >> 8 ) ) : c;
+    }
+}
+
 ServiceStatus MagView::service( ) {
     if ( canvas == nullptr ) {
         lastStatus = ServiceStatus::IDLE;
@@ -893,7 +910,7 @@ ServiceStatus MagView::service( ) {
         // frame into the other buffer if that is not done yet; otherwise there
         // is nothing to do until the wire is clear.
         if ( st7789PushBusy( ) ) {
-            if ( !drawn && tryDraw( ) ) {
+            if ( !hold && !drawn && tryDraw( ) ) {
                 drawn = true;
                 lastStatus = ServiceStatus::BUSY;
                 return lastStatus;
@@ -914,6 +931,7 @@ ServiceStatus MagView::service( ) {
         }
         // The whole frame is on the panel.
         pushRow = -1;
+        shownPushed = true;
         fpsWindowFrames++;
         uint32_t now = millis( );
         if ( now - fpsWindowStartMs >= 1000 ) {
@@ -923,6 +941,11 @@ ServiceStatus MagView::service( ) {
         }
     }
 
+    // Held for a dump: the shown frame stays as it is.
+    if ( hold ) {
+        lastStatus = ServiceStatus::IDLE;
+        return lastStatus;
+    }
     // Nothing in flight: a drawn frame (or one drawn now) starts its way to
     // the panel, and the buffers swap so the next one is drawn elsewhere.
     if ( !drawn && !tryDraw( ) ) {
@@ -934,6 +957,7 @@ ServiceStatus MagView::service( ) {
     canvas = t;
     drawn = false;
     pushRow = 0;
+    shownPushed = false;
     st7789PushRowsStart( shown->getBuffer( ), 0, MAGVIEW_BAND_ROWS < LCD_HEIGHT ? MAGVIEW_BAND_ROWS : LCD_HEIGHT );
     pushRow = MAGVIEW_BAND_ROWS < LCD_HEIGHT ? MAGVIEW_BAND_ROWS : LCD_HEIGHT;
     lastStatus = ServiceStatus::BUSY;

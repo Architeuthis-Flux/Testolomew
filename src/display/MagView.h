@@ -95,6 +95,17 @@ class MagView : public Service {
     uint32_t yields = 0;              // draws put off because the LED service was due first
     uint32_t lastDrawStartUs = 0;     // when a draw last ran (the starvation guard)
 
+    // For a screen dump (DumpService): `hold` stops new frames going to the
+    // panel (the push under way finishes; drawing goes on into the other
+    // buffer); frozen() says the shown frame is complete and will stay.
+    // copyShownRow() gives a row of it in native RGB565 - the push swaps
+    // the bytes of the shown buffer in place for the wire (ST7789.h), so
+    // the copy swaps them back iff that has happened (shownPushed).
+    bool hold = false;
+    bool shownPushed = false; // the shown buffer has been through a push (and is byte-swapped)
+    bool frozen( ) const { return hold && pushRow < 0; }
+    void copyShownRow( int y, uint16_t* dst ) const;
+
   private:
     MagView( ) = default;
 

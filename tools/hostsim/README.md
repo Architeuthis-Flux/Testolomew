@@ -1,34 +1,41 @@
-# Host simulation of the whole firmware
+# The firmware on the host
 
-The firmware's modules run on a PC against a stub of the Arduino API (`Arduino.h`, `Print.h`, `Wire.h`, `SPI.h` here), with the sensor readings made from a simulated magnet. Two programs:
+The firmware's modules run on a PC against stubs of what the chip provides (`Arduino.h`, `Print.h`, `Wire.h`, `SPI.h`, `EEPROM.h`, and the LCD, LED strip and other-core sampler in `*Stub.cpp`). `make` builds everything here; GFX comes from PlatformIO's libdeps, so run `pio run` once first.
 
-- `screens.cpp` moves a probe magnet over the bench array through `MagLocator` (fit + tracker), `RowCounter`, `ProbeLeds`, `Input`, `Ui` and `MagView`, types keys "on the console", and writes a PNG of every screen (`s1_… .png`); `docs/screens-simulated.png` is a montage of them. It also runs the settings module against the RAM `EEPROM.h` and prints two PASS/FAIL lines: the boot-time load must not switch row mode or the LED chain (the modes it does not save), and a changed value (`S23`) is written once after the settle time and not again for the same value.
-- `soak.cpp` is ten minutes of a random hand (random goals, 3 m/s² accelerations, a 0.3 mT glitch on one axis every 40 frames, a 140 ms dropout every 10 s) through the same chain, looking for NaNs, stuck states and tracking error.
+## The simulator: `make sim`, `./sim <script> [-q]`
 
-Build from this folder with the Adafruit GFX and BusIO libraries checked out somewhere (`screens.cpp` draws into the real `GFXcanvas16`; `soak.cpp` does not need them):
+`sim.cpp` boots the firmware through main.cpp's own `setup()` and then runs the real scheduler (`jOS.serviceAll()`) with the clock advancing 250 µs a pass, so every service ticks at its own period as on the board. A `WorldService` writes the dipole field of a simulated magnet into the array's frames (`MagArray::useSimulatedFrames()` tells the array the frames come from outside). The script is typed on the console exactly as on the board - letters, keys and the `:verbs` (`:help` lists them) - with a few directives for the world and for checks:
 
-```sh
-S=../../src; G=/path/to/Adafruit-GFX-Library; B=/path/to/Adafruit_BusIO
-g++ -std=c++11 -O1 -w -DARDUINO=10808 -I . -I $S -I $S/common -I $S/jos -I $S/console -I $S/magarray -I $S/magfit -I $S/rowcount -I $S/display -I $S/probeled -I $S/ui -I $S/play -I $S/settings -I $S/board -I $G -I $B \
-    screens.cpp LedStripStub.cpp MagSamplerStub.cpp $S/magarray/MagArray.cpp $S/magarray/TMAG5273.cpp $S/magfit/MagFit.cpp $S/magfit/MagTracker.cpp $S/magfit/MagLocator.cpp \
-    $S/rowcount/RowGrid.cpp $S/rowcount/RowCounter.cpp $S/display/MagView.cpp $S/display/FastDraw.cpp $S/probeled/ProbeLeds.cpp $S/probeled/ProbeLedService.cpp $S/play/Play.cpp $S/settings/Settings.cpp \
-    $S/ui/Ui.cpp $S/ui/Input.cpp $S/ui/UiStream.cpp $S/ui/Menu.cpp $S/ui/Camera.cpp $S/console/Console.cpp $S/jos/JumperlOS.cpp $G/Adafruit_GFX.cpp -o screens && ./screens
+| line | what it does |
+|---|---|
+| `:screen`, `:probe row 14 3`, `:screen:ascii` ... | any verb: typed with Enter; the run goes on until its frame closes (or 5 s) |
+| `e`, `\t`, `\e[A`, `` ` ``, `/`, `S23\r` | typed keys (escapes `\e \r \n \t`), then a moment for them to play |
+| `@run <ms>` | let the loop run |
+| `@magnet <x> <y> <z> <sx> <sy> <sz>` | the magnet's centre (mm) and axis |
+| `@magnet row <r> <h> [up mm] [lean deg]` | the probe's point in that hole, leaning toward +x |
+| `@magnet off` | no magnet |
+| `@move <dx> <dy> <dz> <ms>` | glide the magnet by that much over that long |
+| `@dropout <ms>` | no readings for that long |
+| `@strip on\|off` | pretend a real LED chain is wired (the display's LED-first rule) |
+| `@type "text" [n] [gap ms]` | type text n times with a gap (a run of joystick nudges) |
+| `@expect "text" [ms]` | the text must appear in what the firmware printed for the previous script line (waiting up to ms) |
+| `@seed <n>`, `@echo <text>`, `@quit` | |
 
-g++ -std=c++11 -O2 -w -I . -I $S -I $S/common -I $S/jos -I $S/console -I $S/magarray -I $S/magfit -I $S/rowcount -I $S/probeled -I $S/play -I $S/board \
-    soak.cpp LedStripStub.cpp MagSamplerStub.cpp $S/magarray/MagArray.cpp $S/magarray/TMAG5273.cpp $S/magfit/MagFit.cpp $S/magfit/MagTracker.cpp $S/magfit/MagLocator.cpp \
-    $S/rowcount/RowGrid.cpp $S/rowcount/RowCounter.cpp $S/probeled/ProbeLeds.cpp $S/probeled/ProbeLedService.cpp $S/play/Play.cpp $S/console/Console.cpp $S/jos/JumperlOS.cpp -o soak && ./soak
+Two verbs exist only in the simulator: `:screen:png <file>` writes what the panel shows as a PNG, and `:screen:verify` checks that the dump path the board uses (`:screen:dump` → `MagView::copyShownRow`, which un-swaps the bytes the LCD push swapped in place) gives exactly what the panel received. The exit code is 1 if any `@expect` failed; the boot line checks that loading the settings did not switch the modes and that the menu table has room.
 
-g++ -std=c++11 -O2 -w -I . -I $S -I $S/common -I $S/jos -I $S/console -I $S/magarray -I $S/magfit -I $S/rowcount -I $S/probeled -I $S/board \
-    pencil.cpp LedStripStub.cpp MagSamplerStub.cpp $S/magarray/MagArray.cpp $S/magarray/TMAG5273.cpp $S/magfit/MagFit.cpp $S/magfit/MagTracker.cpp $S/magfit/MagLocator.cpp \
-    $S/console/Console.cpp $S/jos/JumperlOS.cpp -o pencil && ./pencil [viewHz viewBeta cursorHz cursorBeta shaftHz shaftBeta accel]
-```
+- `make check` runs `scenes/check.txt`, the regression set: the verbs, a simulated probe seen by the tracker, the row counter and the LEDs, the dumps, the menu driven from the console, the settings written after they settle with every page's keys present.
+- `make screens` runs `scenes/screens.txt` (the probe on a row and lifted, the LED preview, paint and erase, coasting, a far probe, the menu pages, the log, the POV, top and orbited cameras) into `out/*.png` and tiles them into `docs/screens-simulated.png` with `montage.py`.
 
-`pencil.cpp` is the benchmark the smoothing levers were set by: a hand that writes (50-250 mm/s strokes with pauses, the pencil turning at up to 1 rad/s) through the real locator and tracker; it reports each output's error while moving and the delay of the truth it best matches (its lag), the frame-to-frame jitter at rest, and the shaft's angle error at rest and while turning. Run it with the six levers (and the tracker's process noise, and the smoothing's jitter allowance `MAGLOC_SPEED_JITTER_K` as an eighth number) to see what a change buys; a last argument `far` has the hand hovering 12-22 mm above the surface instead of writing on it, which is where the weak-field smoothing and its speed rule matter.
+## The benches
 
-`navtest.cpp` drives the nav stick's contacts through `Input` with staggered closings and openings (the ALPS RKJXM1015004's push is a contact of its own that also closes on every tilt) and checks that a press comes out as a press and a tilt as a direction, never the other:
+- `make soak`: ten minutes of a random hand (random goals, 3 m/s² accelerations, a 0.3 mT glitch every 40 frames, a 140 ms dropout every 10 s) through the locator, tracker, row counter and LEDs, looking for NaNs, stuck states and tracking error. Its numbers are quoted in `docs/wireless-probe-sensing.md`.
+- `make pencil`: the benchmark the smoothing levers were set by - a hand that writes (50-250 mm/s strokes with pauses, the pencil turning) through the real locator and tracker; reports each output's error and lag, the jitter at rest, the shaft's angle error. `./pencil [viewHz viewBeta cursorHz cursorBeta shaftHz shaftBeta accel [jitterK]] [far]`.
+- `make navtest`: the nav stick decoder with staggered contact closings and openings (the ALPS stick's push contact closes on every tilt too): a press must come out as a press and a tilt as a direction, never the other.
 
-```sh
-g++ -std=c++11 -O1 -w -I . -I $S -I $S/common -I $S/jos -I $S/console -I $S/ui -I $S/board navtest.cpp $S/ui/Input.cpp $S/console/Console.cpp $S/jos/JumperlOS.cpp -o navtest && ./navtest
-```
+## Tools
 
-`LedStripStub.cpp` stands in for the WS2812 driver (no SPI on a PC: the service reports no strip and renders for the preview), `MagSamplerStub.cpp` for the other core's sampler (the array reads its simulated bus itself), and `EEPROM.h` for the core's EEPROM library (a RAM mirror). The stub defines `private` as `public` for the includes so the programs can poke module internals; it is a test rig, not an example of how to use the modules. `ppm2png.py` turns the PPM frames into PNGs (3× upscaled). These were written in the scratch space on 2026-09-17/18 and copied here because they are the only test of the whole chain; the soak's numbers are quoted in `docs/wireless-probe-sensing.md`.
+- `../screendump.py <port> out.png [--b64] [--step N]` grabs the board's screen over the console (`:screen:dump`) into a PNG; `--ascii` grabs `:screen:ascii` as text; `--decode captured.txt out.png` decodes a dump captured some other way. `../rgb565png.py` is the decoder and PNG writer both it and `montage.py` use.
+- `montage.py out.png a.png b.png ...` tiles PNGs.
+- `ppm2png.py` is kept for the old PPM frames.
+
+The old `screens.cpp` (the first host render test, with its own frame loop and `#define private public`) is in `attic/hostsim-screens.cpp`.

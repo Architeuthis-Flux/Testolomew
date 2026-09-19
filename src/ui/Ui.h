@@ -70,6 +70,11 @@ class Ui : public Service {
     void addNewCommands( );
     int logScroll = 0;      // lines back from the newest that the log screen shows
     uint32_t menuEdits = 0; // bumps on every menu key (the display redraws the menu on it)
+    // The menu from the console (:ui): a key, as if pressed.
+    void menuKeyFromConsole( MenuKey key );
+    // What the screen shows, as text (:screen): the screen, the panes, the
+    // menu page with its items as drawn, the play and probe state.
+    void printScreen( Stream* out );
 
   private:
     Ui( ) = default;
