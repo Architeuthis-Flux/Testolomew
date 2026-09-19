@@ -29,6 +29,7 @@
 #include "MagLocator.h"
 #endif
 #if MODULE_MAG_VIEW
+#include "Display.h"
 #include "MagView.h"
 #endif
 #if MODULE_ROW_COUNT
@@ -145,11 +146,13 @@ void setup( ) {
 #endif
 
 #if MODULE_MAG_VIEW
-    if ( magView.begin( ) ) {
-        jOS.registerService( &magView );
+    if ( display.begin( ) ) {
+        jOS.registerService( &display );
     } else {
-        boot.println( "MagView: LCD or framebuffer setup failed - running without the display" );
+        boot.println( "Display: LCD or framebuffer setup failed - running without the display" );
     }
+    magView.begin( );
+    display.drawFn = magViewDraw;
 #endif
 
 #if MODULE_UI

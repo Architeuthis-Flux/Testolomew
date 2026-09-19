@@ -15,18 +15,10 @@
 // sway or spin (parallax is what makes a wireframe read as 3D on a flat
 // panel), look straight down, follow the probe, or ride on its point.
 //
-// Timing: two framebuffers. One is on its way to the panel in two DMA bands
-// that run on their own while the loop goes on reading sensors; the next
-// frame is drawn into the other meanwhile (a few milliseconds, in one tick).
-// A tick otherwise only starts a band or notices one has finished, so the
-// sensors keep their 100 Hz and the panel gets 40-50 frames a second.
-//
-// The breadboard LEDs come first: a draw holds the loop for as long as it
-// takes, and the LED service (50 Hz, its own DMA) must not be made late by
-// one, so a frame is not started when the LED service is due sooner than
-// this screen's last draw took (it is drawn on the next tick instead). Text
-// goes through FastDraw.h, not GFX's print, which is what made a draw take
-// tens of milliseconds. `e` reports each screen's draw time.
+// The framebuffers, the DMA push and when a frame is drawn are the Display
+// service's (Display.h); this draws into the canvas it is handed, as its
+// drawFn. Text goes through FastDraw.h, not GFX's print. `e` reports each
+// screen's draw time.
 //
 // With the row counter in row mode (console r) the grid becomes the breadboard's
 // rows, and the counted row is written large.
@@ -38,14 +30,11 @@
 #include <Arduino.h>
 
 #include "Camera.h"
-#include "JumperlOS.h"
 #include "Vec3.h"
 
-#define MAGVIEW_BAND_ROWS 120 // rows per DMA band (two per frame; the push runs while the sensors are read)
 #define MAGVIEW_TRAIL_POINTS 48
 #define MAGVIEW_TRAIL_PERIOD_MS 40 // a trail point this often, ~2 s of history
 #define MAGVIEW_LOG_REDRAW_MS 200  // the log screen (all text, 30 ms to draw) no more often than this
-#define MAGVIEW_STARVE_US 60000    // a screen not drawn this long is drawn whatever the LED timing says
 #define MAGVIEW_TEXT 2             // text size: 2 = 12 x 16 px characters, 20 to a line on a 240 px panel
 #define MAGVIEW_CHAR_W ( 6 * MAGVIEW_TEXT )
 #define MAGVIEW_LINE_H ( 8 * MAGVIEW_TEXT )
@@ -64,55 +53,30 @@ enum MagViewScreen {
 
 class GFXcanvas16;
 
-class MagView : public Service {
+class MagView {
   public:
     static MagView& getInstance( );
 
     MagView( const MagView& ) = delete;
     MagView& operator=( const MagView& ) = delete;
 
-    // false if the panel or the framebuffer could not be set up (the service
-    // then idles).
-    bool begin( );
-
-    ServiceStatus service( ) override;
-    const char* getName( ) const override { return "MagView"; }
-    ServicePriority getPriority( ) const override { return ServicePriority::NORMAL; }
-    uint32_t periodUs( ) const override { return 3000; }
+    // The console commands and the camera's home viewpoint (the display
+    // itself is the Display service's).
+    void begin( );
 
     void nextCamera( );
     void nextScreen( );
-    float fps( ) const { return framesPerSecond; }
     MagViewScreen screen = MAGVIEW_SCREEN_SCENE;
     Camera cam; // the 3D view's camera (src/ui/Camera.h); the UI's controls drive it
 
-    // How long a draw of each screen takes (microseconds): the last one, an
-    // average that follows, and the longest since boot. `e` prints them.
-    uint32_t drawLastUs[ MAGVIEW_SCREEN_COUNT ] = { 0 };
-    uint32_t drawAvgUs[ MAGVIEW_SCREEN_COUNT ] = { 0 };
-    uint32_t drawMaxUs[ MAGVIEW_SCREEN_COUNT ] = { 0 };
-    uint32_t clearUs[ 2 ] = { 0, 0 }; // a fillScreen of each canvas, timed at begin(): says which memory it landed in
-    uint32_t yields = 0;              // draws put off because the LED service was due first
-    uint32_t lastDrawStartUs = 0;     // when a draw last ran (the starvation guard)
-
-    // For a screen dump (DumpService): `hold` stops new frames going to the
-    // panel (the push under way finishes; drawing goes on into the other
-    // buffer); frozen() says the shown frame is complete and will stay.
-    // copyShownRow() gives a row of it in native RGB565 - the push swaps
-    // the bytes of the shown buffer in place for the wire (ST7789.h), so
-    // the copy swaps them back iff that has happened (shownPushed).
-    bool hold = false;
-    bool shownPushed = false; // the shown buffer has been through a push (and is byte-swapped)
-    bool frozen( ) const { return hold && pushRow < 0; }
-    void copyShownRow( int y, uint16_t* dst ) const;
+    // A frame into `canvas`. false = nothing new to show (the log screen
+    // unchanged). Installed as the Display's drawFn (magViewDraw).
+    bool drawFrame( GFXcanvas16* canvas, uint32_t nowMs );
 
   private:
     MagView( ) = default;
 
-    GFXcanvas16* canvas = nullptr; // the frame being drawn
-    GFXcanvas16* shown = nullptr;  // the frame on its way to the panel
-    int pushRow = -1;              // next row of `shown` to send, -1 = nothing in flight
-    bool drawn = false;            // `canvas` holds a frame not yet sent
+    GFXcanvas16* canvas = nullptr; // the frame being drawn (the Display's, per call)
 
     // The projection's copy of the camera, taken each frame.
     Vec3 target = { 0, 0, 0 }; // what the camera looks at
@@ -129,17 +93,9 @@ class MagView : public Service {
     int trailHead = 0;
     uint32_t lastTrailMs = 0;
 
-    uint32_t fpsWindowStartMs = 0;
-
-    int fpsWindowFrames = 0;
-    float framesPerSecond = 0.0f;
-
-    void benchmark( );
     void aimCamera( uint32_t nowMs );
     bool project( Vec3 world, int* sx, int* sy ) const; // false = behind the camera
     void line3d( Vec3 a, Vec3 b, uint16_t color );
-    bool tryDraw( );                  // a timed drawFrame, unless the LEDs are due first
-    bool drawFrame( uint32_t nowMs ); // false = nothing new to show
     void drawBoard( );
     void drawRows( );
     void drawSensors( );
@@ -151,6 +107,9 @@ class MagView : public Service {
     void drawTraceScreen( );
     void drawColourWheel( ); // on the draw screen, in paint mode
 };
+
+// The Display's drawFn: the current screen (and its slot).
+bool magViewDraw( GFXcanvas16* canvas, uint32_t nowMs );
 
 extern MagView& magView;
 

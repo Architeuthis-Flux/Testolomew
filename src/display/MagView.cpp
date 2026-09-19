@@ -3,14 +3,10 @@
 
 #include <Adafruit_GFX.h>
 #include <math.h>
-#if __has_include( <ch32h4_itcm.h> )
-#include <ch32h4_itcm.h> // __itcm_func: a function copied to the zero-wait ITCM
-#else
-#define __itcm_func
-#endif
 
 #include "BoardPins.h"
 #include "Console.h"
+#include "Display.h"
 #include "FastDraw.h"
 #include "MagArray.h"
 #include "MagLocator.h"
@@ -76,45 +72,21 @@ static void onScreen( Stream* out ) {
     magView.nextScreen( );
     static const char* names[ MAGVIEW_SCREEN_COUNT ] = { "3D scene", "the breadboard's LEDs", "the log", "the draw screen" };
     char line[ 160 ];
-    snprintf( line, sizeof( line ), "screen: %s  (%.0f frames/s on the last one)", names[ magView.screen ], magView.fps( ) );
+    snprintf( line, sizeof( line ), "screen: %s  (%.0f frames/s on the last one)", names[ magView.screen ], display.fps( ) );
     out->println( line );
     // The cost of each screen, so a slow one is seen for what it is: the
     // loop stops for a draw, and the LEDs after it wait.
-    snprintf( line, sizeof( line ), "draw ms scene %.1f/%.1f  LEDs %.1f/%.1f  log %.1f/%.1f  draw %.1f/%.1f (avg/max)  clear %lu+%lu us  %lu yields to the LEDs",
-              magView.drawAvgUs[ 0 ] * 1e-3f, magView.drawMaxUs[ 0 ] * 1e-3f, magView.drawAvgUs[ 1 ] * 1e-3f, magView.drawMaxUs[ 1 ] * 1e-3f,
-              magView.drawAvgUs[ 2 ] * 1e-3f, magView.drawMaxUs[ 2 ] * 1e-3f, magView.drawAvgUs[ 3 ] * 1e-3f, magView.drawMaxUs[ 3 ] * 1e-3f,
-              (unsigned long)magView.clearUs[ 0 ], (unsigned long)magView.clearUs[ 1 ], (unsigned long)magView.yields );
-    out->println( line );
+    static const char* const slots[ MAGVIEW_SCREEN_COUNT ] = { "scene", "LEDs", "log", "draw" };
+    display.printStats( out, slots, MAGVIEW_SCREEN_COUNT );
 }
 
 void MagView::nextScreen( ) {
     screen = (MagViewScreen)( ( screen + 1 ) % MAGVIEW_SCREEN_COUNT );
 }
 
-bool MagView::begin( ) {
+void MagView::begin( ) {
     consoleAddCommand( 'v', "next camera mode (fixed / sway / spin / top / follow / POV)", onCamera );
-    consoleAddCommand( 'e', "next screen: 3D scene / breadboard LEDs / log", onScreen );
-
-    if ( !st7789Begin( ) ) {
-        return false;
-    }
-    canvas = new GFXcanvas16( LCD_WIDTH, LCD_HEIGHT );
-    shown = new GFXcanvas16( LCD_WIDTH, LCD_HEIGHT );
-    if ( canvas == nullptr || canvas->getBuffer( ) == nullptr || shown == nullptr || shown->getBuffer( ) == nullptr ) {
-        canvas = nullptr;
-        return false;
-    }
-    canvas->setTextWrap( false );
-    shown->setTextWrap( false );
-    // Which memory the two landed in shows in how long a clear takes (the
-    // heap is DTCM first, then the shared SRAM with its wait states).
-    uint32_t t0 = micros( );
-    canvas->fillScreen( COLOR_BACKGROUND );
-    clearUs[ 0 ] = micros( ) - t0;
-    t0 = micros( );
-    shown->fillScreen( COLOR_BACKGROUND );
-    clearUs[ 1 ] = micros( ) - t0;
-    benchmark( );
+    consoleAddCommand( 'e', "next screen: 3D scene / breadboard LEDs / log / draw", onScreen );
 
     // Look at the middle of the array, a little above the board, zoomed so the
     // board outline fills most of the panel's width.
@@ -134,90 +106,11 @@ bool MagView::begin( ) {
     float span = ( xMax - xMin ) > ( yMax - yMin ) ? ( xMax - xMin ) : ( yMax - yMin );
     span += 2.0f * BOARD_MARGIN_MM + 40.0f;
     cameraInit( &cam, middle, MAGVIEW_YAW_DEG, MAGVIEW_ELEVATION_DEG, 4.0f * span, LCD_WIDTH / span );
-    return true;
 }
 
-// What the drawing primitives cost on this chip, printed once at boot: the
-// scene is a few thousand line pixels and a few hundred characters, and
-// which of those is the time decides what is worth rewriting.
-// Two copies of what GFXcanvas16::drawPixel does, one in flash next to this
-// code and one in ITCM, to tell an address effect from a library one.
-static void __attribute__( ( noinline ) ) pixelFlash( uint16_t* buffer, int16_t x, int16_t y, uint16_t color ) {
-    if ( ( x < 0 ) || ( y < 0 ) || ( x >= LCD_WIDTH ) || ( y >= LCD_HEIGHT ) )
-        return;
-    buffer[ x + y * LCD_WIDTH ] = color;
-}
-static __itcm_func void pixelItcm( uint16_t* buffer, int16_t x, int16_t y, uint16_t color ) {
-    if ( ( x < 0 ) || ( y < 0 ) || ( x >= LCD_WIDTH ) || ( y >= LCD_HEIGHT ) )
-        return;
-    buffer[ x + y * LCD_WIDTH ] = color;
-}
-
-void MagView::benchmark( ) {
-    Stream* out = console.port( );
-    if ( out == nullptr ) {
-        return;
-    }
-    uint16_t* buffer = canvas->getBuffer( );
-    uint32_t t0 = micros( );
-    for ( int i = 0; i < 10000; i++ ) {
-        canvas->drawPixel( i % 240, ( i / 240 ) % 240, 0x1234 );
-    }
-    uint32_t pixelUs = micros( ) - t0;
-    t0 = micros( );
-    for ( int i = 0; i < 10000; i++ ) {
-        pixelFlash( buffer, i % 240, ( i / 240 ) % 240, 0x1234 );
-    }
-    uint32_t flashUs = micros( ) - t0;
-    t0 = micros( );
-    for ( int i = 0; i < 10000; i++ ) {
-        pixelItcm( buffer, i % 240, ( i / 240 ) % 240, 0x1234 );
-    }
-    uint32_t itcmUs = micros( ) - t0;
-    t0 = micros( );
-    for ( int i = 0; i < 100; i++ ) {
-        memset( buffer + i * 240, i, 480 ); // libc, 240 pixels
-    }
-    uint32_t memsetUs = micros( ) - t0;
-    t0 = micros( );
-    for ( int i = 0; i < 10000; i++ ) {
-        buffer[ ( i % 240 ) + ( ( i / 240 ) % 240 ) * 240 ] = 0x1234;
-    }
-    uint32_t directUs = micros( ) - t0;
-    t0 = micros( );
-    for ( int i = 0; i < 100; i++ ) {
-        canvas->drawLine( 10, 10 + i, 110, 60 + i, 0x1234 ); // 100 pixels each
-    }
-    uint32_t lineUs = micros( ) - t0;
-    t0 = micros( );
-    for ( int i = 0; i < 100; i++ ) {
-        fastLine( canvas, 10, 10 + i, 110, 60 + i, 0x1234 );
-    }
-    uint32_t fastLineUs = micros( ) - t0;
-    t0 = micros( );
-    for ( int i = 0; i < 400; i++ ) {
-        canvas->fillRect( ( i % 30 ) * 7, ( i / 30 ) * 7, 6, 6, 0x1234 );
-    }
-    uint32_t rectUs = micros( ) - t0;
-    t0 = micros( );
-    for ( int i = 0; i < 10; i++ ) {
-        fastText( canvas, 0, i * 16, 2, 0x1234, "x12.3 y45.6 z78.9 mm" ); // 20 characters
-    }
-    uint32_t textUs = micros( ) - t0;
-    volatile float acc = 0.0f;
-    t0 = micros( );
-    for ( int i = 0; i < 1000; i++ ) {
-        acc += sinf( i * 0.001f );
-    }
-    uint32_t sinUs = micros( ) - t0;
-    canvas->fillScreen( COLOR_BACKGROUND );
-    char line[ 260 ];
-    snprintf( line, sizeof( line ),
-              "MagView: GFX drawPixel %lu ns, the same in flash here %lu ns, in ITCM %lu ns, a buffer write %lu ns, memset of 480 B %lu ns, a 100 px line %lu us (GFX) / %lu us (FastDraw), a 6x6 fillRect %.1f us, a 20-char line of size-2 text %lu us, sinf %lu ns",
-              (unsigned long)( pixelUs * 1000 / 10000 ), (unsigned long)( flashUs * 1000 / 10000 ), (unsigned long)( itcmUs * 1000 / 10000 ), (unsigned long)( directUs * 1000 / 10000 ),
-              (unsigned long)( memsetUs * 1000 / 100 ), (unsigned long)( lineUs / 100 ), (unsigned long)( fastLineUs / 100 ), rectUs / 400.0f, (unsigned long)( textUs / 10 ),
-              (unsigned long)( sinUs * 1000 / 1000 ) );
-    out->println( line );
+bool magViewDraw( GFXcanvas16* canvas, uint32_t nowMs ) {
+    display.slot = magView.screen;
+    return magView.drawFrame( canvas, nowMs );
 }
 
 // ---- camera ----------------------------------------------------------------
@@ -605,14 +498,15 @@ void MagView::drawText( ) {
     // Two lines at the bottom: the array and frame rate; the camera, the
     // track's state and the cursor mode.
     static const char* trackNames[ 4 ] = { "-", "rough", "coast", "track" };
-    snprintf( line, sizeof( line ), "%d/%d sens %2.0ffps s%.1f", magArray.sensorsOk( ), magArray.sensorCount( ), framesPerSecond, magLocator.boardZ ); // s = the surface's height
+    snprintf( line, sizeof( line ), "%d/%d sens %2.0ffps s%.1f", magArray.sensorsOk( ), magArray.sensorCount( ), display.fps( ), magLocator.boardZ ); // s = the surface's height
     textAt( canvas, 2, LCD_HEIGHT - 2 * H - 2, T, COLOR_TEXT_DIM, line );
     snprintf( line, sizeof( line ), "%s %s %s", cameraModeNames[ cam.mode ], magLocator.track.enabled ? trackNames[ magLocator.track.state ] : "raw",
               magLocator.track.cursorMode == MAGCURSOR_UNDER ? "under" : "aim" );
     textAt( canvas, 2, LCD_HEIGHT - H - 2, T, COLOR_TEXT_DIM, line );
 }
 
-bool MagView::drawFrame( uint32_t nowMs ) {
+bool MagView::drawFrame( GFXcanvas16* into, uint32_t nowMs ) {
+    canvas = into;
     const MagProbeFix& fix = magLocator.fix;
 #if MODULE_UI
     // The log screen is all text, which GFX draws slowly (a full screen of
@@ -838,128 +732,11 @@ void MagView::drawLedScreen( ) {
         snprintf( line, sizeof( line ), "+-%.2f %.0f%% up %.0fmm%s", in.sigmaRows, in.confidence * 100.0f, in.heightMm, in.haveUnder ? " *" : "" );
         textAt( canvas, 2, 2 + MAGVIEW_LINE_H, MAGVIEW_TEXT, COLOR_TEXT_DIM, line );
     }
-    snprintf( line, sizeof( line ), "%s %d LEDs %2.0f fps", probeLeds.v5 ? "V5" : "V6", layout.count, framesPerSecond );
+    snprintf( line, sizeof( line ), "%s %d LEDs %2.0f fps", probeLeds.v5 ? "V5" : "V6", layout.count, display.fps( ) );
     textAt( canvas, 2, LCD_HEIGHT - MAGVIEW_LINE_H - 2, MAGVIEW_TEXT, COLOR_TEXT_DIM, line );
 #else
     canvas->setCursor( 4, 4 );
     canvas->setTextColor( COLOR_TEXT_DIM );
     canvas->print( "MODULE_PROBE_LEDS is off" );
 #endif
-}
-
-// A draw, unless the LED service is due before it would be over: the LEDs
-// come first, and the loop cannot take a draw back once it has started. A
-// screen that takes longer than the LED period is drawn anyway (it would
-// never be shown otherwise); none does since text stopped going through
-// GFX. The draw is timed, per screen, for `e`.
-bool MagView::tryDraw( ) {
-    uint32_t t0 = micros( );
-#if MODULE_PROBE_LEDS
-    if ( probeLeds.strip ) {
-        // The expectation is the running average, not the last draw: one
-        // draw stalled by a settings write (a 20 ms flash page) read 18 ms,
-        // and 18 ms never fits between LED frames 20 ms apart with a 4 ms
-        // frame in them - and only a draw can bring the number down, so the
-        // screen froze (2026-09-19, twice). And whatever the numbers say, a
-        // screen not drawn for MAGVIEW_STARVE_US is drawn now: one late LED
-        // frame is nothing next to a display that has stopped.
-        uint32_t expect = drawAvgUs[ screen ];
-        if ( expect > 0 && expect < PROBELED_PERIOD_US && (uint32_t)( t0 - lastDrawStartUs ) < MAGVIEW_STARVE_US ) {
-            int64_t untilDue = (int64_t)( probeLeds.nextDueUs - micros64( ) );
-            if ( untilDue < (int64_t)expect ) {
-                yields++;
-                return false;
-            }
-        }
-    }
-#endif
-    lastDrawStartUs = t0;
-    if ( !drawFrame( millis( ) ) ) {
-        return false;
-    }
-    uint32_t took = micros( ) - t0;
-    drawLastUs[ screen ] = took;
-    drawAvgUs[ screen ] = drawAvgUs[ screen ] == 0 ? took : ( drawAvgUs[ screen ] * 15 + took ) / 16;
-    if ( took > drawMaxUs[ screen ] ) {
-        drawMaxUs[ screen ] = took;
-    }
-    return true;
-}
-
-void MagView::copyShownRow( int y, uint16_t* dst ) const {
-    if ( shown == nullptr || y < 0 || y >= LCD_HEIGHT ) {
-        for ( int x = 0; x < LCD_WIDTH; x++ )
-            dst[ x ] = 0;
-        return;
-    }
-    const uint16_t* src = shown->getBuffer( ) + (size_t)y * LCD_WIDTH;
-    for ( int x = 0; x < LCD_WIDTH; x++ ) {
-        uint16_t c = src[ x ];
-        dst[ x ] = shownPushed ? (uint16_t)( ( c << 8 ) | ( c >> 8 ) ) : c;
-    }
-}
-
-ServiceStatus MagView::service( ) {
-    if ( canvas == nullptr ) {
-        lastStatus = ServiceStatus::IDLE;
-        return lastStatus;
-    }
-
-    if ( pushRow >= 0 ) {
-        // A frame is on its way. While a band is on the wire, draw the next
-        // frame into the other buffer if that is not done yet; otherwise there
-        // is nothing to do until the wire is clear.
-        if ( st7789PushBusy( ) ) {
-            if ( !hold && !drawn && tryDraw( ) ) {
-                drawn = true;
-                lastStatus = ServiceStatus::BUSY;
-                return lastStatus;
-            }
-            lastStatus = ServiceStatus::IDLE;
-            return lastStatus;
-        }
-        st7789PushFinish( );
-        if ( pushRow < LCD_HEIGHT ) {
-            int rows = LCD_HEIGHT - pushRow;
-            if ( rows > MAGVIEW_BAND_ROWS ) {
-                rows = MAGVIEW_BAND_ROWS;
-            }
-            st7789PushRowsStart( shown->getBuffer( ), pushRow, rows );
-            pushRow += rows;
-            lastStatus = ServiceStatus::BUSY;
-            return lastStatus;
-        }
-        // The whole frame is on the panel.
-        pushRow = -1;
-        shownPushed = true;
-        fpsWindowFrames++;
-        uint32_t now = millis( );
-        if ( now - fpsWindowStartMs >= 1000 ) {
-            framesPerSecond = fpsWindowFrames * 1000.0f / ( now - fpsWindowStartMs );
-            fpsWindowStartMs = now;
-            fpsWindowFrames = 0;
-        }
-    }
-
-    // Held for a dump: the shown frame stays as it is.
-    if ( hold ) {
-        lastStatus = ServiceStatus::IDLE;
-        return lastStatus;
-    }
-    // Nothing in flight: a drawn frame (or one drawn now) starts its way to
-    // the panel, and the buffers swap so the next one is drawn elsewhere.
-    if ( !drawn && !tryDraw( ) ) {
-        lastStatus = ServiceStatus::IDLE; // nothing new to show, or not now
-        return lastStatus;
-    }
-    GFXcanvas16* t = shown;
-    shown = canvas;
-    canvas = t;
-    drawn = false;
-    pushRow = 0;
-    shownPushed = false;
-    st7789PushRowsStart( shown->getBuffer( ), 0, MAGVIEW_BAND_ROWS < LCD_HEIGHT ? MAGVIEW_BAND_ROWS : LCD_HEIGHT );
-    pushRow = MAGVIEW_BAND_ROWS < LCD_HEIGHT ? MAGVIEW_BAND_ROWS : LCD_HEIGHT;
-    lastStatus = ServiceStatus::BUSY;
-    return lastStatus;
 }

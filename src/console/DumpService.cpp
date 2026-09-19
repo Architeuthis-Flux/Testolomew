@@ -8,6 +8,7 @@
 #include "Console.h"
 #include "config.h"
 #if MODULE_MAG_VIEW
+#include "Display.h"
 #include "MagView.h"
 #include "ST7789.h"
 #endif
@@ -92,7 +93,7 @@ int DumpService::asciiLine( int y ) {
 #if MODULE_MAG_VIEW
     const int cw = LCD_WIDTH / DUMP_ASCII_W, ch = LCD_HEIGHT / DUMP_ASCII_H; // 3 x 4
     for ( int k = 0; k < ch; k++ ) {
-        magView.copyShownRow( y * ch + k, rowBuffer[ k ] );
+        display.copyShownRow( y * ch + k, rowBuffer[ k ] );
     }
     int n = 0;
     for ( int x = 0; x < DUMP_ASCII_W; x++ ) {
@@ -132,7 +133,7 @@ int DumpService::asciiLine( int y ) {
 
 int DumpService::rleLine( int y ) {
 #if MODULE_MAG_VIEW
-    magView.copyShownRow( y, rowBuffer[ 0 ] );
+    display.copyShownRow( y, rowBuffer[ 0 ] );
     int n = snprintf( line, sizeof( line ), "%d:", y );
     static const char* const hex = "0123456789abcdef";
     int x = 0;
@@ -174,7 +175,7 @@ static const char* const b64chars = "ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopq
 
 int DumpService::b64Line( int y ) {
 #if MODULE_MAG_VIEW
-    magView.copyShownRow( y, rowBuffer[ 0 ] );
+    display.copyShownRow( y, rowBuffer[ 0 ] );
     int n = snprintf( line, sizeof( line ), "%d:", y );
     // Little-endian bytes of every step-th pixel, three bytes to four characters.
     uint8_t bytes[ LCD_WIDTH * 2 ];
@@ -350,7 +351,7 @@ bool DumpService::start( DumpKind what, int stepArg, bool colourArg, Stream* io 
     }
 #if MODULE_MAG_VIEW
     if ( kind == DUMP_ASCII || kind == DUMP_RLE || kind == DUMP_B64 ) {
-        magView.hold = true;
+        display.hold = true;
     }
 #endif
     return true;
@@ -361,7 +362,7 @@ void DumpService::finish( ) {
         return;
     }
 #if MODULE_MAG_VIEW
-    magView.hold = false;
+    display.hold = false;
 #endif
     out->println( "}" );
     logRestore( wasLogging );
@@ -396,7 +397,7 @@ ServiceStatus DumpService::service( ) {
         return lastStatus;
     }
 #if MODULE_MAG_VIEW
-    if ( ( kind == DUMP_ASCII || kind == DUMP_RLE || kind == DUMP_B64 ) && !magView.frozen( ) && millis( ) - startedMs < DUMP_FREEZE_WAIT_MS ) {
+    if ( ( kind == DUMP_ASCII || kind == DUMP_RLE || kind == DUMP_B64 ) && !display.frozen( ) && millis( ) - startedMs < DUMP_FREEZE_WAIT_MS ) {
         lastStatus = ServiceStatus::IDLE; // the frame on its way to the panel finishes first
         return lastStatus;
     }
@@ -492,10 +493,8 @@ static void onStats( int argc, char** argv, Stream* out ) {
     jOS.printStats( out );
     char line[ 200 ];
 #if MODULE_MAG_VIEW
-    snprintf( line, sizeof( line ), "display: %.0f fps, draw us avg/max scene %lu/%lu leds %lu/%lu log %lu/%lu draw %lu/%lu, %lu yields, hold %d", magView.fps( ), (unsigned long)magView.drawAvgUs[ 0 ],
-              (unsigned long)magView.drawMaxUs[ 0 ], (unsigned long)magView.drawAvgUs[ 1 ], (unsigned long)magView.drawMaxUs[ 1 ], (unsigned long)magView.drawAvgUs[ 2 ], (unsigned long)magView.drawMaxUs[ 2 ],
-              (unsigned long)magView.drawAvgUs[ 3 ], (unsigned long)magView.drawMaxUs[ 3 ], (unsigned long)magView.yields, magView.hold ? 1 : 0 );
-    out->println( line );
+    static const char* const slots[ MAGVIEW_SCREEN_COUNT ] = { "scene", "LEDs", "log", "draw" };
+    display.printStats( out, slots, MAGVIEW_SCREEN_COUNT );
 #endif
 #if MODULE_PROBE_LEDS
     if ( probeLeds.strip ) {

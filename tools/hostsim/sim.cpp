@@ -40,6 +40,7 @@
 #include <vector>
 
 #include "Console.h"
+#include "Display.h"
 #include "DumpService.h"
 #include "EEPROM.h"
 #include "Input.h"
@@ -258,14 +259,14 @@ static void run( uint32_t ms ) {
 // The dump path against the panel: hold the display, wait for it to hold
 // still, compare every row.
 static void doVerify( ) {
-    magView.hold = true;
+    display.hold = true;
     uint64_t until = simMicros + 400000u;
-    while ( !magView.frozen( ) && simMicros < until )
+    while ( !display.frozen( ) && simMicros < until )
         pass( );
     int bad = 0, firstRow = -1;
     uint16_t row[ LCD_WIDTH ];
     for ( int y = 0; y < LCD_HEIGHT; y++ ) {
-        magView.copyShownRow( y, row );
+        display.copyShownRow( y, row );
         for ( int x = 0; x < LCD_WIDTH; x++ ) {
             if ( row[ x ] != simPanel[ y * LCD_WIDTH + x ] ) {
                 if ( firstRow < 0 )
@@ -274,13 +275,13 @@ static void doVerify( ) {
             }
         }
     }
-    magView.hold = false;
+    display.hold = false;
     char line[ 120 ];
     if ( bad == 0 ) {
-        snprintf( line, sizeof( line ), "verify: the dump path matches the panel, %d rows, pushed %d", LCD_HEIGHT, magView.shownPushed ? 1 : 0 );
+        snprintf( line, sizeof( line ), "verify: the dump path matches the panel, %d rows, pushed %d", LCD_HEIGHT, display.shownPushed ? 1 : 0 );
         consoleOk( &uiStream, line );
     } else {
-        snprintf( line, sizeof( line ), "verify: %d pixels differ from row %d (pushed %d, frozen %d)", bad, firstRow, magView.shownPushed ? 1 : 0, magView.frozen( ) ? 1 : 0 );
+        snprintf( line, sizeof( line ), "verify: %d pixels differ from row %d (pushed %d, frozen %d)", bad, firstRow, display.shownPushed ? 1 : 0, display.frozen( ) ? 1 : 0 );
         consoleErr( &uiStream, line );
     }
 }
