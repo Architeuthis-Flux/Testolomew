@@ -11,6 +11,7 @@
 
 #include "Camera.h"
 #include "Menu.h"
+#include "UiShell.h"
 
 static Menu menu;
 static bool flag;
@@ -195,6 +196,247 @@ void test_menu_returns_actions_with_their_argument( void ) {
     TEST_ASSERT_EQUAL( 2, ran ); // the two the test ran itself: the menu runs nothing
 }
 
+
+// ---- the shell ------------------------------------------------------------------
+
+// Two fake apps that count what reaches them.
+struct FakeApp {
+    int enters, exits, events, ticks;
+    float lastJoyX, lastJoyY;
+    InputEvent last;
+};
+static FakeApp fakes[ 2 ];
+static void enter0( ) { fakes[ 0 ].enters++; }
+static void exit0( ) { fakes[ 0 ].exits++; }
+static void tick0( float, float x, float y ) { fakes[ 0 ].ticks++; fakes[ 0 ].lastJoyX = x; fakes[ 0 ].lastJoyY = y; }
+static bool event0( const InputEvent* e ) { fakes[ 0 ].events++; fakes[ 0 ].last = *e; return true; }
+static void enter1( ) { fakes[ 1 ].enters++; }
+static void exit1( ) { fakes[ 1 ].exits++; }
+static void tick1( float, float x, float y ) { fakes[ 1 ].ticks++; fakes[ 1 ].lastJoyX = x; fakes[ 1 ].lastJoyY = y; }
+static bool event1( const InputEvent* e ) { fakes[ 1 ].events++; fakes[ 1 ].last = *e; return true; }
+static const UiApp fakeApps[ 2 ] = {
+    { "View", nullptr, enter0, exit0, tick0, nullptr, event0, nullptr },
+    { "LEDs", nullptr, enter1, exit1, tick1, nullptr, event1, nullptr },
+};
+static UiShell shell;
+static uint32_t t;
+static bool heldNow[ IN_CONTROL_COUNT ];
+
+static void shellSetUp( ) {
+    for ( int k = 0; k < 2; k++ ) {
+        FakeApp z = { };
+        fakes[ k ] = z;
+    }
+    for ( int c = 0; c < IN_CONTROL_COUNT; c++ )
+        heldNow[ c ] = false;
+    t = 1000;
+    uiShellInit( &shell, fakeApps, 2, 0, 1 ); // Home: View, Settings, LEDs
+    // A settings menu with a page, a toggle and a destructive action.
+    ran = 0;
+    int page = menuAddSubmenu( &shell.menu, MENU_ROOT, "tracker" );
+    menuAddToggle( &shell.menu, page, "tracker on", &flag );
+    menuAddNumber( &shell.menu, page, "floor", &number, 0.0f, 100.0f, 0.5f, "mm" );
+    menuAddAction( &shell.menu, MENU_ROOT, "reset settings", 'Z', run, true );
+    menuAddAction( &shell.menu, MENU_ROOT, "latest fix", 'l', run, false );
+}
+
+static int send( InputControl c, InputEventKind k ) {
+    t += 10;
+    if ( k == IN_PRESS )
+        heldNow[ c ] = true;
+    if ( k == IN_RELEASE )
+        heldNow[ c ] = false;
+    return uiShellEvent( &shell, { c, k }, t );
+}
+
+// A tap: press, click, release.
+static int tap( InputControl c ) {
+    send( c, IN_PRESS );
+    int r = send( c, IN_CLICK );
+    int r2 = send( c, IN_RELEASE );
+    return r >= 0 ? r : r2;
+}
+
+// A hold: press, hold, release.
+static int hold( InputControl c ) {
+    send( c, IN_PRESS );
+    int r = send( c, IN_HOLD );
+    send( c, IN_RELEASE );
+    return r;
+}
+
+static void tick( float x, float y ) {
+    t += 10;
+    uiShellTick( &shell, t, 0.01f, x, y, heldNow );
+}
+
+void test_shell_home_selects_apps_and_remembers( void ) {
+    shellSetUp( );
+    TEST_ASSERT_EQUAL( 1, fakes[ 0 ].enters );
+    TEST_ASSERT_EQUAL( PANE_APP, uiShellTop( &shell ) );
+    tap( IN_BTN_A ); // Home, cursor on the current app
+    TEST_ASSERT_EQUAL( PANE_HOME, uiShellTop( &shell ) );
+    TEST_ASSERT_EQUAL( 0, shell.home.cursor );
+    send( IN_NAV_LEFT, IN_PRESS ); // wraps to the last cell
+    send( IN_NAV_LEFT, IN_RELEASE );
+    TEST_ASSERT_EQUAL( 2, shell.home.cursor );
+    send( IN_NAV_UP, IN_PRESS ); // clamps: one row only
+    send( IN_NAV_UP, IN_RELEASE );
+    TEST_ASSERT_EQUAL( 2, shell.home.cursor );
+    tap( IN_NAV_PRESS ); // the LEDs app
+    TEST_ASSERT_EQUAL( PANE_APP, uiShellTop( &shell ) );
+    TEST_ASSERT_EQUAL( 1, shell.app );
+    TEST_ASSERT_EQUAL( 1, fakes[ 0 ].exits );
+    TEST_ASSERT_EQUAL( 1, fakes[ 1 ].enters );
+    TEST_ASSERT_EQUAL( 0, shell.previousApp );
+    tap( IN_BTN_B ); // B: the previous app
+    TEST_ASSERT_EQUAL( 0, shell.app );
+    TEST_ASSERT_EQUAL( 1, shell.previousApp );
+    tap( IN_BTN_A ); // Home again: cursor on View; B closes it
+    TEST_ASSERT_EQUAL( 0, shell.home.cursor );
+    send( IN_NAV_RIGHT, IN_PRESS );
+    send( IN_NAV_RIGHT, IN_RELEASE );
+    tap( IN_BTN_B );
+    TEST_ASSERT_EQUAL( PANE_APP, uiShellTop( &shell ) );
+    tap( IN_BTN_A ); // reopened: the cursor is back on the current app, not where it was left
+    TEST_ASSERT_EQUAL( 0, shell.home.cursor );
+    send( IN_NAV_RIGHT, IN_PRESS );
+    send( IN_NAV_RIGHT, IN_RELEASE );
+    tap( IN_NAV_PRESS ); // the Settings cell: the menu in Home's place
+    TEST_ASSERT_EQUAL( PANE_MENU, uiShellTop( &shell ) );
+    TEST_ASSERT_EQUAL( 1, shell.depth );
+}
+
+void test_shell_a_and_b_never_reach_an_app( void ) {
+    shellSetUp( );
+    hold( IN_BTN_A ); // A hold: Settings directly
+    TEST_ASSERT_EQUAL( PANE_MENU, uiShellTop( &shell ) );
+    tap( IN_BTN_B ); // at the root: closes
+    TEST_ASSERT_EQUAL( PANE_APP, uiShellTop( &shell ) );
+    hold( IN_BTN_B ); // B hold in an app: Home
+    TEST_ASSERT_EQUAL( PANE_HOME, uiShellTop( &shell ) );
+    tap( IN_BTN_B );
+    TEST_ASSERT_EQUAL( 0, fakes[ 0 ].events );
+    // The app's own controls do reach it: presses, repeats, holds, the joystick's press.
+    send( IN_NAV_LEFT, IN_PRESS );
+    send( IN_NAV_LEFT, IN_REPEAT );
+    send( IN_NAV_LEFT, IN_RELEASE );
+    hold( IN_NAV_PRESS );
+    tap( IN_JOY_PRESS );
+    TEST_ASSERT_EQUAL( 9, fakes[ 0 ].events );
+}
+
+// The headline bug: a held nav-left that backs out of the menu must not go
+// on into the app; its release clears it; the next press is the app's.
+void test_shell_swallows_a_held_control_across_a_focus_change( void ) {
+    shellSetUp( );
+    hold( IN_BTN_A ); // Settings
+    tap( IN_NAV_PRESS ); // into the tracker page
+    TEST_ASSERT_EQUAL_STRING( "tracker", menuTitle( &shell.menu ) );
+    send( IN_NAV_LEFT, IN_PRESS ); // left on the page's first item: a toggle flips
+    TEST_ASSERT_TRUE( flag );
+    send( IN_NAV_LEFT, IN_REPEAT );
+    TEST_ASSERT_FALSE( flag );
+    tap( IN_BTN_B ); // back to the root...
+    tap( IN_BTN_B ); // ...and closed, with nav-left still down
+    TEST_ASSERT_EQUAL( PANE_APP, uiShellTop( &shell ) );
+    TEST_ASSERT_TRUE( shell.swallow[ IN_NAV_LEFT ] );
+    send( IN_NAV_LEFT, IN_REPEAT );
+    send( IN_NAV_LEFT, IN_REPEAT );
+    TEST_ASSERT_EQUAL( 0, fakes[ 0 ].events ); // never reached the app
+    send( IN_NAV_LEFT, IN_RELEASE );
+    TEST_ASSERT_EQUAL( 0, fakes[ 0 ].events );
+    TEST_ASSERT_FALSE( shell.swallow[ IN_NAV_LEFT ] );
+    send( IN_NAV_LEFT, IN_PRESS ); // the next press is the app's
+    TEST_ASSERT_EQUAL( 1, fakes[ 0 ].events );
+    TEST_ASSERT_EQUAL( IN_NAV_LEFT, fakes[ 0 ].last.control );
+    send( IN_NAV_LEFT, IN_RELEASE );
+    // B held from two panes deep: everything closes, Home opens, and B's
+    // own release is swallowed - it does not close Home.
+    hold( IN_BTN_A );
+    tap( IN_NAV_PRESS );
+    TEST_ASSERT_EQUAL_STRING( "tracker", menuTitle( &shell.menu ) );
+    send( IN_BTN_B, IN_PRESS );
+    send( IN_BTN_B, IN_HOLD );
+    TEST_ASSERT_EQUAL( PANE_HOME, uiShellTop( &shell ) );
+    TEST_ASSERT_EQUAL( 1, shell.depth );
+    send( IN_BTN_B, IN_RELEASE );
+    TEST_ASSERT_EQUAL( PANE_HOME, uiShellTop( &shell ) );
+    tap( IN_BTN_B );
+    TEST_ASSERT_EQUAL( PANE_APP, uiShellTop( &shell ) );
+    // The menu remembered nothing of the page it was on? It keeps it: the
+    // next open is where it was.
+    TEST_ASSERT_EQUAL_STRING( "tracker", menuTitle( &shell.menu ) );
+}
+
+void test_shell_confirm_and_result( void ) {
+    shellSetUp( );
+    hold( IN_BTN_A );
+    send( IN_NAV_DOWN, IN_PRESS ); // reset settings
+    send( IN_NAV_DOWN, IN_RELEASE );
+    TEST_ASSERT_EQUAL( -1, tap( IN_NAV_PRESS ) ); // asks first
+    TEST_ASSERT_EQUAL( PANE_CONFIRM, uiShellTop( &shell ) );
+    TEST_ASSERT_EQUAL( -1, tap( IN_BTN_B ) ); // no
+    TEST_ASSERT_EQUAL( PANE_MENU, uiShellTop( &shell ) );
+    TEST_ASSERT_EQUAL( -1, tap( IN_NAV_PRESS ) );
+    int action = tap( IN_BTN_A ); // yes: the action comes back to be run
+    TEST_ASSERT_TRUE( action >= 0 );
+    TEST_ASSERT_EQUAL( 'Z', shell.menu.items[ action ].tag );
+    TEST_ASSERT_EQUAL( PANE_MENU, uiShellTop( &shell ) );
+    send( IN_NAV_DOWN, IN_PRESS ); // latest fix: no confirmation
+    send( IN_NAV_DOWN, IN_RELEASE );
+    action = tap( IN_NAV_PRESS );
+    TEST_ASSERT_TRUE( action >= 0 );
+    TEST_ASSERT_EQUAL( 'l', shell.menu.items[ action ].tag );
+    uiShellShowResult( &shell, "l", 30, 10 ); // the caller ran it and shows the log tail
+    TEST_ASSERT_EQUAL( PANE_RESULT, uiShellTop( &shell ) );
+    TEST_ASSERT_EQUAL( 2, shell.depth );
+    for ( int k = 0; k < 25; k++ ) {
+        send( IN_NAV_UP, IN_PRESS );
+        send( IN_NAV_UP, IN_RELEASE );
+    }
+    TEST_ASSERT_EQUAL( 20, shell.resultScroll ); // clamped to what is above the window
+    tap( IN_BTN_B ); // dismissed: the page underneath is still there
+    TEST_ASSERT_EQUAL( PANE_MENU, uiShellTop( &shell ) );
+    TEST_ASSERT_EQUAL( 0, fakes[ 0 ].events );
+}
+
+void test_shell_timeout_and_joystick( void ) {
+    shellSetUp( );
+    tick( 0.0f, 0.0f );
+    TEST_ASSERT_TRUE( shell.joyArmed );
+    tick( 0.5f, 0.0f );
+    TEST_ASSERT_FLOAT_WITHIN( 0.001f, 0.5f, fakes[ 0 ].lastJoyX ); // the app has the stick
+    tap( IN_BTN_A ); // Home: the stick is not the app's
+    tick( 0.5f, 0.0f );
+    TEST_ASSERT_FLOAT_WITHIN( 0.001f, 0.0f, fakes[ 0 ].lastJoyX );
+    TEST_ASSERT_TRUE( fakes[ 0 ].ticks == 3 ); // but it still ticks
+    tap( IN_BTN_B ); // closed while the stick is still over: not the app's until centred
+    tick( 0.5f, 0.0f );
+    TEST_ASSERT_FLOAT_WITHIN( 0.001f, 0.0f, fakes[ 0 ].lastJoyX );
+    tick( 0.0f, 0.0f );
+    tick( 0.5f, 0.0f );
+    TEST_ASSERT_FLOAT_WITHIN( 0.001f, 0.5f, fakes[ 0 ].lastJoyX );
+    // 20 s idle: the overlays close, cursors kept.
+    tap( IN_BTN_A );
+    send( IN_NAV_RIGHT, IN_PRESS );
+    send( IN_NAV_RIGHT, IN_RELEASE );
+    TEST_ASSERT_EQUAL( 1, shell.home.cursor );
+    t += UISHELL_IDLE_MS;
+    tick( 0.0f, 0.0f );
+    TEST_ASSERT_EQUAL( PANE_APP, uiShellTop( &shell ) );
+    TEST_ASSERT_EQUAL( 1, shell.home.cursor );
+    // A swallowed control whose release the ring lost: healed from the raw state.
+    hold( IN_BTN_A );
+    send( IN_NAV_LEFT, IN_PRESS );
+    tap( IN_BTN_B );
+    TEST_ASSERT_TRUE( shell.swallow[ IN_NAV_LEFT ] );
+    heldNow[ IN_NAV_LEFT ] = false; // it went up, unseen
+    tick( 0.0f, 0.0f );
+    TEST_ASSERT_FALSE( shell.swallow[ IN_NAV_LEFT ] );
+    TEST_ASSERT_FALSE( shell.held[ IN_NAV_LEFT ] );
+}
+
 // ---- camera ------------------------------------------------------------------
 
 static Camera cam;
@@ -273,6 +515,11 @@ int main( int argc, char** argv ) {
     RUN_TEST( test_menu_edits_in_place );
     RUN_TEST( test_menu_accessor_set_once_with_the_flipped_value );
     RUN_TEST( test_menu_returns_actions_with_their_argument );
+    RUN_TEST( test_shell_home_selects_apps_and_remembers );
+    RUN_TEST( test_shell_a_and_b_never_reach_an_app );
+    RUN_TEST( test_shell_swallows_a_held_control_across_a_focus_change );
+    RUN_TEST( test_shell_confirm_and_result );
+    RUN_TEST( test_shell_timeout_and_joystick );
     RUN_TEST( test_camera_glides_and_orbits );
     RUN_TEST( test_camera_turns_the_short_way );
     RUN_TEST( test_camera_pov_is_at_the_point_looking_down_the_shaft );
