@@ -171,6 +171,11 @@ void setup( ) {
     int loaded = settings.begin( &ui.shell.menu );
     settingsMenuAddNewCommands( ); // s and Z into the menu's commands page
     jOS.registerService( &settings );
+    boot.print( "menu: " );
+    boot.print( ui.shell.menu.count );
+    boot.print( "/" );
+    boot.print( MENU_MAX_ITEMS );
+    boot.println( " items" );
 #if MODULE_MAG_ARRAY
     if ( !magArray.baselineRestored ) {
         // Nothing saved: the compiled-in zero rather than the blind one under

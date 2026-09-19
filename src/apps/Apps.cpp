@@ -27,6 +27,10 @@ UiApp apps[ APP_COUNT ] = {
     { "LEDs", nullptr, nullptr, nullptr, nullptr, ledsDraw, nullptr, nullptr },
     { "Terminal", nullptr, nullptr, nullptr, nullptr, terminalDraw, terminalEvent, terminalGeneration },
     { "Draw", nullptr, drawEnter, drawExit, drawTick, drawDraw, drawEvent, nullptr },
+    { "Target", nullptr, targetEnter, targetExit, nullptr, targetDraw, targetEvent, nullptr },
+    { "Rows", nullptr, nullptr, nullptr, nullptr, rowsDraw, rowsEvent, rowsGeneration },
+    { "Calibrate", nullptr, calibrateEnter, calibrateExit, nullptr, calibrateDraw, calibrateEvent, calibrateGeneration },
+    { "Info", nullptr, nullptr, nullptr, nullptr, infoDraw, nullptr, infoGeneration },
 };
 
 // The icons, packed from their ASCII art into bits at boot (a flash table
@@ -45,7 +49,7 @@ static void packIcon( const char* const* art, uint8_t* bits ) {
 }
 
 // Icons.h's order: View, LEDs, Terminal, Draw, Target, Rows, Calibrate, Settings, Info.
-static const int iconOfApp[ APP_COUNT ] = { 0, 1, 2, 3 };
+static const int iconOfApp[ APP_COUNT ] = { 0, 1, 2, 3, 4, 5, 6, 8 };
 #define ICON_SETTINGS_INDEX 7
 
 static uint32_t lastInputStamp = 0, lastFrameStamp = 0;
@@ -115,6 +119,12 @@ static void screenExtra( Stream* out ) {
         snprintf( line, sizeof( line ), "row: %d hole %d %.0f%%", r.row, r.hole, 100.0f * ( r.tracked ? r.trackConfidence : r.confidence ) );
         out->println( line );
     }
+    if ( rowCounter.calibrating( ) ) {
+        int row, hole;
+        rowCounter.calibrationTarget( &row, &hole );
+        snprintf( line, sizeof( line ), "calibrating: tap row %d hole %d, step %d/%d, %.0f%%", row, hole, rowCounter.calibrationStepNumber( ) + 1, ROWGRID_CALIBRATION_TARGETS, 100.0f * rowCounter.tapProgress( ) );
+        out->println( line );
+    }
 #endif
     snprintf( line, sizeof( line ), "camera: %s target %.1f %.1f %.1f yaw %.0f el %.0f zoom %.2f", cameraModeNames[ viewCamera.mode ], viewCamera.target.x, viewCamera.target.y, viewCamera.target.z,
               viewCamera.yawDeg, viewCamera.elevationDeg, viewCamera.zoom );
@@ -139,5 +149,5 @@ void appsBegin( ) {
     display.drawFn = appsDrawFrame;
     display.slotNames = slotNames;
     display.slotCount = APP_COUNT;
-    consoleAddCommand( 'e', "next app (View / LEDs / Terminal / Draw), with each app's draw time", onNextApp );
+    consoleAddCommand( 'e', "next app (View / LEDs / Terminal / Draw / Target / Rows / Calibrate / Info), with each app's draw time", onNextApp );
 }

@@ -164,6 +164,11 @@ static void runConsoleKeyWithNumber( int key, float argument ) {
     runConsoleKey( key, argument );
 }
 
+// An app from the menu (the menu closes over it).
+static void runOpenApp( int app, float ) {
+    appsOpen( app );
+}
+
 static void runResetView( int, float ) {
     cameraReset( &viewCamera );
 }
@@ -238,7 +243,7 @@ void settingsMenuBuild( Menu* m ) {
     int rows = menuAddSubmenu( m, MENU_ROOT, "rows" );
     menuAddToggleAccessor( m, rows, "row mode", getRowMode, setRowMode );
     menuAddInfo( m, rows, "row", rowInfo );
-    menuAddAction( m, rows, "calibrate 12 taps", 'c', runConsoleKey, false );
+    menuAddAction( m, rows, "calibrate 12 taps", APP_CALIBRATE, runOpenApp, false );
     menuAddNumberAction( m, rows, "anchor at row", 'R', runConsoleKeyWithNumber, 1.0f, 60.0f, 1.0f, 1.0f );
     menuAddAction( m, rows, "forget anchors", 'C', runConsoleKey, true );
     menuAddAction( m, rows, "hold-still test", 'h', runConsoleKey, false );

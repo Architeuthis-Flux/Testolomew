@@ -92,3 +92,26 @@ e
 e
 @run 300
 :screen:png out/s18_terminal.png
+\t
+@run 300
+:ui go rows
+@run 400
+:screen:png out/s19_rows.png
+\t
+@run 300
+:ui go target
+@run 400
+:screen:png out/s20_target.png
+\t
+@run 300
+:ui go calibrate
+@run 400
+:screen:png out/s21_calibrate.png
+\t
+@run 300
+:ui go info
+@run 1200
+:screen:png out/s22_info.png
+\t
+@run 300
+:screen:png out/s23_home.png

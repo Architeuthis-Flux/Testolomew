@@ -176,6 +176,71 @@
 @expect "app: View"
 @expect "play: off"
 
+# The other apps, by name from Home: Rows shows the counted row; Target
+# starts the game; Calibrate starts the twelve taps and leaving cancels
+# them; Info is text; the Home grid has nine cells with Settings eighth.
+:key a
+@run 300
+:screen
+@expect "home: cursor 0 View"
+:ui go rows
+@expect "ok{go Rows}"
+:screen
+@expect "app: Rows"
+@expect "row: 14 hole 3"
+:key a
+@run 300
+:ui go target
+@expect "ok{go Target}"
+:screen
+@expect "app: Target"
+@expect "play: target"
+:key a
+@run 300
+:ui go calibrate
+@expect "ok{go Calibrate}"
+@run 300
+:screen
+@expect "app: Calibrate"
+@expect "calibrating: tap row 1 hole 1, step 1/12"
+:key b
+@run 300
+:screen
+@expect "app: Target"
+:key a
+@run 300
+:ui go info
+@expect "ok{go Info}"
+:screen
+@expect "app: Info"
+:key a
+@run 300
+:ui go settings
+@expect "ok{go Settings}"
+:screen
+@expect "panes: menu"
+@expect "menu: /magnet"
+# (the menu remembers the page it was left on: back to the root first)
+:ui back
+:screen
+@expect "menu: / cursor"
+:ui go rows
+@expect "ok{go rows}"
+:ui go calibrate
+@expect "ok{go calibrate 12 taps}"
+@run 300
+:screen
+@expect "app: Calibrate"
+@expect "panes: -"
+@expect "calibrating: tap row 1 hole 1"
+:key a
+@run 300
+:ui go view
+@run 200
+:screen
+@expect "app: View"
+@expect "play: off"
+
 # The joystick from the console orbits the camera.
 :joy 0.8 0 400
 @expect "ok{joy"

@@ -21,9 +21,13 @@ enum UiAppId {
     APP_LEDS,
     APP_TERMINAL,
     APP_DRAW,
+    APP_TARGET,
+    APP_ROWS,
+    APP_CALIBRATE,
+    APP_INFO,
     APP_COUNT
 };
-#define APPS_SETTINGS_CELL APP_COUNT // Settings sits after the apps on Home
+#define APPS_SETTINGS_CELL 7 // Home: View, LEDs, Terminal, Draw, Target, Rows, Calibrate, Settings, Info
 
 extern UiApp apps[ APP_COUNT ];
 
@@ -53,5 +57,24 @@ void drawExit( );
 void drawDraw( GFXcanvas16* canvas );
 void drawTick( float dtS, float joyX, float joyY );
 bool drawEvent( const InputEvent* e );
+void drawBoardMap( GFXcanvas16* canvas, bool brushRing ); // the board from above with the paint (the Target app uses it too)
+// Target (AppTarget.cpp): the target game.
+void targetEnter( );
+void targetExit( );
+void targetDraw( GFXcanvas16* canvas );
+bool targetEvent( const InputEvent* e );
+// Rows (AppRows.cpp): the counted row, large.
+void rowsDraw( GFXcanvas16* canvas );
+bool rowsEvent( const InputEvent* e );
+uint32_t rowsGeneration( );
+// Calibrate (AppCalibrate.cpp): the twelve taps.
+void calibrateEnter( );
+void calibrateExit( );
+void calibrateDraw( GFXcanvas16* canvas );
+bool calibrateEvent( const InputEvent* e );
+uint32_t calibrateGeneration( );
+// Info (AppInfo.cpp): the build, the sensors, the frame rate, the services.
+void infoDraw( GFXcanvas16* canvas );
+uint32_t infoGeneration( );
 
 #endif // APPS_H

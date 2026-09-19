@@ -42,7 +42,11 @@ static void textAt( GFXcanvas16* c, int x, int y, int size, uint16_t color, cons
 // ones squares in their colour at their level (as the LEDs have them), the
 // brush's ring round the point as hollow squares in the paint colour, the
 // point itself a cross. The map is the LED screen's: 7 px a row.
-static void drawTraceScreen( ) {
+// The board from above: every hole a dot, the painted ones squares in
+// their colour at their level, the brush's ring round the point (if asked),
+// the point itself a cross (green when touching).
+void drawBoardMap( GFXcanvas16* into, bool brushRing ) {
+    canvas = into;
 #if MODULE_PLAY
     const LedLayout& layout = probeLeds.layout;
     const ProbeLedFrame& frame = probeLeds.frame;
@@ -62,7 +66,7 @@ static void drawTraceScreen( ) {
             fastFillRect( canvas, x, y, 1, 1, COLOR_GRID );
         }
         // The brush ring (what the LED renderer is showing as the cursor).
-        if ( brush.active && frame.target[ i ] > 0.0f && frame.target[ i ] != painted ) {
+        if ( brushRing && brush.active && frame.target[ i ] > 0.0f && frame.target[ i ] != painted ) {
             fastRect( canvas, x - 3, y - 3, 7, 7, RGB565( brush.r, brush.g, brush.b ) );
         }
     }
@@ -74,6 +78,16 @@ static void drawTraceScreen( ) {
         fastFillRect( canvas, x - 4, y, 9, 1, c );
         fastFillRect( canvas, x, y - 4, 1, 9, c );
     }
+#else
+    (void)brushRing;
+    textAt( canvas, 4, 4, UI_TEXT, COLOR_TEXT_DIM, "MODULE_PLAY is off" );
+#endif
+}
+
+static void drawTraceScreen( ) {
+#if MODULE_PLAY
+    drawBoardMap( canvas, true );
+    const ProbeLedInput& in = probeLeds.input;
     char line[ 40 ];
     snprintf( line, sizeof( line ), "%s: %s", playModeNames[ play.mode ], in.state == PROBELED_NONE ? "no probe" : ( in.heightMm < play.touchMm ? "touching" : "lifted" ) ); // 20 columns
     textAt( canvas, 2, 2, UI_TEXT, COLOR_TEXT_DIM, line );
