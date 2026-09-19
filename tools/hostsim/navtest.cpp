@@ -1,24 +1,22 @@
 // The nav stick decoder on the host: staggered contacts must give one press, not stray directions.
-#define private public
 #include "Input.h"
-#undef private
 #include "Console.h"
 
 static const char* names[] = {"UP","DOWN","LEFT","RIGHT","PRESS","JUP","JDOWN","JLEFT","JRIGHT","JPRESS","A","B"};
-static const char* kinds[] = {"press","release","repeat","hold"};
+static const char* kinds[] = {"press","release","repeat","hold","click","long"};
 static int fails = 0;
 static void run(const char* what, int ms) { for (int t = 0; t < ms; t += 5) { simMicros += 5000; input.service(); } (void)what; }
 static void drain(const char* stage, const char* expect) {
     char got[256] = ""; InputEvent e;
-    while (input.next(&e)) { if (e.kind == IN_REPEAT || e.kind == IN_HOLD) continue; char b[32]; snprintf(b, sizeof b, "%s:%s ", names[e.control], kinds[e.kind]); strncat(got, b, sizeof got - strlen(got) - 1); }
+    while (input.next(&e)) { if (e.kind == IN_REPEAT || e.kind == IN_HOLD || e.kind == IN_CLICK || e.kind == IN_LONG_HOLD) continue; char b[32]; snprintf(b, sizeof b, "%s:%s ", names[e.control], kinds[e.kind]); strncat(got, b, sizeof got - strlen(got) - 1); }
     bool ok = strcmp(got, expect) == 0; if (!ok) fails++;
     printf("%-34s %s  got [%s] expected [%s]\n", stage, ok ? "ok  " : "FAIL", got, expect);
 }
 int main() {
     console.begin(&Serial); input.begin();
     for (int p = 0; p < 64; p++) simPinLevel[p] = 1;
-    input.buttons[IN_NAV_UP].pin = 10; input.buttons[IN_NAV_DOWN].pin = 11; input.buttons[IN_NAV_LEFT].pin = 12; input.buttons[IN_NAV_RIGHT].pin = 13;
-    input.buttons[IN_NAV_PRESS].pin = -1; // sections 1-6: the no-push-pin fallback (three or four contacts = a press)
+    input.setPin(IN_NAV_UP, 10, true); input.setPin(IN_NAV_DOWN, 11, true); input.setPin(IN_NAV_LEFT, 12, true); input.setPin(IN_NAV_RIGHT, 13, true);
+    input.setPin(IN_NAV_PRESS, -1, true); // sections 1-6: the no-push-pin fallback (three or four contacts = a press)
     run("settle", 100); drain("idle", "");
     // 1. centre push: contacts close 4 ms apart, held 300 ms, open 4 ms apart
     simPinLevel[10] = 0; run("", 5); simPinLevel[12] = 0; run("", 5); simPinLevel[11] = 0; run("", 5); simPinLevel[13] = 0; run("", 300);
@@ -41,7 +39,7 @@ int main() {
     drain("slow push (15 ms apart)", "PRESS:press ");
     for (int p = 10; p <= 13; p++) simPinLevel[p] = 1; run("", 100); drain("slow push released", "PRESS:release ");
     // 7. The push contact closes on every stick movement too. Tilt: push first, direction 15 ms later -> a direction only.
-    input.buttons[IN_NAV_PRESS].pin = 14; simPinLevel[14] = 1; run("", 100); drain("push pin idle", "");
+    input.setPin(IN_NAV_PRESS, 14, true); simPinLevel[14] = 1; run("", 100); drain("push pin idle", "");
     simPinLevel[14] = 0; run("", 15); simPinLevel[11] = 0; run("", 300); drain("tilt (push closes first)", "DOWN:press ");
     simPinLevel[11] = 1; run("", 10); simPinLevel[14] = 1; run("", 150); drain("tilt released", "DOWN:release ");
     // 8. Tilt: direction first, push 10 ms later.

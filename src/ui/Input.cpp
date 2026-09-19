@@ -57,7 +57,7 @@ static void onKeyVerb( int argc, char** argv, Stream* out ) {
     } else if ( strcmp( how, "up" ) == 0 ) {
         input.simRelease( (InputControl)c );
     } else if ( strcmp( how, "hold" ) == 0 ) {
-        input.simHold( (InputControl)c, INPUT_HOLD_MS + 200 );
+        input.simHold( (InputControl)c, BUTTON_HOLD_MS + 200 );
     } else if ( how[ 0 ] == 'x' && how[ 1 ] >= '0' && how[ 1 ] <= '9' ) {
         int n = atoi( how + 1 );
         for ( int k = 0; k < n && k < 64; k++ )
@@ -93,18 +93,25 @@ void Input::begin( ) {
                                                   -1, -1, -1, -1, PIN_JOY_PRESS,
                                                   PIN_BTN_A, PIN_BTN_B };
     for ( int c = 0; c < IN_CONTROL_COUNT; c++ ) {
-        InputButton b = { };
-        b.pin = pins[ c ];
-        b.activeLow = true; // the stick's contacts and the buttons: switches to ground on the chip's pull-ups
+        InputSource s = { };
+        s.pin = pins[ c ];
+        s.activeLow = true; // the stick's contacts and the buttons: switches to ground on the chip's pull-ups
         bool pullup = true;
         if ( c == IN_JOY_PRESS ) {
-            b.activeLow = JOY_PRESS_ACTIVE_LOW != 0; // as wired (BoardPins.h)
+            s.activeLow = JOY_PRESS_ACTIVE_LOW != 0; // as wired (BoardPins.h)
             pullup = JOY_PRESS_PULLUP != 0;
         }
-        buttons[ c ] = b;
-        if ( b.pin >= 0 ) {
-            pinMode( b.pin, pullup ? INPUT_PULLUP : INPUT );
+        sources[ c ] = s;
+        if ( s.pin >= 0 ) {
+            pinMode( s.pin, pullup ? INPUT_PULLUP : INPUT );
         }
+        // Every control's level settles INPUT_DEBOUNCE_MS before it counts -
+        // the nav decoder's outputs too: the push contact outlives a tilt's
+        // direction contact by a few milliseconds, and without this that
+        // tail came out as a press (tools/hostsim/navtest.cpp, "tilt
+        // released"). The directions repeat, the presses and buttons hold.
+        bool direction = ( c >= IN_NAV_UP && c <= IN_NAV_RIGHT ) || ( c >= IN_JOY_UP && c <= IN_JOY_RIGHT );
+        buttonInit( &trackers[ c ], INPUT_DEBOUNCE_MS, direction );
     }
     joystickFitted = PIN_JOY_X >= 0 && PIN_JOY_Y >= 0;
     if ( joystickFitted ) {
@@ -126,25 +133,25 @@ void Input::begin( ) {
 // ---- the simulation surface ------------------------------------------------------
 
 void Input::simPress( InputControl c ) {
-    buttons[ c ].simDown = true;
-    buttons[ c ].simUntil = 0;
+    sources[ c ].simDown = true;
+    sources[ c ].simUntil = 0;
 }
 
 void Input::simRelease( InputControl c ) {
-    buttons[ c ].simDown = false;
-    buttons[ c ].simUntil = 0;
+    sources[ c ].simDown = false;
+    sources[ c ].simUntil = 0;
 }
 
 void Input::simHold( InputControl c, uint32_t ms ) {
     uint32_t until = millis( ) + ms;
-    buttons[ c ].simDown = true;
-    buttons[ c ].simUntil = until == 0 ? 1 : until;
+    sources[ c ].simDown = true;
+    sources[ c ].simUntil = until == 0 ? 1 : until;
 }
 
 // A tap: pressed, then released a moment later. Several in a row are played
 // one after another, so "down down down" is three presses.
 void Input::simTap( InputControl c ) {
-    buttons[ c ].taps++;
+    sources[ c ].taps++;
 }
 
 void Input::simJoystick( float x, float y, uint32_t ms ) {
@@ -164,25 +171,27 @@ bool Input::simActive( ) const {
     if ( simJoyOn )
         return true;
     for ( int c = 0; c < IN_CONTROL_COUNT; c++ ) {
-        if ( buttons[ c ].simDown || buttons[ c ].emulated || buttons[ c ].taps > 0 )
+        if ( sources[ c ].simDown || sources[ c ].emulated || sources[ c ].taps > 0 )
             return true;
     }
     return false;
 }
 
 void Input::setPin( InputControl c, int pin, bool activeLow ) {
-    buttons[ c ].pin = pin;
-    buttons[ c ].activeLow = activeLow;
+    sources[ c ].pin = pin;
+    sources[ c ].activeLow = activeLow;
 }
 
 uint32_t Input::heldMask( ) const {
     uint32_t mask = 0;
     for ( int c = 0; c < IN_CONTROL_COUNT; c++ ) {
-        if ( buttons[ c ].state )
+        if ( trackers[ c ].down )
             mask |= 1u << c;
     }
     return mask;
 }
+
+// ---- reports -----------------------------------------------------------------------
 
 void Input::printNavTrace( Stream* out ) const {
     char line[ 100 ];
@@ -203,25 +212,34 @@ void Input::printNavTrace( Stream* out ) const {
 void Input::printInputs( Stream* out ) const {
     char line[ 200 ];
     if ( joystickFitted ) {
-        snprintf( line, sizeof( line ), "joystick raw x %d y %d of %.0f (centre %.0f)  ->  x %+.2f y %+.2f (dead zone %.0f %%)  press %s",
+        snprintf( line, sizeof( line ), "joystick raw x %d y %d of %.0f (centre %.0f)  ->  x %+.2f y %+.2f (dead zone %.0f %%)  press %s (%s)",
                   analogRead( PIN_JOY_X ), analogRead( PIN_JOY_Y ), joyFullScale, 0.5f * joyFullScale, joyX, joyY, INPUT_JOY_DEAD * 100.0f,
-                  buttons[ IN_JOY_PRESS ].state ? "DOWN" : "up" );
+                  trackers[ IN_JOY_PRESS ].down ? "DOWN" : "up", sources[ IN_JOY_PRESS ].activeLow ? "active low" : "active high" );
     } else {
         snprintf( line, sizeof( line ), "joystick not fitted (PIN_JOY_X/Y are -1); typed: x %+.2f y %+.2f", joyX, joyY );
     }
     out->println( line );
     snprintf( line, sizeof( line ), "nav stick contacts up %d down %d left %d right %d push %s (stable pattern 0x%x, decoded: %s%s%s%s%s)  buttons A %s B %s",
               ( navRaw >> 0 ) & 1, ( navRaw >> 1 ) & 1, ( navRaw >> 2 ) & 1, ( navRaw >> 3 ) & 1,
-              buttons[ IN_NAV_PRESS ].pin < 0 ? "(no pin)" : ( navPushRaw ? "1" : "0" ), navStable,
-              navPressed ? "PRESS" : "", buttons[ IN_NAV_UP ].state ? "up " : "", buttons[ IN_NAV_DOWN ].state ? "down " : "",
-              buttons[ IN_NAV_LEFT ].state ? "left " : "", buttons[ IN_NAV_RIGHT ].state ? "right " : "",
-              buttons[ IN_BTN_A ].state ? "DOWN" : "up", buttons[ IN_BTN_B ].state ? "DOWN" : "up" );
+              sources[ IN_NAV_PRESS ].pin < 0 ? "(no pin)" : ( navPushRaw ? "1" : "0" ), navStable,
+              navPressed ? "PRESS" : "", trackers[ IN_NAV_UP ].down ? "up " : "", trackers[ IN_NAV_DOWN ].down ? "down " : "",
+              trackers[ IN_NAV_LEFT ].down ? "left " : "", trackers[ IN_NAV_RIGHT ].down ? "right " : "",
+              trackers[ IN_BTN_A ].down ? "DOWN" : "up", trackers[ IN_BTN_B ].down ? "DOWN" : "up" );
+    out->println( line );
+    snprintf( line, sizeof( line ), "events: %d waiting, %lu dropped (ring of %d); held mask 0x%03lx%s", eventCount, (unsigned long)dropped, INPUT_EVENTS, (unsigned long)heldMask( ),
+              simActive( ) ? "; a simulated control is active" : "" );
     out->println( line );
 }
 
+// ---- events ------------------------------------------------------------------------
+
+// A full ring drops its OLDEST: the newest event is the one that says what
+// the hand is doing now.
 void Input::post( InputControl c, InputEventKind k ) {
     if ( eventCount >= INPUT_EVENTS ) {
-        return; // dropped: nobody is reading them
+        eventHead = ( eventHead + 1 ) % INPUT_EVENTS;
+        eventCount--;
+        dropped++;
     }
     events[ ( eventHead + eventCount ) % INPUT_EVENTS ] = { c, k };
     eventCount++;
@@ -237,44 +255,9 @@ bool Input::next( InputEvent* e ) {
     return true;
 }
 
-// One control's debounced state, and the events it makes.
-void Input::feed( InputControl c, bool down, uint32_t now ) {
-    InputButton& b = buttons[ c ];
-    if ( down != b.raw ) {
-        b.raw = down;
-        b.changedMs = now;
-    }
-    if ( down != b.state && (int32_t)( now - b.changedMs ) >= (int32_t)INPUT_DEBOUNCE_MS ) {
-        b.state = down;
-        if ( down ) {
-            b.pressedMs = now;
-            b.nextRepeatMs = now + INPUT_REPEAT_DELAY_MS;
-            b.holdFired = false;
-            post( c, IN_PRESS );
-        } else {
-            post( c, IN_RELEASE );
-        }
-    }
-    if ( b.state ) {
-        if ( (int32_t)( now - b.nextRepeatMs ) >= 0 ) {
-            b.nextRepeatMs = now + INPUT_REPEAT_MS;
-            post( c, IN_REPEAT );
-        }
-        if ( !b.holdFired && (int32_t)( now - b.pressedMs ) >= (int32_t)INPUT_HOLD_MS ) {
-            b.holdFired = true;
-            post( c, IN_HOLD );
-        }
-    }
-}
-
-// A typed key: a tap (the console cannot say when a key goes up).
-void Input::emulate( InputControl c, uint32_t now ) {
-    (void)now;
-    simTap( c );
-}
+// ---- typed keys --------------------------------------------------------------------
 
 bool Input::takeKey( char c ) {
-    uint32_t now = millis( );
     // Arrow keys arrive as ESC [ A/B/C/D.
     if ( escape == 0 && c == 27 ) {
         escape = 1;
@@ -288,16 +271,16 @@ bool Input::takeKey( char c ) {
         escape = 0;
         switch ( c ) {
         case 'A':
-            emulate( IN_NAV_UP, now );
+            simTap( IN_NAV_UP );
             return true;
         case 'B':
-            emulate( IN_NAV_DOWN, now );
+            simTap( IN_NAV_DOWN );
             return true;
         case 'C':
-            emulate( IN_NAV_RIGHT, now );
+            simTap( IN_NAV_RIGHT );
             return true;
         case 'D':
-            emulate( IN_NAV_LEFT, now );
+            simTap( IN_NAV_LEFT );
             return true;
         default:
             return true;
@@ -308,24 +291,24 @@ bool Input::takeKey( char c ) {
     switch ( c ) {
     case '\r':
     case '\n':
-        // Enter is the nav press only while the UI wants it (a menu is open);
-        // otherwise the console ignores newlines anyway. A terminal that sends
-        // CR LF is one press, not two.
+        // Enter is the nav press only while the UI wants it (an overlay is
+        // open); otherwise the console ignores newlines anyway. A terminal
+        // that sends CR LF is one press, not two.
         if ( uiWantsEnter ) {
             if ( !( c == '\n' && afterCr ) ) {
-                emulate( IN_NAV_PRESS, now );
+                simTap( IN_NAV_PRESS );
             }
             return true;
         }
         return false;
     case '\t':
-        emulate( IN_BTN_A, now );
+        simTap( IN_BTN_A );
         return true;
     case '`':
-        emulate( IN_BTN_B, now );
+        simTap( IN_BTN_B );
         return true;
     case '/':
-        emulate( IN_JOY_PRESS, now );
+        simTap( IN_JOY_PRESS );
         return true;
     case ',':
         simJoystick( -0.8f, simJoyOn ? simJoyY : 0.0f, INPUT_EMULATED_NUDGE_MS );
@@ -344,6 +327,8 @@ bool Input::takeKey( char c ) {
     }
 }
 
+// ---- reading -----------------------------------------------------------------------
+
 static float deadZone( float v ) {
     float a = v < 0 ? -v : v;
     if ( a < INPUT_JOY_DEAD ) {
@@ -354,42 +339,22 @@ static float deadZone( float v ) {
     return v < 0 ? -s : s;
 }
 
-ServiceStatus Input::service( ) {
-    uint32_t now = millis( );
+bool Input::pinDown( int c ) const {
+    const InputSource& s = sources[ c ];
+    return s.pin >= 0 && ( digitalRead( s.pin ) == LOW ) == s.activeLow;
+}
 
-    // The joystick: a simulated one while there is one, else the real one if
-    // fitted, else centred.
-    if ( simJoyOn && simJoyUntil != 0 && (int32_t)( now - simJoyUntil ) >= 0 ) {
-        simJoystickOff( );
-    }
-    if ( simJoyOn ) {
-        joyX = simJoyX;
-        joyY = simJoyY;
-    } else if ( joystickFitted ) {
-        // ASSUMPTION: centre at half scale (`j` shows the raw readings).
-        float half = 0.5f * joyFullScale;
-        float x = ( analogRead( PIN_JOY_X ) - half ) / half;
-        float y = ( analogRead( PIN_JOY_Y ) - half ) / half;
-        if ( JOY_X_REVERSED )
-            x = -x;
-        if ( JOY_Y_REVERSED )
-            y = -y;
-        joyX = deadZone( x );
-        joyY = deadZone( y );
-    } else {
-        joyX = joyY = 0.0f;
-    }
-
-    // The nav stick: its four contacts as one pattern, decoded once it has
-    // held still for the debounce time (see Input.h).
+// The nav stick: its four contacts as one pattern, decoded once it has held
+// still for the debounce time (see Input.h). Fills navDown[ 0-3 ] with the
+// directions and navDown[ 4 ] with the press.
+void Input::decodeNav( uint32_t now, bool navDown[ 5 ] ) {
     uint8_t pattern = 0;
     for ( int c = IN_NAV_UP; c <= IN_NAV_RIGHT; c++ ) {
-        const InputButton& b = buttons[ c ];
-        if ( b.pin >= 0 && ( digitalRead( b.pin ) == LOW ) == b.activeLow ) {
+        if ( pinDown( c ) ) {
             pattern |= (uint8_t)( 1 << ( c - IN_NAV_UP ) );
         }
     }
-    bool pushNow = buttons[ IN_NAV_PRESS ].pin >= 0 && ( digitalRead( buttons[ IN_NAV_PRESS ].pin ) == LOW ) == buttons[ IN_NAV_PRESS ].activeLow;
+    bool pushNow = pinDown( IN_NAV_PRESS );
     uint8_t traced = pattern | ( pushNow ? 0x10 : 0 );
     if ( traced != navTraceLast ) {
         navTraceLast = traced;
@@ -409,7 +374,7 @@ ServiceStatus Input::service( ) {
     }
     // The push contact, debounced here (it is decoded, not fed straight to
     // the button machinery).
-    if ( buttons[ IN_NAV_PRESS ].pin >= 0 ) {
+    if ( sources[ IN_NAV_PRESS ].pin >= 0 ) {
         if ( pushNow != navPushRaw ) {
             navPushRaw = pushNow;
             navPushChangedMs = now;
@@ -437,8 +402,9 @@ ServiceStatus Input::service( ) {
     int decodedClosed = 0;
     for ( int k = 0; k < 4; k++ )
         decodedClosed += ( navDecoded >> k ) & 1;
-    bool navDown[ 5 ] = { false, false, false, false, false };
-    if ( buttons[ IN_NAV_PRESS ].pin >= 0 ) {
+    for ( int k = 0; k < 5; k++ )
+        navDown[ k ] = false;
+    if ( sources[ IN_NAV_PRESS ].pin >= 0 ) {
         // Decide one thing at a time (see Input.h). A direction that has
         // held its time wins while it lasts; the push contact alone, with no
         // direction contact closed, for its time, is the press while it lasts.
@@ -470,39 +436,74 @@ ServiceStatus Input::service( ) {
                 navDown[ k ] = ( navDecoded >> k ) & 1;
         }
     }
+}
+
+ServiceStatus Input::service( ) {
+    uint32_t now = millis( );
+
+    // The joystick: a simulated one while there is one, else the real one if
+    // fitted, else centred.
+    if ( simJoyOn && simJoyUntil != 0 && (int32_t)( now - simJoyUntil ) >= 0 ) {
+        simJoystickOff( );
+    }
+    if ( simJoyOn ) {
+        joyX = simJoyX;
+        joyY = simJoyY;
+    } else if ( joystickFitted ) {
+        // ASSUMPTION: centre at half scale (`j` shows the raw readings).
+        float half = 0.5f * joyFullScale;
+        float x = ( analogRead( PIN_JOY_X ) - half ) / half;
+        float y = ( analogRead( PIN_JOY_Y ) - half ) / half;
+        if ( JOY_X_REVERSED )
+            x = -x;
+        if ( JOY_Y_REVERSED )
+            y = -y;
+        joyX = deadZone( x );
+        joyY = deadZone( y );
+    } else {
+        joyX = joyY = 0.0f;
+    }
+
+    bool navDown[ 5 ];
+    decodeNav( now, navDown );
 
     for ( int c = 0; c < IN_CONTROL_COUNT; c++ ) {
-        InputButton& b = buttons[ c ];
+        InputSource& s = sources[ c ];
         bool down = false;
         if ( c >= IN_NAV_UP && c <= IN_NAV_PRESS ) {
             down = navDown[ c - IN_NAV_UP ];
         } else if ( c >= IN_JOY_UP && c <= IN_JOY_RIGHT ) {
             // The stick as a four-way, with hysteresis.
             float v = c == IN_JOY_UP ? joyY : ( c == IN_JOY_DOWN ? -joyY : ( c == IN_JOY_RIGHT ? joyX : -joyX ) );
-            down = b.state ? v > INPUT_JOY_OFF : v > INPUT_JOY_ON;
-        } else if ( b.pin >= 0 ) {
-            down = ( digitalRead( b.pin ) == LOW ) == b.activeLow;
+            down = trackers[ c ].down ? v > INPUT_JOY_OFF : v > INPUT_JOY_ON;
+        } else {
+            down = pinDown( c );
         }
-        if ( !b.emulated && b.taps > 0 && (int32_t)( now - b.nextTapMs ) >= 0 ) {
-            b.emulated = true;
-            b.emulatedUntil = now + INPUT_DEBOUNCE_MS + 30;
-            b.taps--;
+        // The simulation on top: taps played one after another, and holds.
+        if ( !s.emulated && s.taps > 0 && (int32_t)( now - s.nextTapMs ) >= 0 ) {
+            s.emulated = true;
+            s.emulatedUntil = now + INPUT_TAP_MS;
+            s.taps--;
         }
-        if ( b.emulated ) {
-            if ( (int32_t)( now - b.emulatedUntil ) < 0 ) {
+        if ( s.emulated ) {
+            if ( (int32_t)( now - s.emulatedUntil ) < 0 ) {
                 down = true;
             } else {
-                b.emulated = false;
-                b.nextTapMs = now + INPUT_DEBOUNCE_MS + 30;
+                s.emulated = false;
+                s.nextTapMs = now + INPUT_TAP_MS;
             }
         }
-        if ( b.simDown && b.simUntil != 0 && (int32_t)( now - b.simUntil ) >= 0 ) {
-            b.simDown = false;
+        if ( s.simDown && s.simUntil != 0 && (int32_t)( now - s.simUntil ) >= 0 ) {
+            s.simDown = false;
         }
-        if ( b.simDown ) {
+        if ( s.simDown ) {
             down = true;
         }
-        feed( (InputControl)c, down, now );
+        InputEventKind made[ 2 ];
+        int n = buttonFeed( &trackers[ c ], down, now, made );
+        for ( int k = 0; k < n; k++ ) {
+            post( (InputControl)c, made[ k ] );
+        }
     }
 
     lastStatus = eventCount > 0 ? ServiceStatus::BUSY : ServiceStatus::IDLE;
