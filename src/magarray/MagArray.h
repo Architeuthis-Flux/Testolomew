@@ -115,6 +115,7 @@ class MagArray : public Service {
     // (2.3 mA a sensor instead of 3.0; a recovery puts low-noise back).
     void powerOff( );
     void powerOffFrom( int n );
+    void powerOnly( uint32_t mask ); // bit i set = sensor i stays powered
     void powerOn( );
     void holdSampler( bool hold );
     void setLowNoise( bool on );

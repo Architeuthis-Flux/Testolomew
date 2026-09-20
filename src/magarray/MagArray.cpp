@@ -676,18 +676,22 @@ void MagArray::powerOff( ) {
     poweredOff = true;
 }
 
-void MagArray::powerOffFrom( int n ) {
+void MagArray::powerOnly( uint32_t mask ) {
     if ( simulatedFrames )
         return;
     pauseSampler( );
     for ( int i = 0; i < MAG_SENSOR_COUNT; i++ ) {
-        disabled[ i ] = i >= n;
+        disabled[ i ] = !( ( mask >> i ) & 1u );
         if ( disabled[ i ] ) {
             digitalWrite( magSensorPlaces[ i ].vccPin, LOW );
             sensors[ i ].ok = false;
         }
     }
     resumeSampler( );
+}
+
+void MagArray::powerOffFrom( int n ) {
+    powerOnly( n >= 32 ? 0xffffffffu : ( 1u << n ) - 1u );
 }
 
 void MagArray::powerOn( ) {

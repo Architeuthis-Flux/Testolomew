@@ -143,16 +143,35 @@ static void onLoadVerb( int argc, char** argv, Stream* out ) {
                 bool ln = argv[ 2 ][ 1 ] == 'n';
                 magArray.setLowNoise( ln );
                 consoleOk( out, ln ? "sensors in low-noise conversion (3.0 mA each)" : "sensors in low-power conversion (2.3 mA each; a recovery puts low-noise back)" );
+            } else if ( strcmp( argv[ 2 ], "only" ) == 0 && argc >= 4 ) {
+                // A list of sensor numbers, 0-7, comma-separated: :load sensors only 0,3,5
+                uint32_t mask = 0;
+                for ( const char* q = argv[ 3 ]; *q != '\0'; q++ ) {
+                    if ( *q >= '0' && *q <= '7' )
+                        mask |= 1u << ( *q - '0' );
+                }
+                magArray.powerOnly( mask );
+                snprintf( line, sizeof( line ), "sensors %s powered, the rest off (:load sensors on brings them back)", argv[ 3 ] );
+                consoleOk( out, line );
             } else if ( argv[ 2 ][ 0 ] >= '0' && argv[ 2 ][ 0 ] <= '9' ) {
                 int n = atoi( argv[ 2 ] );
                 magArray.powerOffFrom( n );
                 snprintf( line, sizeof( line ), "the first %d sensor%s powered, the rest off (:load sensors on brings them back)", n, n == 1 ? "" : "s" );
                 consoleOk( out, line );
             } else {
-                consoleErr( out, "usage: :load sensors on|off|lp|ln|<n>" );
+                consoleErr( out, "usage: :load sensors on|off|lp|ln|<n>|only <list, e.g. 0,3,5>" );
             }
 #else
             consoleErr( out, "no array in this build" );
+#endif
+            return;
+        }
+        if ( strcmp( argv[ 1 ], "fit" ) == 0 && ( on || off ) ) {
+#if MODULE_MAG_LOCATOR
+            magLocator.fitHeld = off;
+            consoleOk( out, on ? "fit running" : "fit held (the frames flow; nothing is fitted, so no fix, no tracking)" );
+#else
+            consoleErr( out, "no locator in this build" );
 #endif
             return;
         }
@@ -189,7 +208,7 @@ static void onLoadVerb( int argc, char** argv, Stream* out ) {
 #endif
             return;
         }
-        consoleErr( out, "usage: :load [strip|display|heartbeat on|off] [sampler on|off|<ms>] [sensors on|off|lp|ln|<n>] [lcd <MHz>]" );
+        consoleErr( out, "usage: :load [strip|display|heartbeat|fit on|off] [sampler on|off|<ms>] [sensors on|off|lp|ln|<n>|only <list>] [lcd <MHz>]" );
         return;
     }
     out->println( "load{" );
@@ -218,6 +237,11 @@ static void onLoadVerb( int argc, char** argv, Stream* out ) {
     } else {
         snprintf( line, sizeof( line ), "sampler: %s, free-running (%.0f passes/s since the last look; :load sampler <ms> paces it)", magArray.samplerHeld ? "HELD" : "running", passes );
     }
+    out->println( line );
+#endif
+#if MODULE_MAG_LOCATOR
+    snprintf( line, sizeof( line ), "fit: %s, the last %lu us (a tracking fit), %lu cold starts since boot, the last %lu us - the V5F's heaviest work, in bursts", magLocator.fitHeld ? "HELD" : "running",
+              (unsigned long)magLocator.fix.fitUs, (unsigned long)magLocator.coldStarts, (unsigned long)magLocator.coldStartUs );
     out->println( line );
 #endif
     snprintf( line, sizeof( line ), "heartbeat: %s (green LED, 1 k to VDDIO, ~2 mA at 1 Hz)", heartbeat.enabled ? "on" : "off" );
@@ -328,7 +352,7 @@ void setup( ) {
     // The dumps (:screen:ascii, :leds...) go out a row a tick from here.
     dump.begin( );
     jOS.registerService( &dump );
-    consoleAddVerb( "load", "[strip|display|heartbeat on|off] [sampler on|off|<ms>] [sensors on|off|lp|ln|<n>] [lcd <MHz>]", "what draws from the 3.3 V rail and changes; switches for a bisect", CONSOLE_CHANGES, onLoadVerb );
+    consoleAddVerb( "load", "[strip|display|heartbeat|fit on|off] [sampler on|off|<ms>] [sensors on|off|lp|ln|<n>|only <list>] [lcd <MHz>]", "what draws from the 3.3 V rail and changes; switches for a bisect", CONSOLE_CHANGES, onLoadVerb );
 
     console.printHelp( );
     boardLed( PIN_LED_BLUE, false );

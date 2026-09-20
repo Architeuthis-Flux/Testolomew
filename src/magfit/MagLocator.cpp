@@ -463,7 +463,14 @@ ServiceStatus MagLocator::service( ) {
     if ( sim.on && sim.untilMs != 0 && (int32_t)( millis( ) - sim.untilMs ) >= 0 ) {
         simProbeOff( );
     }
-    lastStatus = sim.on ? simFrame( &in ) : fitFrame( &in );
+    if ( fitHeld ) {
+        fix.valid = false;
+        fix.present = false;
+        result.valid = false;
+        lastStatus = ServiceStatus::IDLE;
+    } else {
+        lastStatus = sim.on ? simFrame( &in ) : fitFrame( &in );
+    }
     learnFloor( millis( ) );
     track.surfaceZ = boardZ;
     track.tipOffsetMm = tipOffsetMm;
@@ -626,6 +633,7 @@ ServiceStatus MagLocator::fitFrame( MagTrackInput* in ) {
             return ServiceStatus::IDLE;
         }
         nextColdStartMs = now + MAGLOC_COLD_START_PERIOD_MS;
+        coldStarts++;
     }
     Vec3 lastGood = result.position;
 
@@ -637,6 +645,8 @@ ServiceStatus MagLocator::fitFrame( MagTrackInput* in ) {
         good = magFitSolve( magArray.position, smooth, magArray.fresh, magArray.sensorCount( ), MAGLOC_MAX_MISFIT, &result );
     }
     fix.fitUs = micros( ) - start;
+    if ( !wasTracking )
+        coldStartUs = fix.fitUs;
     MagFitResult thisFrame = result; // as fitted, before the ride-through below may put the last good position back
     Vec3 position = result.position, sigma = result.sigma;
     float residual = result.residual, signal = result.signal;
