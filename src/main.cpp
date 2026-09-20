@@ -15,6 +15,8 @@
 // as in arduino-pico); everything here runs on the 400 MHz V5F for now.
 // ---------------------------------------------------------------------------
 #include <Arduino.h>
+#include <stdlib.h>
+#include <string.h>
 
 #include "BoardPins.h"
 #include "Console.h"
@@ -30,6 +32,7 @@
 #endif
 #if MODULE_MAG_VIEW
 #include "Display.h"
+#include "ST7789.h"
 #endif
 #if MODULE_ROW_COUNT
 #include "RowCounter.h"
@@ -80,19 +83,109 @@
 class HeartbeatService : public Service {
   public:
     ServiceStatus service( ) override {
-        on = !on;
+        on = enabled && !on;
         boardLed( PIN_LED_GREEN, on );
         return ServiceStatus::IDLE;
     }
     const char* getName( ) const override { return "Heartbeat"; }
     ServicePriority getPriority( ) const override { return ServicePriority::LOW; }
     uint32_t periodUs( ) const override { return 500000; }
+    bool enabled = true; // :load heartbeat off: the LED is on VDDIO through 1 k, 2 mA at 1 Hz
 
   private:
     bool on = false;
 };
 
 static HeartbeatService heartbeat;
+
+// :load - what draws from the 3.3 V rail and changes, and switches to take
+// each away for a bisect (the LCD's backlight hangs straight off that rail
+// with no resistor of its own, so it shows every millivolt: the board's
+// VDDIO is the ME6211 LDO's 3.3 V through R2, shared with VDD33, the LCD
+// and the header's 3V3).
+static void onLoadVerb( int argc, char** argv, Stream* out ) {
+    char line[ 200 ];
+    if ( argc >= 3 ) {
+        bool on = strcmp( argv[ 2 ], "on" ) == 0;
+        bool off = strcmp( argv[ 2 ], "off" ) == 0;
+        if ( strcmp( argv[ 1 ], "strip" ) == 0 && ( on || off ) ) {
+#if MODULE_PROBE_LEDS
+            probeLeds.setStrip( on, nullptr );
+            consoleOk( out, on ? "strip on" : "strip off (cleared)" );
+#else
+            consoleErr( out, "no strip in this build" );
+#endif
+            return;
+        }
+        if ( strcmp( argv[ 1 ], "display" ) == 0 && ( on || off ) ) {
+#if MODULE_MAG_VIEW
+            display.hold = off; // held: no frames go to the panel (the picture stays)
+            consoleOk( out, on ? "display running" : "display held (no pushes)" );
+#else
+            consoleErr( out, "no display in this build" );
+#endif
+            return;
+        }
+        if ( strcmp( argv[ 1 ], "heartbeat" ) == 0 && ( on || off ) ) {
+            heartbeat.enabled = on;
+            consoleOk( out, on ? "heartbeat on" : "heartbeat off" );
+            return;
+        }
+        if ( strcmp( argv[ 1 ], "sensors" ) == 0 && ( on || off ) ) {
+#if MODULE_MAG_ARRAY
+            if ( off )
+                magArray.powerOff( );
+            else
+                magArray.powerOn( );
+            consoleOk( out, on ? "sensors powered and re-addressed" : "sensors off (their VCC pins low, the sampler paused)" );
+#else
+            consoleErr( out, "no array in this build" );
+#endif
+            return;
+        }
+        if ( strcmp( argv[ 1 ], "lcd" ) == 0 ) {
+#if MODULE_MAG_VIEW
+            long mhz = atol( argv[ 2 ] );
+            if ( mhz < 1 || mhz > 100 ) {
+                consoleErr( out, "usage: :load lcd <MHz 1-100> (50 at boot; the core rounds down to 100 MHz / 2^n)" );
+                return;
+            }
+            st7789SetSpiHz( (uint32_t)mhz * 1000000u );
+            snprintf( line, sizeof( line ), "LCD SPI asked for %ld MHz", mhz );
+            consoleOk( out, line );
+#else
+            consoleErr( out, "no display in this build" );
+#endif
+            return;
+        }
+        consoleErr( out, "usage: :load [strip|display|heartbeat|sensors on|off] [lcd <MHz>]" );
+        return;
+    }
+    out->println( "load{" );
+#if MODULE_PROBE_LEDS
+    if ( probeLeds.strip ) {
+        snprintf( line, sizeof( line ), "strip: on, %lu frames since the last report, %.0f mA now, %.0f-%.0f mA, the biggest change from one frame to the next %.0f mA (budget %.0f, by the %.0f mA/channel model)",
+                  (unsigned long)probeLeds.stripFramesSent, probeLeds.stripLastMa, probeLeds.stripLeastMa, probeLeds.stripMostMa, probeLeds.stripMaxStepMa, probeLeds.stripBudgetMa( ), PROBELED_MA_PER_CHANNEL );
+        probeLeds.resetStripWindow( );
+    } else {
+        snprintf( line, sizeof( line ), "strip: off%s", PIN_LED_STRIP >= 0 ? " (wired: :load strip on)" : "" );
+    }
+    out->println( line );
+#endif
+#if MODULE_MAG_VIEW
+    snprintf( line, sizeof( line ), "display: %s, %.0f fps, SPI %lu MHz, two DMA bands a frame (115 KB); the panel's own current follows the picture", display.hold ? "HELD" : "running", display.fps( ),
+              (unsigned long)( st7789SpiHz( ) / 1000000u ) );
+    out->println( line );
+#endif
+#if MODULE_MAG_ARRAY
+    snprintf( line, sizeof( line ), "sensors: %s, %d of %d answering, continuous low-noise conversion ~3 mA each from their GPIO supplies", magArray.poweredOff ? "OFF" : "on", magArray.sensorsOk( ), magArray.sensorCount( ) );
+    out->println( line );
+#endif
+    snprintf( line, sizeof( line ), "heartbeat: %s (green LED, 1 k to VDDIO, ~2 mA at 1 Hz)", heartbeat.enabled ? "on" : "off" );
+    out->println( line );
+    out->println( "fixed: the LCD backlight (LEDA straight to VDDIO, no series resistor on the board), the LCD's VDD, the cores from VDD33 (the same LDO), the joystick's pots" );
+    out->println( "}" );
+}
 
 void setup( ) {
     Serial.begin( CONSOLE_BAUD );
@@ -196,6 +289,7 @@ void setup( ) {
     // The dumps (:screen:ascii, :leds...) go out a row a tick from here.
     dump.begin( );
     jOS.registerService( &dump );
+    consoleAddVerb( "load", "[strip|display|heartbeat|sensors on|off] [lcd <MHz>]", "what draws from the 3.3 V rail and changes; switches for a bisect", CONSOLE_CHANGES, onLoadVerb );
 
     console.printHelp( );
     boardLed( PIN_LED_BLUE, false );

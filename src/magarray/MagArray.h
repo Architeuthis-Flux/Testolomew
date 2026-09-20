@@ -106,6 +106,13 @@ class MagArray : public Service {
     void restoreBaseline( const Vec3* list, int count, const char* origin = "the saved zero" );
     void shiftBaseline( int i, Vec3 by );
 
+    // The sensors' supply pins driven low (and the sampler paused): every
+    // sensor off, for a power bisect. powerOn() is begin( false ): the walk
+    // again, the zero in use kept.
+    void powerOff( );
+    void powerOn( );
+    bool poweredOff = false;
+
     void startBaseline( );
     // Move the baseline a fraction of the way to the latest raw readings (the
     // locator calls this while it sees nothing, to track slow drift).

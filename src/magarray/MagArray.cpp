@@ -644,6 +644,24 @@ void MagArray::publishFrame( ) {
     frameCount++;
 }
 
+void MagArray::powerOff( ) {
+    if ( simulatedFrames )
+        return;
+    pauseSampler( );
+    for ( int i = 0; i < MAG_SENSOR_COUNT; i++ ) {
+        digitalWrite( magSensorPlaces[ i ].vccPin, LOW );
+        sensors[ i ].ok = false;
+    }
+    poweredOff = true;
+}
+
+void MagArray::powerOn( ) {
+    if ( !poweredOff )
+        return;
+    poweredOff = false;
+    begin( false );
+}
+
 void MagArray::useSimulatedFrames( ) {
     simulatedFrames = true;
     samplerOn = false;
@@ -666,8 +684,8 @@ ServiceStatus MagArray::service( ) {
         return lastStatus;
     }
 
-    if ( magSamplerParked( ) ) {
-        return ServiceStatus::IDLE; // F: the other core is parked for a flash; nothing to read, nothing to recover
+    if ( magSamplerParked( ) || poweredOff ) {
+        return ServiceStatus::IDLE; // F: the other core is parked for a flash; or :load sensors off. Nothing to read, nothing to recover
     }
     if ( sensorsOk( ) < MAG_SENSOR_COUNT && now >= nextRecoveryMs ) {
         nextRecoveryMs = now + RECOVERY_PERIOD_MS;

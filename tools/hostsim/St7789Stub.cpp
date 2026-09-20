@@ -9,6 +9,15 @@
 #include <string.h>
 
 uint16_t simPanel[ LCD_WIDTH * LCD_HEIGHT ];
+static uint32_t spiHz = LCD_SPI_HZ;
+
+void st7789SetSpiHz( uint32_t hz ) {
+    spiHz = hz;
+}
+
+uint32_t st7789SpiHz( void ) {
+    return spiHz;
+}
 uint32_t simPushes = 0;
 static bool inFlight = false;
 static uint64_t doneUs = 0;
@@ -39,7 +48,7 @@ bool st7789PushRowsStart( uint16_t* frame, int y0, int rows ) {
     pushBand( frame, y0, rows );
     inFlight = true;
     // rows x 240 px x 16 bits at LCD_SPI_HZ: a 120-row band is ~9 ms.
-    doneUs = simMicros + (uint64_t)rows * LCD_WIDTH * 16 * 1000000ull / LCD_SPI_HZ;
+    doneUs = simMicros + (uint64_t)rows * LCD_WIDTH * 16 * 1000000ull / spiHz;
     return true;
 }
 

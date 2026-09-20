@@ -8,6 +8,16 @@
 
 #define LCD_BUS SPI
 
+static uint32_t spiHz = LCD_SPI_HZ;
+
+void st7789SetSpiHz( uint32_t hz ) {
+    spiHz = hz < 1000000u ? 1000000u : ( hz > 100000000u ? 100000000u : hz );
+}
+
+uint32_t st7789SpiHz( void ) {
+    return spiHz;
+}
+
 #define CMD_SWRESET 0x01
 #define CMD_SLPOUT 0x11
 #define CMD_NORON 0x13
@@ -57,7 +67,7 @@ bool st7789Begin( void ) {
     digitalWrite( PIN_LCD_RST, HIGH );
     delay( 120 );
 
-    LCD_BUS.beginTransaction( SPISettings( LCD_SPI_HZ, MSBFIRST, LCD_SPI_MODE ) );
+    LCD_BUS.beginTransaction( SPISettings( spiHz, MSBFIRST, LCD_SPI_MODE ) );
     digitalWrite( PIN_LCD_CS, LOW );
 
     writeCommand( CMD_SWRESET, nullptr, 0 );
@@ -93,7 +103,7 @@ void st7789PushRows( uint16_t* frame, int y0, int rows ) {
         band[ i ] = (uint16_t)( ( band[ i ] << 8 ) | ( band[ i ] >> 8 ) );
     }
 
-    LCD_BUS.beginTransaction( SPISettings( LCD_SPI_HZ, MSBFIRST, LCD_SPI_MODE ) );
+    LCD_BUS.beginTransaction( SPISettings( spiHz, MSBFIRST, LCD_SPI_MODE ) );
     digitalWrite( PIN_LCD_CS, LOW );
     setWindow( LCD_X_OFFSET, LCD_Y_OFFSET + y0, LCD_X_OFFSET + LCD_WIDTH - 1, LCD_Y_OFFSET + y0 + rows - 1 );
     writeCommand( CMD_RAMWR, nullptr, 0 );
@@ -132,7 +142,7 @@ bool st7789PushRowsStart( uint16_t* frame, int y0, int rows ) {
         band[ i ] = (uint16_t)( ( band[ i ] << 8 ) | ( band[ i ] >> 8 ) );
     }
 
-    LCD_BUS.beginTransaction( SPISettings( LCD_SPI_HZ, MSBFIRST, LCD_SPI_MODE ) );
+    LCD_BUS.beginTransaction( SPISettings( spiHz, MSBFIRST, LCD_SPI_MODE ) );
     digitalWrite( PIN_LCD_CS, LOW );
     setWindow( LCD_X_OFFSET, LCD_Y_OFFSET + y0, LCD_X_OFFSET + LCD_WIDTH - 1, LCD_Y_OFFSET + y0 + rows - 1 );
     writeCommand( CMD_RAMWR, nullptr, 0 );

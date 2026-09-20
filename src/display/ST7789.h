@@ -51,4 +51,9 @@ bool st7789PushRowsStart( uint16_t* frame, int y0, int rows );
 bool st7789PushBusy( void );
 void st7789PushFinish( void );
 
+// The SPI clock for the pushes from now on (LCD_SPI_HZ at boot; the core
+// picks the largest power-of-two division of 100 MHz not over it).
+void st7789SetSpiHz( uint32_t hz );
+uint32_t st7789SpiHz( void );
+
 #endif // ST7789_H

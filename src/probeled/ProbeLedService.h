@@ -97,6 +97,17 @@ class ProbeLedService : public Service {
     uint32_t stripScaledFrames = 0; // frames scaled down to it
     float stripWorstScale = 1.0f;   // the smallest scale applied since the last `n`
     float stripLastMa = 0.0f;       // the last frame's estimated current, after scaling
+    // ...and since the last :load report: the least and most a frame drew,
+    // the biggest change from one frame to the next, and how many frames
+    // went out (a WS2812 keeps its last frame, so the current changes only
+    // when a frame does).
+    float stripLeastMa = 0.0f, stripMostMa = 0.0f, stripMaxStepMa = 0.0f;
+    uint32_t stripFramesSent = 0;
+    void resetStripWindow( ) {
+        stripLeastMa = stripMostMa = stripLastMa;
+        stripMaxStepMa = 0.0f;
+        stripFramesSent = 0;
+    }
 
     void useV5( bool on );
     // The chain on or off (off clears it); nothing happens if it is so already.

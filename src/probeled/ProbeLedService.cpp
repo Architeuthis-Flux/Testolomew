@@ -222,6 +222,7 @@ void ProbeLedService::sendFrame( bool chainFree, bool topFree, int count ) {
     // Scaled channels are truncated, not rounded: rounding up by half a
     // count on each of 1200 channels is 28 mA past the budget (8 % of it).
     // What is sent is what is summed for the report.
+    float wasMa = stripLastMa;
     stripLastMa = 0.0f;
     for ( int p = 0; p < count; p++ ) {
         uint8_t r = stripRgb[ p ][ 0 ], g = stripRgb[ p ][ 1 ], b = stripRgb[ p ][ 2 ];
@@ -238,11 +239,25 @@ void ProbeLedService::sendFrame( bool chainFree, bool topFree, int count ) {
     }
     stripBudgetUs = micros( ) - tb;
     uint32_t ts = micros( );
+    bool sent = false;
     if ( chainFree )
-        ledStripShow( &chain );
+        sent = ledStripShow( &chain ) || sent;
     if ( topFree )
-        ledStripShow( &top );
+        sent = ledStripShow( &top ) || sent;
     stripShowUs = micros( ) - ts;
+    if ( sent ) {
+        // The chain's current changes only when a frame goes out.
+        float step = stripLastMa - wasMa;
+        if ( step < 0.0f )
+            step = -step;
+        if ( step > stripMaxStepMa )
+            stripMaxStepMa = step;
+        if ( stripFramesSent == 0 || stripLastMa < stripLeastMa )
+            stripLeastMa = stripLastMa;
+        if ( stripFramesSent == 0 || stripLastMa > stripMostMa )
+            stripMostMa = stripLastMa;
+        stripFramesSent++;
+    }
 }
 
 void ProbeLedService::printCursorLine( Stream* out ) const {

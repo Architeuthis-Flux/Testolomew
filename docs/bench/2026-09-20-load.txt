@@ -1,0 +1,123 @@
+    0.0 x
+    0.0 :load
+    0.0 load{
+    0.0 strip: on, 0 frames since the last report, 0 mA now, 0-0 mA, the biggest change from one frame to the next 0 mA (budget 1000, by the 12 mA/channel model)
+    0.0 display: running, 41 fps, SPI 50 MHz, two DMA bands a frame (115 KB); the panel's own current follows the picture
+    0.0 sensors: on, 8 of 8 answering, continuous low-noise conversion ~3 mA each from their GPIO supplies
+    0.0 heartbeat: on (green LED, 1 k to VDDIO, ~2 mA at 1 Hz)
+    0.1 fixed: the LCD backlight (LEDA straight to VDDIO, no series resistor on the board), the LCD's VDD, the cores from VDD33 (the same LDO), the joystick's pots
+    0.1 }
+    0.0 :probe row 14 3
+    0.0 ok{probe sim: magnet 24.0 30.2 16.3 shaft 0.00 0.00 1.00 sigma 0.30}
+    0.0 row  14   this fix  14.00 (-0.00) hole 3  +/-0.12 rows  100 % sure  track  14.00 +/-0.12 100 %   x 24.0 y 30.2 z 16.3 down  misfit 2 %  seen by 8+0 faint
+    0.5 row  14   this fix  14.00 (-0.00) hole 3  +/-0.12 rows  100 % sure  track  14.00 +/-0.12 100 %   x 24.0 y 30.2 z 16.3 down  misfit 2 %  seen by 8+0 faint
+    1.0 row  14   this fix  14.00 (-0.00) hole 3  +/-0.12 rows  100 % sure  track  14.00 +/-0.12 100 %   x 24.0 y 30.2 z 16.3 down  misfit 2 %  seen by 8+0 faint
+    1.5 row  14   this fix  14.00 (-0.00) hole 3  +/-0.12 rows  100 % sure  track  14.00 +/-0.12 100 %   x 24.0 y 30.2 z 16.3 down  misfit 2 %  seen by 8+0 faint
+    2.1 row  14   this fix  14.00 (-0.00) hole 3  +/-0.12 rows  100 % sure  track  14.00 +/-0.12 100 %   x 24.0 y 30.2 z 16.3 down  misfit 2 %  seen by 8+0 faint
+    2.6 row  14   this fix  14.00 (-0.00) hole 3  +/-0.12 rows  100 % sure  track  14.00 +/-0.12 100 %   x 24.0 y 30.2 z 16.3 down  misfit 2 %  seen by 8+0 faint
+    0.0 
+    0.0 :load
+    0.0 load{
+    0.0 strip: on, 6 frames since the last report, 36 mA now, 15-36 mA, the biggest change from one frame to the next 15 mA (budget 1000, by the 12 mA/channel model)
+    0.0 display: running, 42 fps, SPI 50 MHz, two DMA bands a frame (115 KB); the panel's own current follows the picture
+    0.0 sensors: on, 8 of 8 answering, continuous low-noise conversion ~3 mA each from their GPIO supplies
+    0.0 heartbeat: on (green LED, 1 k to VDDIO, ~2 mA at 1 Hz)
+    0.1 fixed: the LCD backlight (LEDA straight to VDDIO, no series resistor on the board), the LCD's VDD, the cores from VDD33 (the same LDO), the joystick's pots
+    0.1 }
+    0.2 row  14   this fix  14.00 (-0.00) hole 3  +/-0.12 rows  100 % sure  track  14.00 +/-0.12 100 %   x 24.0 y 30.2 z 16.3 down  misfit 2 %  seen by 8+0 faint
+    0.7 row  14   this fix  14.00 (-0.00) hole 3  +/-0.12 rows  100 % sure  track  14.00 +/-0.12 100 %   x 24.0 y 30.2 z 16.3 down  misfit 2 %  seen by 8+0 faint
+    1.2 row  14   this fix  14.00 (-0.00) hole 3  +/-0.12 rows  100 % sure  track  14.00 +/-0.12 100 %   x 24.0 y 30.2 z 16.3 down  misfit 2 %  seen by 8+0 faint
+    1.8 row  14   this fix  14.00 (-0.00) hole 3  +/-0.12 rows  100 % sure  track  14.00 +/-0.12 100 %   x 24.0 y 30.2 z 16.3 down  misfit 2 %  seen by 8+0 faint
+    2.3 row  14   this fix  14.00 (-0.00) hole 3  +/-0.12 rows  100 % sure  track  14.00 +/-0.12 100 %   x 24.0 y 30.2 z 16.3 down  misfit 2 %  seen by 8+0 faint
+    2.8 row  14   this fix  14.00 (-0.00) hole 3  +/-0.12 rows  100 % sure  track  14.00 +/-0.12 100 %   x 24.0 y 30.2 z 16.3 down  misfit 2 %  seen by 8+0 faint
+    3.3 row  14   this fix  14.00 (-0.00) hole 3  +/-0.12 rows  100 % sure  track  14.00 +/-0.12 100 %   x 24.0 y 30.2 z 16.3 down  misfit 2 %  seen by 8+0 faint
+    3.8 row  14   this fix  14.00 (-0.00) hole 3  +/-0.12 rows  100 % sure  track  14.00 +/-0.12 100 %   x 24.0 y 30.2 z 16.3 down  misfit 2 %  seen by 8+0 faint
+    0.0 row  14   this fix  14.00 (-0.00) hole 3  +/-0.12 rows  100 % sure  track  14.00 +/-0.12 100 %   x 24.0 y 30.2 z 16.3 down  misfit 2 %  seen by 8+0 faint
+    0.0 :probe row 20 2 8
+    0.0 ok{probe sim: magnet 39.2 28.1 24.3 shaft 0.00 0.00 1.00 sigma 0.30}
+    0.3 row  20   this fix  20.00 (-0.00) hole 2  +/-0.12 rows  100 % sure  track  20.00 +/-0.12 100 %   x 39.2 y 28.1 z 24.3 up  misfit 2 %  seen by 8+0 faint
+    0.8 row  20   this fix  20.00 (-0.00) hole 2  +/-0.12 rows  100 % sure  track  20.00 +/-0.12 100 %   x 39.2 y 28.1 z 24.3 up  misfit 2 %  seen by 8+0 faint
+    1.3 row  20   this fix  20.00 (-0.00) hole 2  +/-0.12 rows  100 % sure  track  20.00 +/-0.12 100 %   x 39.2 y 28.1 z 24.3 up  misfit 2 %  seen by 8+0 faint
+    1.8 row  20   this fix  20.00 (-0.00) hole 2  +/-0.12 rows  100 % sure  track  20.00 +/-0.12 100 %   x 39.2 y 28.1 z 24.3 up  misfit 2 %  seen by 8+0 faint
+    2.4 row  20   this fix  20.00 (-0.00) hole 2  +/-0.12 rows  100 % sure  track  20.00 +/-0.12 100 %   x 39.2 y 28.1 z 24.3 up  misfit 2 %  seen by 8+0 faint
+    2.9 row  20   this fix  20.00 (-0.00) hole 2  +/-0.12 rows  100 % sure  track  20.00 +/-0.12 100 %   x 39.2 y 28.1 z 24.3 up  misfit 2 %  seen by 8+0 faint
+    0.0 :load
+    0.0 load{
+    0.0 strip: on, 20 frames since the last report, 28 mA now, 28-44 mA, the biggest change from one frame to the next 4 mA (budget 1000, by the 12 mA/channel model)
+    0.0 display: running, 42 fps, SPI 50 MHz, two DMA bands a frame (115 KB); the panel's own current follows the picture
+    0.0 sensors: on, 8 of 8 answering, continuous low-noise conversion ~3 mA each from their GPIO supplies
+    0.0 heartbeat: on (green LED, 1 k to VDDIO, ~2 mA at 1 Hz)
+    0.1 fixed: the LCD backlight (LEDA straight to VDDIO, no series resistor on the board), the LCD's VDD, the cores from VDD33 (the same LDO), the joystick's pots
+    0.1 }
+    0.1 row  20   this fix  20.00 (-0.00) hole 2  +/-0.12 rows  100 % sure  track  20.00 +/-0.12 100 %   x 39.2 y 28.1 z 24.3 up  misfit 2 %  seen by 8+0 faint
+    0.5 row  20   this fix  20.00 (-0.00) hole 2  +/-0.12 rows  100 % sure  track  20.00 +/-0.12 100 %   x 39.2 y 28.1 z 24.3 up  misfit 2 %  seen by 8+0 faint
+    1.0 row  20   this fix  20.00 (-0.00) hole 2  +/-0.12 rows  100 % sure  track  20.00 +/-0.12 100 %   x 39.2 y 28.1 z 24.3 up  misfit 2 %  seen by 8+0 faint
+    1.5 row  20   this fix  20.00 (-0.00) hole 2  +/-0.12 rows  100 % sure  track  20.00 +/-0.12 100 %   x 39.2 y 28.1 z 24.3 up  misfit 2 %  seen by 8+0 faint
+    2.0 row  20   this fix  20.00 (-0.00) hole 2  +/-0.12 rows  100 % sure  track  20.00 +/-0.12 100 %   x 39.2 y 28.1 z 24.3 up  misfit 2 %  seen by 8+0 faint
+    2.6 row  20   this fix  20.00 (-0.00) hole 2  +/-0.12 rows  100 % sure  track  20.00 +/-0.12 100 %   x 39.2 y 28.1 z 24.3 up  misfit 2 %  seen by 8+0 faint
+    3.1 row  20   this fix  20.00 (-0.00) hole 2  +/-0.12 rows  100 % sure  track  20.00 +/-0.12 100 %   x 39.2 y 28.1 z 24.3 up  misfit 2 %  seen by 8+0 faint
+    3.6 row  20   this fix  20.00 (-0.00) hole 2  +/-0.12 rows  100 % sure  track  20.00 +/-0.12 100 %   x 39.2 y 28.1 z 24.3 up  misfit 2 %  seen by 8+0 faint
+    0.0 
+    0.0 :probe off
+    0.0 ok{probe sim off}
+    1.0 row: no fix
+    0.0 :load
+    0.0 load{
+    0.0 strip: on, 24 frames since the last report, 0 mA now, 0-29 mA, the biggest change from one frame to the next 7 mA (budget 1000, by the 12 mA/channel model)
+    0.0 display: running, 41 fps, SPI 50 MHz, two DMA bands a frame (115 KB); the panel's own current follows the picture
+    0.0 sensors: on, 8 of 8 answering, continuous low-noise conversion ~3 mA each from their GPIO supplies
+    0.0 heartbeat: on (green LED, 1 k to VDDIO, ~2 mA at 1 Hz)
+    0.1 fixed: the LCD backlight (LEDA straight to VDDIO, no series resistor on the board), the LCD's VDD, the cores from VDD33 (the same LDO), the joystick's pots
+    0.1 }
+    0.0 settings: saved in flash (50 records put back at boot, 0 writes since, 0 failed), and what is running is the same:
+    0.0   tuning=3
+    0.0   tracker/tracker on=1
+    0.0   tracker/floor=0.3
+    0.0   tracker/gate=4
+    0.0   tracker/presence=0.04
+    0.0   tracker/far hold=2.5
+    0.0   smoothing/view Hz=1.5
+    0.0   smoothing/view beta=0.5
+    0.0   smoothing/cursor Hz=1
+    0.0   smoothing/cursor beta=0.5
+    0.0   smoothing/shaft Hz=1
+    0.1   smoothing/shaft beta=10
+    0.1   smoothing/camera=0.18
+    0.1   smoothing/POV turn=0.6
+    0.1   smoothing/POV move=0.3
+    0.1   smoothing/accel=10000
+    0.1   cursor/cursor=1
+    0.1   cursor/surface=16.273
+    0.1   cursor/tip=0
+    0.1   cursor/reach=40
+    0.1   camera/mode=5
+    0.1   LEDs/layout=1
+    0.1   LEDs/bright=1
+    0.1   LEDs/strip=1
+    0.1   LEDs/budget mA=1000
+    0.1   LEDs/colours=0
+    0.1   LEDs/full peak=1
+    0.1   LEDs/bloom=0
+    0.1   LEDs/sparkle=0
+    0.1   LEDs/pulse=0
+    0.1   LEDs/fade=0.12
+    0.1   LEDs/touch ring=0
+    0.1   play/hue=0
+    0.1   play/sat=1
+    0.1   play/paint bright=0.5
+    0.1   play/brush=0
+    0.1   play/touch=2
+    0.1   controls/direction ms=30
+    0.1   controls/push guard ms=50
+    0.1   controls/joy menu at=0.1
+    0.1   controls/joy menu off=0.15
+    0.1   controls/joystick=1
+    0.1   zero=0,-0.1415,-0.0493,-0.0471
+    0.1   zero=1,0.0103,0.0561,-0.1583
+    0.1   zero=2,-0.0264,-0.0846,-0.0407
+    0.1   zero=3,-0.1069,-0.1276,-0.0226
+    0.1   zero=4,-0.0493,0.0762,-0.1167
+    0.1   zero=5,0.0216,-0.0253,-0.0297
+    0.1   zero=6,-0.0438,-0.0175,-0.0799
+    0.1   zero=7,0.0068,0.0694,-0.0996
+    0.1   magnet=23.9,3.8,25.5,0.46,-0.38,-0.80,4600
