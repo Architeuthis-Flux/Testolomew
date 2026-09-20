@@ -551,6 +551,7 @@ bool magFitSolveStep( const Vec3* sensors, const Vec3* fields, const bool* use, 
         result->coldBest = coarse;
         result->coldCost = 1e30f; // the lattice's cost is not a refined one: the refinement decides
         result->coldIterations = 0;
+        result->coldSeedIterations = 0;
         return false;
     } else if ( result->coldStage == 1 ) {
         // Stage 1: refine the lattice's point - on a budget, resumed next
@@ -579,13 +580,30 @@ bool magFitSolveStep( const Vec3* sensors, const Vec3* fields, const bool* use, 
         }
         result->coldStage = 0;
     } else {
-        // Stage k >= 2: seed k-2, on a short budget.
+        // Stage k >= 2: seed k-2, on a short budget - and with a steady
+        // budget smaller than that, resumed over calls from where it got
+        // (coldSeedPoint / coldSeedIterations) so a seed keeps its
+        // LM_SEED_ITERATIONS however small each call is.
         best = result->coldBest;
         bestCost = result->coldCost;
         int seed = result->coldStage - 2;
-        Vec3 start = { cx / cw + coldSeeds[ seed ][ 0 ], cy / cw + coldSeeds[ seed ][ 1 ], coldSeeds[ seed ][ 2 ] };
+        Vec3 start;
+        if ( result->coldSeedIterations == 0 ) {
+            start = { cx / cw + coldSeeds[ seed ][ 0 ], cy / cw + coldSeeds[ seed ][ 1 ], coldSeeds[ seed ][ 2 ] };
+        } else {
+            start = result->coldSeedPoint;
+        }
+        int callIt = budget > 0 && budget < LM_SEED_ITERATIONS ? budget : seedIt;
+        bool converged = true;
+        int before = result->iterations;
         Vec3 p;
-        float cost = refine( &fp, start, &p, &result->iterations, seedIt, minIt );
+        float cost = refine( &fp, start, &p, &result->iterations, callIt, minIt, &converged );
+        result->coldSeedIterations += result->iterations - before;
+        if ( budget > 0 && !converged && result->coldSeedIterations < LM_SEED_ITERATIONS ) {
+            result->coldSeedPoint = p;
+            return false; // more of this seed next call
+        }
+        result->coldSeedIterations = 0;
         if ( cost < bestCost ) {
             bestCost = cost;
             best = p;

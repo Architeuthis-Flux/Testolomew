@@ -30,6 +30,8 @@ int main(int argc, char** argv){ console.begin(&Serial); magArray.begin(); magAr
   if (argc>=7){ tr.viewMinCutoff=atof(argv[1]); tr.viewBeta=atof(argv[2]); tr.oneEuroMinCutoff=atof(argv[3]); tr.oneEuroBeta=atof(argv[4]); tr.shaftMinCutoff=atof(argv[5]); tr.shaftBeta=atof(argv[6]); }
   if (argc>=8) tr.accelSigma=atof(argv[7]);
   if (argc>=9) magLocator.speedJitterK=atof(argv[8]);
+  // "steady N" as the last two arguments: the fit on a steady budget of N iterations a frame (MagLocator's fit load), to see what it costs in error and lag.
+  if (argc>=3 && strcmp(argv[argc-2], "steady")==0) { magLocator.steadyFit = true; magLocator.steadyIterations = atof(argv[argc-1]); argc -= 2; printf("fit load: steady, %.0f iterations a frame\n", magLocator.steadyIterations); }
   bool far = argc>=2 && strcmp(argv[argc-1], "far")==0; // hovering 12-22 mm above the surface instead of writing on it: the weak-field smoothing is on
   float zLow = far ? 30.0f : 17.5f, zHigh = far ? 40.0f : 24.0f;
   if (far) printf("far: hovering %.0f-%.0f mm up\n", zLow, zHigh);

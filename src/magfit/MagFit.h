@@ -71,6 +71,8 @@ struct MagFitResult {
     Vec3 coldBest;
     float coldCost;
     int coldIterations; // spent on the lattice's point so far (a steady budget resumes it)
+    int coldSeedIterations; // ...and on the current seed (likewise), with where it got to
+    Vec3 coldSeedPoint;
 };
 
 // The error bar. At the answer, the fit knows how much every reading would

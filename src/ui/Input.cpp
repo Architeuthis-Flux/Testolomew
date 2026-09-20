@@ -215,8 +215,8 @@ void Input::printNavTrace( Stream* out ) const {
 void Input::printInputs( Stream* out ) const {
     char line[ 200 ];
     if ( joystickFitted ) {
-        snprintf( line, sizeof( line ), "joystick raw x %d y %d of %.0f (centre %.0f)  ->  linear x %+.2f y %+.2f, expo x %+.2f y %+.2f (dead zone %.0f %%, full at %.0f %%)  press %s (pin %s, %s)",
-                  analogRead( PIN_JOY_X ), analogRead( PIN_JOY_Y ), joyFullScale, 0.5f * joyFullScale, joyRawX, joyRawY, joyX, joyY, INPUT_JOY_DEAD * 100.0f, INPUT_JOY_OUTER * 100.0f,
+        snprintf( line, sizeof( line ), "joystick raw x %d y %d of %.0f (centre followed to %.0f %.0f)  ->  linear x %+.2f y %+.2f, expo x %+.2f y %+.2f (dead zone %.0f %%, full at %.0f %%)  press %s (pin %s, %s)",
+                  analogRead( PIN_JOY_X ), analogRead( PIN_JOY_Y ), joyFullScale, joyCentreX, joyCentreY, joyRawX, joyRawY, joyX, joyY, INPUT_JOY_DEAD * 100.0f, INPUT_JOY_OUTER * 100.0f,
                   trackers[ IN_JOY_PRESS ].down ? "DOWN" : "up", pinDown( IN_JOY_PRESS ) ? "reads pressed" : "reads released", sources[ IN_JOY_PRESS ].activeLow ? "active low" : "active high" );
     } else {
         snprintf( line, sizeof( line ), "joystick not fitted (PIN_JOY_X/Y are -1); typed: x %+.2f y %+.2f", joyX, joyY );
@@ -387,6 +387,31 @@ static int readAxis( int pin, int* minSeen, int* maxSeen ) {
     return c < lo ? lo : ( c > hi ? hi : c ); // the median of three
 }
 
+// The stick's centre follows a reading that has held still (within a few
+// counts) for INPUT_JOY_CENTRE_STILL_MS near the centre it has: a resting
+// stick that came back off-centre is centred again within a few seconds; a
+// hand holding a direction moves more than that, or holds further out.
+void Input::followCentre( int rx, int ry, uint32_t now, float half ) {
+    const int stillCounts = 40;
+    bool still = rx - joyStillX <= stillCounts && joyStillX - rx <= stillCounts && ry - joyStillY <= stillCounts && joyStillY - ry <= stillCounts;
+    if ( !still ) {
+        joyStillX = rx;
+        joyStillY = ry;
+        joyStillSinceMs = now;
+        return;
+    }
+    float dx = ( rx - joyCentreX ) / half, dy = ( ry - joyCentreY ) / half;
+    if ( dx * dx + dy * dy > INPUT_JOY_CENTRE_WITHIN * INPUT_JOY_CENTRE_WITHIN ) {
+        return; // held out: a direction, not a rest
+    }
+    if ( now - joyStillSinceMs < INPUT_JOY_CENTRE_STILL_MS ) {
+        return;
+    }
+    float alpha = ( INPUT_PERIOD_US * 1e-6f ) / INPUT_JOY_CENTRE_TAU_S;
+    joyCentreX += alpha * ( rx - joyCentreX );
+    joyCentreY += alpha * ( ry - joyCentreY );
+}
+
 bool Input::pinDown( int c ) const {
     const InputSource& s = sources[ c ];
     return s.pin >= 0 && ( digitalRead( s.pin ) == LOW ) == s.activeLow;
@@ -504,13 +529,15 @@ ServiceStatus Input::service( ) {
         joyRawX = joyX = simJoyX; // a simulated stick is what it says, both ways
         joyRawY = joyY = simJoyY;
     } else if ( joystickFitted ) {
-        // ASSUMPTION: centre at half scale (`j` shows the raw readings).
+        // The centre: half scale to start with, then followed slowly while
+        // the stick sits still near it (`j` shows the raw readings and the centre).
         float half = 0.5f * joyFullScale;
         int rx = readAxis( PIN_JOY_X, &joyMinX, &joyMaxX );
         int ry = readAxis( PIN_JOY_Y, &joyMinY, &joyMaxY );
         joySamples += 3;
-        float x = ( rx - half ) / half;
-        float y = ( ry - half ) / half;
+        followCentre( rx, ry, now, half );
+        float x = ( rx - joyCentreX ) / half;
+        float y = ( ry - joyCentreY ) / half;
         if ( JOY_X_REVERSED )
             x = -x;
         if ( JOY_Y_REVERSED )

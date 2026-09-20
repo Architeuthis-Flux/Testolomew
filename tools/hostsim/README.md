@@ -29,7 +29,7 @@ Two verbs exist only in the simulator: `:screen:png <file>` writes what the pane
 ## The benches
 
 - `make soak`: ten minutes of a random hand (random goals, 3 m/s² accelerations, a 0.3 mT glitch every 40 frames, a 140 ms dropout every 10 s) through the locator, tracker, row counter and LEDs, looking for NaNs, stuck states and tracking error. Its numbers are quoted in `docs/wireless-probe-sensing.md`.
-- `make pencil`: the benchmark the smoothing levers were set by - a hand that writes (50-250 mm/s strokes with pauses, the pencil turning) through the real locator and tracker; reports each output's error and lag, the jitter at rest, the shaft's angle error. `./pencil [viewHz viewBeta cursorHz cursorBeta shaftHz shaftBeta accel [jitterK]] [far]`.
+- `make pencil`: the benchmark the smoothing levers were set by - a hand that writes (50-250 mm/s strokes with pauses, the pencil turning) through the real locator and tracker; reports each output's error and lag, the jitter at rest, the shaft's angle error. `./pencil [viewHz viewBeta cursorHz cursorBeta shaftHz shaftBeta accel [jitterK]] [far] [steady N]` (`steady N`: the fit on a steady budget of N iterations a frame, MagLocator's "fit load").
 - `make navtest`: the nav stick decoder with staggered contact closings and openings (the ALPS stick's push contact closes on every tilt too): a press must come out as a press and a tilt as a direction, never the other.
 
 ## Tools

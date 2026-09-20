@@ -51,6 +51,9 @@
 #define INPUT_DEBOUNCE_MS BUTTON_DEBOUNCE_MS
 #define INPUT_HOLD_MS BUTTON_HOLD_MS
 #define INPUT_JOY_DEAD 0.04f  // the inner dead zone: this much of the travel round the centre is nothing (a scaled radial one: no step at its edge)
+#define INPUT_JOY_CENTRE_WITHIN 0.3f // the centre follows a stick that sits still this close to it...
+#define INPUT_JOY_CENTRE_STILL_MS 1500 // ...for this long (a hand holding a direction is not still that long at that little)
+#define INPUT_JOY_CENTRE_TAU_S 4.0f    // ...with this time constant
 #define INPUT_JOY_OUTER 0.97f // ...and this much is full (a cheap stick does not quite reach the rails)
 #define INPUT_EMULATED_NUDGE_MS 150 // a typed joystick key holds the stick this long
 #define INPUT_TAP_MS 40             // a typed key or :key tap holds the control this long (and the next waits as long)
@@ -122,6 +125,15 @@ class Input : public Service {
     // the single samples since `j` last looked is what shows the transients.
     int joyMinX = 4095, joyMaxX = 0, joyMinY = 4095, joyMaxY = 0;
     uint32_t joySamples = 0;
+    // The stick's centre, in counts: half scale at boot, then followed
+    // slowly (INPUT_JOY_CENTRE_TAU_S) while the stick sits still within
+    // INPUT_JOY_CENTRE_WITHIN of it - a cheap stick springs back to a
+    // different place each time (13 % off on both axes was seen,
+    // 2026-09-20, and at a low menu threshold that is a held direction
+    // repeating for ever).
+    float joyCentreX = 2047.5f, joyCentreY = 2047.5f;
+    uint32_t joyStillSinceMs = 0;
+    int joyStillX = 0, joyStillY = 0;
 
     // The feel (the Settings menu's controls page, saved - a saved value
     // wins over the defines above until a reset): the decoder's guards in
@@ -183,6 +195,7 @@ class Input : public Service {
 
     void post( InputControl c, InputEventKind k );
     bool pinDown( int c ) const;
+    void followCentre( int rx, int ry, uint32_t now, float half );
     void decodeNav( uint32_t now, bool navDown[ 5 ] );
 };
 

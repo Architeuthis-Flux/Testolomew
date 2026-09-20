@@ -85,7 +85,7 @@
 // - converged or not while tracking, one resumable slice of the cold start
 // while hunting - so the V5F's work, and its supply current, is the same
 // every 10 ms rather than a burst now and then. Kevin's idea, 2026-09-20.
-#define MAGLOC_STEADY_ITERATIONS 6 // the default of "fit iters" (an iteration is ~0.85 ms on the CH32H417; tracking needs two or three)
+#define MAGLOC_STEADY_ITERATIONS 2 // the default of "fit iters" (~0.85 ms each on the CH32H417). tools/hostsim/pencil.cpp: 2 a frame tracks exactly as the natural caps do (error, lag and jitter to the last digit); at 1 it loses 0.1 % of frames. More only makes the pulse the supply shows bigger (2026-09-20).
 
 // While tracking, this many frames in a row may fail to fit before the magnet
 // is called lost and the (slow, paced) cold start takes over. Each failed frame
