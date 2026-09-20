@@ -12,7 +12,7 @@ Written 2026-09-19 (midday) as the hand-over for a new chat, after the night of 
 
 ## 2. Home, the apps and the Settings menu
 
-The screen is one of nine things from the **Home** grid (button A): **View** (the 3D scene), **LEDs** (the breadboard's LEDs as the cursor lights them), **Terminal** (the console's log, 40 x 28), **Draw** (the paint app: going to it starts painting, leaving stops), **Target** (the target game, likewise), **Rows** (the counted row, large, with how sure), **Calibrate** (the twelve taps; leaving cancels), **Settings** (the pages below, over the app), **Info** (the build, the sensors, the frame rate, the service table). The probe, the LEDs and the paint go on underneath whatever is open.
+The screen is one of nine things from the **Home** grid (button A): **View** (the 3D scene), **LEDs** (the breadboard's LEDs as the cursor lights them), **Terminal** (the console's log, 40 x 28), **Draw** (the paint app: going to it starts painting, leaving stops), **Settings** (the centre cell: the pages below, over the app), **Target** (the target game, likewise), **Rows** (the counted row, large, with how sure), **Calibrate** (the twelve taps; leaving cancels), **Info** (the build, the sensors, the frame rate, the service table). The probe, the LEDs and the paint go on underneath whatever is open.
 
 The controls mean the same everywhere (the shell, `src/ui/UiShell.cpp`, is the one owner of them):
 

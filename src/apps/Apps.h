@@ -27,7 +27,7 @@ enum UiAppId {
     APP_INFO,
     APP_COUNT
 };
-#define APPS_SETTINGS_CELL 7 // Home: View, LEDs, Terminal, Draw, Target, Rows, Calibrate, Settings, Info
+#define APPS_SETTINGS_CELL 4 // Home: View, LEDs, Terminal, Draw, Settings (the centre), Target, Rows, Calibrate, Info
 
 extern UiApp apps[ APP_COUNT ];
 

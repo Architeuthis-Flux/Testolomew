@@ -275,7 +275,7 @@
 :joy -0.9 -0.9 300
 @run 100
 :screen
-@expect "home: cursor 6 Calibrate"
+@expect "home: cursor 6 Rows"
 @run 400
 :ui go settings
 :ui go controls

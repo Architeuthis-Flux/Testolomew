@@ -1,0 +1,20 @@
+# `j` with a hand on every control, pasted by Kevin on 2026-09-20 08:30: the joystick's push reads
+# pressed (active low, JOY_PRESS_ACTIVE_LOW 1 is right), both axes reach +-1 (X reversed as wired,
+# JOY_X_REVERSED 1), each nav direction decodes with the push contact closed too, the nav press
+# decodes alone, and buttons A and B read. Held masks: 0x200 joystick press, 0x100 joy right,
+# 0x040 joy down, 0x020 joy up, 0x080 joy left, 0x010 nav press, 0x001 nav up, 0x002 down,
+# 0x004 left, 0x008 right, 0x400 A, 0x800 B.
+joystick raw x 2052 y 2078 of 4095 (centre 2048)  ->  linear x +0.00 y +0.00 (a menu direction past 0.25), expo x +0.00 y +0.00 (dead zone 4 %)  press DOWN (pin reads pressed,active low)
+events: 0 waiting, 0 dropped (ring of 32); held mask 0x200
+joystick raw x 7 y 2060 of 4095 (centre 2048)  ->  linear x +1.00 y +0.00 ... held mask 0x100
+joystick raw x 2036 y 76 of 4095 (centre 2048)  ->  linear x +0.00 y -0.96 ... held mask 0x040
+joystick raw x 2037 y 4080 of 4095 (centre 2048)  ->  linear x +0.00 y +0.99 ... held mask 0x020
+joystick raw x 3359 y 2063 of 4095 (centre 2048)  ->  linear x -0.63 y +0.00 ... held mask 0x080
+nav stick contacts up 0 down 0 left 0 right 0 push 1 (stable pattern 0x0, decoded: PRESS)  held mask 0x010
+nav stick contacts up 1 down 0 left 0 right 0 push 1 (stable pattern 0x1, decoded: up )  held mask 0x001
+nav stick contacts up 0 down 1 left 0 right 0 push 1 (stable pattern 0x2, decoded: down )  held mask 0x002
+nav stick contacts up 0 down 0 left 1 right 0 push 1 (stable pattern 0x4, decoded: left )  held mask 0x004
+nav stick contacts up 0 down 0 left 0 right 1 push 1 (stable pattern 0x8, decoded: right )  held mask 0x008
+buttons A DOWN B up  held mask 0x400
+buttons A up B DOWN  held mask 0x800
+feel: a direction after 20 ms (50 with the push contact closed), the press after 20 ms alone, contacts settle 10 ms; the stick is a menu direction past 0.25

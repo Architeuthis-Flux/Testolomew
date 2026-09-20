@@ -49,9 +49,9 @@
 #define INPUT_PERIOD_US 5000
 #define INPUT_DEBOUNCE_MS BUTTON_DEBOUNCE_MS
 #define INPUT_HOLD_MS BUTTON_HOLD_MS
-#define INPUT_JOY_DEAD 0.05f        // fraction of travel ignored round the centre
-#define INPUT_JOY_MENU_AT 0.25f     // as a four-way: this much of the raw travel is a direction (the menu's; the setting "joy menu at")
-#define INPUT_JOY_MENU_OFF 0.6f     // ...released back inside this fraction of it (hysteresis)
+#define INPUT_JOY_DEAD 0.04f        // fraction of travel ignored round the centre
+#define INPUT_JOY_MENU_AT 0.12f     // as a four-way: this much of the raw travel is a direction (the menu's; the setting "joy menu at")
+#define INPUT_JOY_MENU_OFF 0.08f     // ...released back inside this fraction of it (hysteresis)
 #define INPUT_EMULATED_NUDGE_MS 150 // a typed joystick key holds the stick this long
 #define INPUT_TAP_MS 40             // a typed key or :key tap holds the control this long (and the next waits as long)
 #define INPUT_NAV_SETTLE_MS 10      // the nav contacts' pattern has to hold still this long (contact bounce)
@@ -63,8 +63,8 @@
 // (a centre push wobbles the stick into a direction contact first; on this
 // unit the push contact closes on every tilt, so this is the one that
 // counts); the push alone must hold INPUT_NAV_DIRECTION_MS to be the press.
-#define INPUT_NAV_DIRECTION_MS 20
-#define INPUT_NAV_DIRECTION_WITH_PUSH_MS 50
+#define INPUT_NAV_DIRECTION_MS 10
+#define INPUT_NAV_DIRECTION_WITH_PUSH_MS 20
 #define INPUT_NAV_TRACE 32          // nav pattern changes remembered for `J`
 #define INPUT_EVENTS 32             // the event ring; a full one drops its oldest (counted: `j`)
 
