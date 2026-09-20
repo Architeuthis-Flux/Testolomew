@@ -9,6 +9,7 @@
 #define KERNEL_SCALE 1000.0f
 
 #define LM_MAX_ITERATIONS 30
+#define LM_SEED_ITERATIONS 12 // a cold start's seeds: one that leads somewhere converges in far fewer; one that does not is cut short (it was most of a 12 ms slice)
 #define LM_MAX_TRIES 8
 #define LM_STEP_LIMIT_MM 20.0f // longest move in one iteration
 #define LM_DONE_MM 0.005f      // converged when a step is shorter than this
@@ -167,7 +168,7 @@ static Vec3 clampToBox( const FitProblem* fp, Vec3 p ) {
 
 // Levenberg-Marquardt over the magnet position, from `start`. Returns the
 // final cost; *pOut is where it ended up.
-static float refine( const FitProblem* fp, Vec3 start, Vec3* pOut, int* iterationsOut ) {
+static float refine( const FitProblem* fp, Vec3 start, Vec3* pOut, int* iterationsOut, int maxIterations = LM_MAX_ITERATIONS ) {
     static float e0[ 3 * MAGFIT_MAX_SENSORS ];
     static float e1[ 3 * MAGFIT_MAX_SENSORS ];
     static float jac[ 3 * MAGFIT_MAX_SENSORS ][ 3 ];
@@ -178,7 +179,7 @@ static float refine( const FitProblem* fp, Vec3 start, Vec3* pOut, int* iteratio
     float lambda = 1e-2f;
     int iter = 0;
 
-    for ( ; iter < LM_MAX_ITERATIONS; iter++ ) {
+    for ( ; iter < maxIterations; iter++ ) {
         // Numeric Jacobian of the residuals. Because evaluate() re-solves the
         // moment at the nudged position, this is the variable-projection
         // Jacobian with no extra algebra.
@@ -522,7 +523,7 @@ bool magFitSolveStep( const Vec3* sensors, const Vec3* fields, const bool* use, 
         int seed = result->coldStage - 1;
         Vec3 start = { cx / cw + coldSeeds[ seed ][ 0 ], cy / cw + coldSeeds[ seed ][ 1 ], coldSeeds[ seed ][ 2 ] };
         Vec3 p;
-        float cost = refine( &fp, start, &p, &result->iterations );
+        float cost = refine( &fp, start, &p, &result->iterations, LM_SEED_ITERATIONS );
         if ( cost < bestCost ) {
             bestCost = cost;
             best = p;
