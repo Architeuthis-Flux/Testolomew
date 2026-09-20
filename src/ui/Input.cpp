@@ -232,6 +232,18 @@ void Input::printInputs( Stream* out ) const {
     snprintf( line, sizeof( line ), "events: %d waiting, %lu dropped (ring of %d); held mask 0x%03lx%s", eventCount, (unsigned long)dropped, INPUT_EVENTS, (unsigned long)heldMask( ),
               simActive( ) ? "; a simulated control is active" : "" );
     out->println( line );
+    if ( joystickFitted ) {
+        // The single ADC samples' spread since the last look: at rest, more
+        // than a few counts is the reference (the 3.3 V rail) moving under
+        // the conversions, not the hand.
+        Input* self = const_cast<Input*>( this );
+        snprintf( line, sizeof( line ), "joystick ADC spread since the last j: x %d..%d (%d counts), y %d..%d (%d counts) over %lu samples; %.1f %% of travel is %d counts", joyMinX, joyMaxX,
+                  joyMaxX - joyMinX, joyMinY, joyMaxY, joyMaxY - joyMinY, (unsigned long)joySamples, 100.0f * INPUT_JOY_DEAD, (int)( INPUT_JOY_DEAD * 0.5f * joyFullScale ) );
+        out->println( line );
+        self->joyMinX = self->joyMinY = 4095;
+        self->joyMaxX = self->joyMaxY = 0;
+        self->joySamples = 0;
+    }
     snprintf( line, sizeof( line ), "feel: a nav direction after %.0f ms (%.0f with the push contact closed), the press after %.0f ms alone, contacts settle %d ms; buttons %d ms bounce",
               navDirectionMs, navPushGuardMs, navDirectionMs, INPUT_NAV_SETTLE_MS, INPUT_DEBOUNCE_MS );
     out->println( line );
@@ -359,6 +371,22 @@ static void shapeStick( float x, float y, float* linearX, float* linearY, float*
     *expoY = uy * s * s;
 }
 
+// One axis: three conversions, the median (a transient on one is thrown
+// out), and the spread of the singles kept for `j`.
+static int readAxis( int pin, int* minSeen, int* maxSeen ) {
+    int a = analogRead( pin ), b = analogRead( pin ), c = analogRead( pin );
+    int lo = a < b ? a : b, hi = a < b ? b : a;
+    if ( lo < *minSeen )
+        *minSeen = lo;
+    if ( hi > *maxSeen )
+        *maxSeen = hi;
+    if ( c < *minSeen )
+        *minSeen = c;
+    if ( c > *maxSeen )
+        *maxSeen = c;
+    return c < lo ? lo : ( c > hi ? hi : c ); // the median of three
+}
+
 bool Input::pinDown( int c ) const {
     const InputSource& s = sources[ c ];
     return s.pin >= 0 && ( digitalRead( s.pin ) == LOW ) == s.activeLow;
@@ -478,8 +506,11 @@ ServiceStatus Input::service( ) {
     } else if ( joystickFitted ) {
         // ASSUMPTION: centre at half scale (`j` shows the raw readings).
         float half = 0.5f * joyFullScale;
-        float x = ( analogRead( PIN_JOY_X ) - half ) / half;
-        float y = ( analogRead( PIN_JOY_Y ) - half ) / half;
+        int rx = readAxis( PIN_JOY_X, &joyMinX, &joyMaxX );
+        int ry = readAxis( PIN_JOY_Y, &joyMinY, &joyMaxY );
+        joySamples += 3;
+        float x = ( rx - half ) / half;
+        float y = ( ry - half ) / half;
         if ( JOY_X_REVERSED )
             x = -x;
         if ( JOY_Y_REVERSED )

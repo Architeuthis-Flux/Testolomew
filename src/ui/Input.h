@@ -115,6 +115,13 @@ class Input : public Service {
     bool joystickFitted = false;
     float joyFullScale = 4095.0f; // what analogRead() returns at full deflection
     StickDpad dpad;
+    // The ADC is read three times an axis and the median taken: a supply
+    // transient during one conversion (the ADC's reference is the 3.3 V
+    // rail, and the V5F's bursts of work swing it - 2026-09-20) reads as a
+    // deflection, and one bad sample of three is thrown out. The spread of
+    // the single samples since `j` last looked is what shows the transients.
+    int joyMinX = 4095, joyMaxX = 0, joyMinY = 4095, joyMaxY = 0;
+    uint32_t joySamples = 0;
 
     // The feel (the Settings menu's controls page, saved - a saved value
     // wins over the defines above until a reset): the decoder's guards in
