@@ -27,9 +27,10 @@
 //     push contact is not a press.
 // With no push pin (-1) three or four direction contacts at once count as
 // the press instead, and a press then stays on until at most one is left.
-// Every control's level, the decoder's outputs included, then settles
-// INPUT_DEBOUNCE_MS in its tracker before it counts (the push contact
-// outlives a tilt's direction contact by a few milliseconds).
+// The decoder's outputs go to their trackers with no further debounce
+// (the guards are the debounce); the joystick press and the buttons settle
+// INPUT_DEBOUNCE_MS. The two guards are settings (direction ms, push guard
+// ms), so the feel can be tuned on the board.
 //
 // Pins are in BoardPins.h (PIN_NAV_*, PIN_JOY_*, PIN_BTN_*), -1 = not
 // fitted. The same events can be typed on the serial console: arrow keys =
@@ -49,12 +50,21 @@
 #define INPUT_DEBOUNCE_MS BUTTON_DEBOUNCE_MS
 #define INPUT_HOLD_MS BUTTON_HOLD_MS
 #define INPUT_JOY_DEAD 0.05f        // fraction of travel ignored round the centre
-#define INPUT_JOY_ON 0.6f           // as a four-way: past this = pressed...
-#define INPUT_JOY_OFF 0.4f          // ...back inside this = released
+#define INPUT_JOY_MENU_AT 0.25f     // as a four-way: this much of the raw travel is a direction (the menu's; the setting "joy menu at")
+#define INPUT_JOY_MENU_OFF 0.6f     // ...released back inside this fraction of it (hysteresis)
 #define INPUT_EMULATED_NUDGE_MS 150 // a typed joystick key holds the stick this long
 #define INPUT_TAP_MS 40             // a typed key or :key tap holds the control this long (and the next waits as long)
-#define INPUT_NAV_DIRECTION_MS 60           // one or two nav contacts must hold this long to be a direction (a push closes all four, but not at once)
-#define INPUT_NAV_DIRECTION_WITH_PUSH_MS 130 // ...and this long while the push contact is closed: a centre push's wobble into a direction lasts up to about 100 ms
+#define INPUT_NAV_SETTLE_MS 10      // the nav contacts' pattern has to hold still this long (contact bounce)
+// The nav decoder's guards, the defaults of the settings "direction ms" and
+// "push guard ms" (2026-09-19: 60 and 130 made every tilt 170 ms late with
+// the tracker's debounce on top; Kevin wanted much less). One or two
+// contacts must hold INPUT_NAV_DIRECTION_MS to be a direction, and
+// INPUT_NAV_DIRECTION_WITH_PUSH_MS while the push contact is closed too
+// (a centre push wobbles the stick into a direction contact first; on this
+// unit the push contact closes on every tilt, so this is the one that
+// counts); the push alone must hold INPUT_NAV_DIRECTION_MS to be the press.
+#define INPUT_NAV_DIRECTION_MS 20
+#define INPUT_NAV_DIRECTION_WITH_PUSH_MS 50
 #define INPUT_NAV_TRACE 32          // nav pattern changes remembered for `J`
 #define INPUT_EVENTS 32             // the event ring; a full one drops its oldest (counted: `j`)
 
@@ -90,10 +100,19 @@ class Input : public Service {
     uint32_t heldMask( ) const; // bit c set while control c is down (debounced)
     uint32_t dropped = 0;       // events lost to a full ring
 
-    // The joystick, -1..1 each way, dead zone taken out, + = right / up.
+    // The joystick, -1..1 each way, dead zone taken out, + = right / up:
+    // joyX/Y with the expo (fine near the centre: the camera's), joyRawX/Y
+    // linear (the four-way's).
     float joyX = 0.0f, joyY = 0.0f;
+    float joyRawX = 0.0f, joyRawY = 0.0f;
     bool joystickFitted = false;
     float joyFullScale = 4095.0f; // what analogRead() returns at full deflection
+
+    // The feel (the Settings menu's controls page, saved): the decoder's
+    // guards in ms, and how far the stick goes before it is a menu direction.
+    float navDirectionMs = INPUT_NAV_DIRECTION_MS;
+    float navPushGuardMs = INPUT_NAV_DIRECTION_WITH_PUSH_MS;
+    float joyMenuAt = INPUT_JOY_MENU_AT;
 
     // Console `j`: everything as read, for checking the wiring; `J`: what the
     // nav stick's contacts did lately.

@@ -105,13 +105,14 @@ void Input::begin( ) {
         if ( s.pin >= 0 ) {
             pinMode( s.pin, pullup ? INPUT_PULLUP : INPUT );
         }
-        // Every control's level settles INPUT_DEBOUNCE_MS before it counts -
-        // the nav decoder's outputs too: the push contact outlives a tilt's
-        // direction contact by a few milliseconds, and without this that
-        // tail came out as a press (tools/hostsim/navtest.cpp, "tilt
-        // released"). The directions repeat, the presses and buttons hold.
+        // The nav decoder's outputs and the joystick's four-way are debounced
+        // already (the guards, the hysteresis): no more on top, so a tilt
+        // counts as soon as it is decoded. The joystick press and the
+        // buttons settle INPUT_DEBOUNCE_MS. The directions repeat, the
+        // presses and buttons hold.
         bool direction = ( c >= IN_NAV_UP && c <= IN_NAV_RIGHT ) || ( c >= IN_JOY_UP && c <= IN_JOY_RIGHT );
-        buttonInit( &trackers[ c ], INPUT_DEBOUNCE_MS, direction );
+        bool decoded = c <= IN_NAV_PRESS || ( c >= IN_JOY_UP && c <= IN_JOY_RIGHT );
+        buttonInit( &trackers[ c ], decoded ? 0 : INPUT_DEBOUNCE_MS, direction );
     }
     joystickFitted = PIN_JOY_X >= 0 && PIN_JOY_Y >= 0;
     if ( joystickFitted ) {
@@ -212,9 +213,9 @@ void Input::printNavTrace( Stream* out ) const {
 void Input::printInputs( Stream* out ) const {
     char line[ 200 ];
     if ( joystickFitted ) {
-        snprintf( line, sizeof( line ), "joystick raw x %d y %d of %.0f (centre %.0f)  ->  x %+.2f y %+.2f (dead zone %.0f %%)  press %s (%s)",
-                  analogRead( PIN_JOY_X ), analogRead( PIN_JOY_Y ), joyFullScale, 0.5f * joyFullScale, joyX, joyY, INPUT_JOY_DEAD * 100.0f,
-                  trackers[ IN_JOY_PRESS ].down ? "DOWN" : "up", sources[ IN_JOY_PRESS ].activeLow ? "active low" : "active high" );
+        snprintf( line, sizeof( line ), "joystick raw x %d y %d of %.0f (centre %.0f)  ->  linear x %+.2f y %+.2f (a menu direction past %.2f), expo x %+.2f y %+.2f (dead zone %.0f %%)  press %s (pin %s, %s)",
+                  analogRead( PIN_JOY_X ), analogRead( PIN_JOY_Y ), joyFullScale, 0.5f * joyFullScale, joyRawX, joyRawY, joyMenuAt, joyX, joyY, INPUT_JOY_DEAD * 100.0f,
+                  trackers[ IN_JOY_PRESS ].down ? "DOWN" : "up", pinDown( IN_JOY_PRESS ) ? "reads pressed" : "reads released", sources[ IN_JOY_PRESS ].activeLow ? "active low" : "active high" );
     } else {
         snprintf( line, sizeof( line ), "joystick not fitted (PIN_JOY_X/Y are -1); typed: x %+.2f y %+.2f", joyX, joyY );
     }
@@ -228,6 +229,9 @@ void Input::printInputs( Stream* out ) const {
     out->println( line );
     snprintf( line, sizeof( line ), "events: %d waiting, %lu dropped (ring of %d); held mask 0x%03lx%s", eventCount, (unsigned long)dropped, INPUT_EVENTS, (unsigned long)heldMask( ),
               simActive( ) ? "; a simulated control is active" : "" );
+    out->println( line );
+    snprintf( line, sizeof( line ), "feel: a direction after %.0f ms (%.0f with the push contact closed), the press after %.0f ms alone, contacts settle %d ms; the stick is a menu direction past %.2f",
+              navDirectionMs, navPushGuardMs, navDirectionMs, INPUT_NAV_SETTLE_MS, joyMenuAt );
     out->println( line );
 }
 
@@ -329,14 +333,23 @@ bool Input::takeKey( char c ) {
 
 // ---- reading -----------------------------------------------------------------------
 
-static float deadZone( float v ) {
+// The stick past its dead zone, linear (the four-way's) and with an expo
+// (fine control near the centre: the camera's).
+static float linear( float v ) {
     float a = v < 0 ? -v : v;
     if ( a < INPUT_JOY_DEAD ) {
         return 0.0f;
     }
     float s = ( a - INPUT_JOY_DEAD ) / ( 1.0f - INPUT_JOY_DEAD );
-    s = s * s; // expo: fine control near the centre
+    if ( s > 1.0f )
+        s = 1.0f;
     return v < 0 ? -s : s;
+}
+
+static float expo( float linearValue ) {
+    float s = linearValue < 0 ? -linearValue : linearValue;
+    s = s * s;
+    return linearValue < 0 ? -s : s;
 }
 
 bool Input::pinDown( int c ) const {
@@ -368,7 +381,7 @@ void Input::decodeNav( uint32_t now, bool navDown[ 5 ] ) {
         navRaw = pattern;
         navChangedMs = now;
     }
-    if ( pattern != navStable && (int32_t)( now - navChangedMs ) >= (int32_t)INPUT_DEBOUNCE_MS ) {
+    if ( pattern != navStable && (int32_t)( now - navChangedMs ) >= (int32_t)INPUT_NAV_SETTLE_MS ) {
         navStable = pattern;
         navStableSinceMs = now;
     }
@@ -379,7 +392,7 @@ void Input::decodeNav( uint32_t now, bool navDown[ 5 ] ) {
             navPushRaw = pushNow;
             navPushChangedMs = now;
         }
-        if ( pushNow != navPushStable && (int32_t)( now - navPushChangedMs ) >= (int32_t)INPUT_DEBOUNCE_MS ) {
+        if ( pushNow != navPushStable && (int32_t)( now - navPushChangedMs ) >= (int32_t)INPUT_NAV_SETTLE_MS ) {
             navPushStable = pushNow;
             navPushStableSinceMs = now;
         }
@@ -395,7 +408,8 @@ void Input::decodeNav( uint32_t now, bool navDown[ 5 ] ) {
     int closed = 0;
     for ( int k = 0; k < 4; k++ )
         closed += ( navStable >> k ) & 1;
-    uint32_t hold = navPushStable ? INPUT_NAV_DIRECTION_WITH_PUSH_MS : INPUT_NAV_DIRECTION_MS;
+    uint32_t directionMs = (uint32_t)( navDirectionMs < 0.0f ? 0.0f : navDirectionMs );
+    uint32_t hold = navPushStable ? (uint32_t)( navPushGuardMs < 0.0f ? 0.0f : navPushGuardMs ) : directionMs;
     if ( closed >= 3 || closed == 0 || (int32_t)( now - navStableSinceMs ) >= (int32_t)hold ) {
         navDecoded = navStable;
     }
@@ -409,14 +423,19 @@ void Input::decodeNav( uint32_t now, bool navDown[ 5 ] ) {
         // held its time wins while it lasts; the push contact alone, with no
         // direction contact closed, for its time, is the press while it lasts.
         if ( navDirectionOn ) {
-            if ( closed == 0 )
+            if ( closed == 0 ) {
                 navDirectionOn = false;
+                // The push contact outlives a tilt's direction contact by a
+                // few milliseconds: that tail is not a press. The push-alone
+                // clock starts now.
+                navPushStableSinceMs = now;
+            }
         } else if ( navPressed ) {
             if ( !navPushStable )
                 navPressed = false;
         } else if ( decodedClosed > 0 && closed > 0 ) {
             navDirectionOn = true;
-        } else if ( navPushStable && closed == 0 && (int32_t)( now - navPushStableSinceMs ) >= (int32_t)INPUT_NAV_DIRECTION_MS ) {
+        } else if ( navPushStable && closed == 0 && (int32_t)( now - navPushStableSinceMs ) >= (int32_t)directionMs ) {
             navPressed = true;
         }
         if ( navDirectionOn ) {
@@ -447,8 +466,8 @@ ServiceStatus Input::service( ) {
         simJoystickOff( );
     }
     if ( simJoyOn ) {
-        joyX = simJoyX;
-        joyY = simJoyY;
+        joyRawX = joyX = simJoyX; // a simulated stick is what it says, both ways
+        joyRawY = joyY = simJoyY;
     } else if ( joystickFitted ) {
         // ASSUMPTION: centre at half scale (`j` shows the raw readings).
         float half = 0.5f * joyFullScale;
@@ -458,10 +477,12 @@ ServiceStatus Input::service( ) {
             x = -x;
         if ( JOY_Y_REVERSED )
             y = -y;
-        joyX = deadZone( x );
-        joyY = deadZone( y );
+        joyRawX = linear( x );
+        joyRawY = linear( y );
+        joyX = expo( joyRawX );
+        joyY = expo( joyRawY );
     } else {
-        joyX = joyY = 0.0f;
+        joyX = joyY = joyRawX = joyRawY = 0.0f;
     }
 
     bool navDown[ 5 ];
@@ -473,9 +494,10 @@ ServiceStatus Input::service( ) {
         if ( c >= IN_NAV_UP && c <= IN_NAV_PRESS ) {
             down = navDown[ c - IN_NAV_UP ];
         } else if ( c >= IN_JOY_UP && c <= IN_JOY_RIGHT ) {
-            // The stick as a four-way, with hysteresis.
-            float v = c == IN_JOY_UP ? joyY : ( c == IN_JOY_DOWN ? -joyY : ( c == IN_JOY_RIGHT ? joyX : -joyX ) );
-            down = trackers[ c ].down ? v > INPUT_JOY_OFF : v > INPUT_JOY_ON;
+            // The stick as a four-way: a small deflection of the raw stick,
+            // with hysteresis.
+            float v = c == IN_JOY_UP ? joyRawY : ( c == IN_JOY_DOWN ? -joyRawY : ( c == IN_JOY_RIGHT ? joyRawX : -joyRawX ) );
+            down = trackers[ c ].down ? v > INPUT_JOY_MENU_OFF * joyMenuAt : v > joyMenuAt;
         } else {
             down = pinDown( c );
         }

@@ -38,19 +38,28 @@ int main() {
     simPinLevel[10] = 0; run("", 15); simPinLevel[12] = 0; run("", 15); simPinLevel[11] = 0; run("", 15); simPinLevel[13] = 0; run("", 300);
     drain("slow push (15 ms apart)", "PRESS:press ");
     for (int p = 10; p <= 13; p++) simPinLevel[p] = 1; run("", 100); drain("slow push released", "PRESS:release ");
-    // 7. The push contact closes on every stick movement too. Tilt: push first, direction 15 ms later -> a direction only.
+    // 7. The push contact closes on every stick movement too. Tilt: push first, direction 15 ms later -> a direction only,
+    // and the push contact outliving the direction contact by 10 ms on the release is not a press.
     input.setPin(IN_NAV_PRESS, 14, true); simPinLevel[14] = 1; run("", 100); drain("push pin idle", "");
     simPinLevel[14] = 0; run("", 15); simPinLevel[11] = 0; run("", 300); drain("tilt (push closes first)", "DOWN:press ");
     simPinLevel[11] = 1; run("", 10); simPinLevel[14] = 1; run("", 150); drain("tilt released", "DOWN:release ");
+    // 7b. ...and how fast a tilt now counts: the direction is out within 70 ms of the contact closing.
+    simPinLevel[14] = 0; simPinLevel[12] = 0; run("", 70); drain("tilt within 70 ms", "LEFT:press ");
+    simPinLevel[12] = 1; simPinLevel[14] = 1; run("", 150); drain("tilt released 3", "LEFT:release ");
     // 8. Tilt: direction first, push 10 ms later.
     simPinLevel[10] = 0; run("", 10); simPinLevel[14] = 0; run("", 300); drain("tilt (direction first)", "UP:press ");
     simPinLevel[14] = 1; simPinLevel[10] = 1; run("", 150); drain("tilt released 2", "UP:release ");
     // 9. Centre push with a wobble: push, a direction contact for 30 ms, then push alone.
     simPinLevel[14] = 0; run("", 5); simPinLevel[13] = 0; run("", 30); simPinLevel[13] = 1; run("", 300); drain("push with wobble", "PRESS:press ");
     simPinLevel[14] = 1; run("", 150); drain("push released", "PRESS:release ");
-    // 9b. The same with a long wobble: a direction contact for 100 ms before the push settles alone - still only the press.
-    simPinLevel[14] = 0; run("", 8); simPinLevel[11] = 0; run("", 100); simPinLevel[11] = 1; run("", 300); drain("push with a 100 ms wobble", "PRESS:press ");
+    // 9b. The same with a long wobble: a direction contact for 100 ms before the push settles alone - only the press
+    // with the guard raised to 130 (the setting "push guard ms"); at the fast default of 50 a 100 ms wobble IS a direction.
+    input.navPushGuardMs = 130.0f;
+    simPinLevel[14] = 0; run("", 8); simPinLevel[11] = 0; run("", 100); simPinLevel[11] = 1; run("", 300); drain("push with a 100 ms wobble (guard 130)", "PRESS:press ");
     simPinLevel[14] = 1; run("", 150); drain("push released 2", "PRESS:release ");
+    input.navPushGuardMs = INPUT_NAV_DIRECTION_WITH_PUSH_MS;
+    simPinLevel[14] = 0; run("", 8); simPinLevel[11] = 0; run("", 100); simPinLevel[11] = 1; run("", 300); drain("push with a 100 ms wobble (guard 50)", "DOWN:press DOWN:release PRESS:press ");
+    simPinLevel[14] = 1; run("", 150); drain("push released 2b", "PRESS:release ");
     // 9c. A short tilt (a flick of 160 ms) with the push closing too, as on this unit: a direction, not a press.
     simPinLevel[14] = 0; simPinLevel[12] = 0; run("", 160); simPinLevel[12] = 1; simPinLevel[14] = 1; run("", 150); drain("160 ms flick", "LEFT:press LEFT:release ");
     // 10. A clean centre push, and a roll from up to up+right while tilted (the diagonal follows).

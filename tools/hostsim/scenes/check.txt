@@ -48,12 +48,21 @@
 :log 3
 @expect "log{"
 
-# Home: A opens it with the cursor on the current app; the apps by name.
+# Home: A opens it with the cursor on the current app; the apps by name;
+# the joystick steers it at a quarter of its travel.
 :key a
 @expect "ok{key a tap}"
 @run 300
 :screen
 @expect "panes: home"
+@expect "home: cursor 0 View"
+:joy 0 -0.3 300
+@run 500
+:screen
+@expect "home: cursor 3 Draw"
+:joy 0 0.3 300
+@run 500
+:screen
 @expect "home: cursor 0 View"
 :ui go leds
 @expect "ok{go LEDs}"
@@ -269,6 +278,7 @@ S23\r
 @run 4000
 s
 @expect "cursor/surface=23"
+@expect "controls/direction ms="
 @expect "tracker/floor="
 @expect "tracker/tracker on="
 @expect "smoothing/view Hz="

@@ -11,7 +11,8 @@
 //   in an app       nav/joystick, their presses: the app's own; A click: Home;
 //                   A hold: Settings; B click: the previous app, else Home;
 //                   B hold: Home
-//   Home            up/down/left/right move, a press (or A) selects, B closes
+//   Home            up/down/left/right move, a press (or A), on its way down,
+//                   selects; B closes
 //   Settings page   up/down move, LEFT/RIGHT CHANGE THE VALUE IN PLACE, a
 //                   press enters / runs / flips / cycles, B backs a page (at
 //                   the root: closes), B hold closes everything and opens Home

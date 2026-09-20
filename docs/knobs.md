@@ -21,8 +21,8 @@ The controls mean the same everywhere (the shell, `src/ui/UiShell.cpp`, is the o
 | nav / joystick up-down | the app's own | move | move the cursor (wraps) | scroll the result |
 | nav / joystick left-right | the app's own | move | **change the value in place**: a toggle flips, a choice cycles, a number steps (x10 after eight repeats), a number-taking action steps its argument | - |
 | analog joystick | the app's own (once centred after a change of focus) | - | - | - |
-| nav press / joystick press (click) | the app's own | select | enter the page / run the action / flip / cycle | yes / dismiss |
-| **A** click | Home | select | select | yes / dismiss |
+| nav press / joystick press (on the way down) | the app's own | select | enter the page / run the action / flip / cycle | yes / dismiss |
+| **A** click (press, in the panes) | Home | select | select | yes / dismiss |
 | **A** hold | Settings | - | - | - |
 | **B** click | the previous app, else Home | close | back a page (the parent's cursor kept); at the root: close | no / dismiss |
 | **B** hold | Home | - | close everything, Home | cancel, Home |
@@ -99,6 +99,15 @@ All of these were set on the bench (`tools/hostsim/pencil.cpp`): a hand writing 
 | target | info: the target game's tally (`w` prints it) | - |
 
 Draw app controls, in paint mode: **joystick** moves the wheel's marker (4 radii/s at full tilt; expo on the stick), **joystick click** toggles draw / ERASE (a click: on the release of a short press, never on a hold), **nav up/down** brightness, **nav left/right** brush, **nav press held** clear. The panel under the map shows every value; the map shows the drawing as the LEDs have it, and the brush ring (the LEDs just outside what a touch would paint) as hollow squares. In paint mode the LED cursor *is* that ring: no glow, bloom, sparkle or height colour, no fade.
+
+### controls
+| item | what it does | default |
+|---|---|---|
+| direction ms | how long one or two nav contacts must hold before they are a direction, and how long the push contact must be closed alone before it is the press | 20 |
+| push guard ms | the same for a direction while the push contact is closed too - on this stick the push contact closes on every tilt, so this is the one that counts. A centre push wobbles into a direction contact first (up to ~100 ms was seen on 2026-09-18): raise it if a press ever moves the cursor, lower it for speed | 50 |
+| joy menu at | how far the joystick goes (0-1 of its raw travel) before it counts as a menu direction; released again at 60 % of that | 0.25 |
+
+The contacts settle 10 ms before any of this; nothing is debounced twice. `j` prints the numbers in force. A press selects on its way DOWN in Home, the menu and the dialogs (the release-based click felt like nothing happening).
 
 ### magnet, sensors
 `strength` info, `learn strength` (`k`: hold the fit to this magnet's strength), `forget strength` (`K`), `re-zero (away!)` (`z`: the probe well clear of the board), `orientation check` (`o`), `latest fix` (`l`). `sensors` info, `array status` (`m`), `bus check` (`b`), `power-cycle` (`p`), `service table` (`X`), `saved settings` (`s`).

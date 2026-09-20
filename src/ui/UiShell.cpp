@@ -149,6 +149,9 @@ static MenuKey directionKey( InputControl c ) {
     }
 }
 
+// The presses select on their way DOWN in the panes (a click - the release
+// of a short press - felt like nothing happening; the press's own click and
+// release are then swallowed by the focus change, or ignored).
 static bool isSelect( InputControl c ) {
     return c == IN_NAV_PRESS || c == IN_JOY_PRESS || c == IN_BTN_A;
 }
@@ -214,7 +217,7 @@ int uiShellEvent( UiShell* s, InputEvent e, uint32_t nowMs ) {
     case PANE_HOME:
         if ( isDirection( c ) && press ) {
             homeKey( &s->home, directionKey( c ) );
-        } else if ( isSelect( c ) && e.kind == IN_CLICK ) {
+        } else if ( isSelect( c ) && e.kind == IN_PRESS ) {
             int app = uiShellHomeCellApp( s, s->home.cursor );
             if ( app >= 0 ) {
                 uiShellSelectApp( s, app );
@@ -230,7 +233,7 @@ int uiShellEvent( UiShell* s, InputEvent e, uint32_t nowMs ) {
         if ( isDirection( c ) && press ) {
             return menuAction( s, menuKey( &s->menu, directionKey( c ), repeat ) );
         }
-        if ( isSelect( c ) && e.kind == IN_CLICK ) {
+        if ( isSelect( c ) && e.kind == IN_PRESS ) {
             return menuAction( s, menuKey( &s->menu, MENUKEY_ENTER, false ) );
         }
         if ( c == IN_BTN_B ) {
@@ -241,7 +244,7 @@ int uiShellEvent( UiShell* s, InputEvent e, uint32_t nowMs ) {
         }
         return -1;
     case PANE_CONFIRM:
-        if ( isSelect( c ) && e.kind == IN_CLICK ) {
+        if ( isSelect( c ) && e.kind == IN_PRESS ) {
             int item = s->confirmItem;
             s->confirmItem = -1;
             pop( s );
@@ -267,7 +270,7 @@ int uiShellEvent( UiShell* s, InputEvent e, uint32_t nowMs ) {
                 s->resultScroll++;
             if ( k == MENUKEY_DOWN && s->resultScroll > 0 )
                 s->resultScroll--;
-        } else if ( ( isSelect( c ) || c == IN_BTN_B ) && e.kind == IN_CLICK ) {
+        } else if ( ( isSelect( c ) && e.kind == IN_PRESS ) || ( c == IN_BTN_B && e.kind == IN_CLICK ) ) {
             pop( s );
         } else if ( c == IN_BTN_B && e.kind == IN_HOLD ) {
             homeFromAnywhere( s );

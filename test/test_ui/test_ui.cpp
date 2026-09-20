@@ -249,12 +249,12 @@ static int send( InputControl c, InputEventKind k ) {
     return uiShellEvent( &shell, { c, k }, t );
 }
 
-// A tap: press, click, release.
+// A tap: press, click, release; whatever action any of the three returned.
 static int tap( InputControl c ) {
-    send( c, IN_PRESS );
-    int r = send( c, IN_CLICK );
+    int r0 = send( c, IN_PRESS );
+    int r1 = send( c, IN_CLICK );
     int r2 = send( c, IN_RELEASE );
-    return r >= 0 ? r : r2;
+    return r0 >= 0 ? r0 : ( r1 >= 0 ? r1 : r2 );
 }
 
 // A hold: press, hold, release.

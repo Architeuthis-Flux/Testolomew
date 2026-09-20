@@ -5,6 +5,7 @@
 
 #include "Apps.h"
 #include "Console.h"
+#include "Input.h"
 #include "MagArray.h"
 #include "MagLocator.h"
 #include "Ui.h"
@@ -260,6 +261,15 @@ void settingsMenuBuild( Menu* m ) {
     menuAddAction( m, playPage, "clear", 'W', runConsoleKey, false );
     menuAddInfo( m, playPage, "target", playInfo );
 #endif
+
+    // The feel of the controls (Input.h): how long a tilt of the nav stick
+    // must hold before it counts, longer while its push contact is closed
+    // (a centre push wobbles into a direction first), and how far the
+    // joystick goes before it is a menu direction.
+    int controls = menuAddSubmenu( m, MENU_ROOT, "controls" );
+    menuAddNumber( m, controls, "direction ms", &input.navDirectionMs, 0.0f, 150.0f, 5.0f, "" );
+    menuAddNumber( m, controls, "push guard ms", &input.navPushGuardMs, 0.0f, 200.0f, 5.0f, "" );
+    menuAddNumber( m, controls, "joy menu at", &input.joyMenuAt, 0.1f, 0.9f, 0.05f, "" );
 
     // The magnet: k, K, z, o, l.
     int magnet = menuAddSubmenu( m, MENU_ROOT, "magnet" );
