@@ -96,6 +96,10 @@ void tmag5273Decode( const TMAG5273* dev, const uint8_t* raw, TMAG5273Reading* r
 extern uint8_t tmag5273LastFailedRegister;
 extern uint8_t tmag5273LastFailedCode;
 
+// The conversion's current mode: low-noise (3.0 mA, what tmag5273Begin
+// sets) or low-power (2.3 mA, a little more noise), continuous either way.
+bool tmag5273SetLowNoise( TwoWire* bus, uint8_t address, bool lowNoise );
+
 // Single register access, for poking at things from the console.
 bool tmag5273WriteRegister( TwoWire* bus, uint8_t address, uint8_t reg, uint8_t value );
 bool tmag5273ReadRegister( TwoWire* bus, uint8_t address, uint8_t reg, uint8_t* value );

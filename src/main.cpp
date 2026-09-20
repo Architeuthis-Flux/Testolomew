@@ -131,13 +131,35 @@ static void onLoadVerb( int argc, char** argv, Stream* out ) {
             consoleOk( out, on ? "heartbeat on" : "heartbeat off" );
             return;
         }
-        if ( strcmp( argv[ 1 ], "sensors" ) == 0 && ( on || off ) ) {
+        if ( strcmp( argv[ 1 ], "sensors" ) == 0 ) {
 #if MODULE_MAG_ARRAY
-            if ( off )
-                magArray.powerOff( );
-            else
-                magArray.powerOn( );
-            consoleOk( out, on ? "sensors powered and re-addressed" : "sensors off (their VCC pins low, the sampler paused)" );
+            if ( on || off ) {
+                if ( off )
+                    magArray.powerOff( );
+                else
+                    magArray.powerOn( );
+                consoleOk( out, on ? "sensors powered and re-addressed" : "sensors off (their VCC pins low, the sampler paused)" );
+            } else if ( strcmp( argv[ 2 ], "lp" ) == 0 || strcmp( argv[ 2 ], "ln" ) == 0 ) {
+                bool ln = argv[ 2 ][ 1 ] == 'n';
+                magArray.setLowNoise( ln );
+                consoleOk( out, ln ? "sensors in low-noise conversion (3.0 mA each)" : "sensors in low-power conversion (2.3 mA each; a recovery puts low-noise back)" );
+            } else if ( argv[ 2 ][ 0 ] >= '0' && argv[ 2 ][ 0 ] <= '9' ) {
+                int n = atoi( argv[ 2 ] );
+                magArray.powerOffFrom( n );
+                snprintf( line, sizeof( line ), "the first %d sensor%s powered, the rest off (:load sensors on brings them back)", n, n == 1 ? "" : "s" );
+                consoleOk( out, line );
+            } else {
+                consoleErr( out, "usage: :load sensors on|off|lp|ln|<n>" );
+            }
+#else
+            consoleErr( out, "no array in this build" );
+#endif
+            return;
+        }
+        if ( strcmp( argv[ 1 ], "sampler" ) == 0 && ( on || off ) ) {
+#if MODULE_MAG_ARRAY
+            magArray.holdSampler( off );
+            consoleOk( out, on ? "sampler running" : "sampler held (the other core off the bus; the sensors stay powered and converting)" );
 #else
             consoleErr( out, "no array in this build" );
 #endif
@@ -158,7 +180,7 @@ static void onLoadVerb( int argc, char** argv, Stream* out ) {
 #endif
             return;
         }
-        consoleErr( out, "usage: :load [strip|display|heartbeat|sensors on|off] [lcd <MHz>]" );
+        consoleErr( out, "usage: :load [strip|display|heartbeat|sampler on|off] [sensors on|off|lp|ln|<n>] [lcd <MHz>]" );
         return;
     }
     out->println( "load{" );
@@ -178,7 +200,9 @@ static void onLoadVerb( int argc, char** argv, Stream* out ) {
     out->println( line );
 #endif
 #if MODULE_MAG_ARRAY
-    snprintf( line, sizeof( line ), "sensors: %s, %d of %d answering, continuous low-noise conversion ~3 mA each from their GPIO supplies", magArray.poweredOff ? "OFF" : "on", magArray.sensorsOk( ), magArray.sensorCount( ) );
+    snprintf( line, sizeof( line ), "sensors: %s, %d of %d powered, %d answering, continuous %s conversion (~%.1f mA each, free-running) from their GPIO supplies; the sampler %s",
+              magArray.poweredOff ? "OFF" : "on", magArray.enabledCount( ), magArray.sensorCount( ), magArray.sensorsOk( ), magArray.lowNoise ? "low-noise" : "low-power", magArray.lowNoise ? 3.0f : 2.3f,
+              magArray.samplerHeld ? "HELD" : "running" );
     out->println( line );
 #endif
     snprintf( line, sizeof( line ), "heartbeat: %s (green LED, 1 k to VDDIO, ~2 mA at 1 Hz)", heartbeat.enabled ? "on" : "off" );
@@ -289,7 +313,7 @@ void setup( ) {
     // The dumps (:screen:ascii, :leds...) go out a row a tick from here.
     dump.begin( );
     jOS.registerService( &dump );
-    consoleAddVerb( "load", "[strip|display|heartbeat|sensors on|off] [lcd <MHz>]", "what draws from the 3.3 V rail and changes; switches for a bisect", CONSOLE_CHANGES, onLoadVerb );
+    consoleAddVerb( "load", "[strip|display|heartbeat|sampler on|off] [sensors on|off|lp|ln|<n>] [lcd <MHz>]", "what draws from the 3.3 V rail and changes; switches for a bisect", CONSOLE_CHANGES, onLoadVerb );
 
     console.printHelp( );
     boardLed( PIN_LED_BLUE, false );

@@ -157,7 +157,7 @@ void MagArray::pauseSampler( ) {
 }
 
 void MagArray::resumeSampler( ) {
-    if ( samplerOn ) {
+    if ( samplerOn && !samplerHeld ) {
         for ( int i = 0; i < MAG_SENSOR_COUNT; i++ ) {
             magSamplerSetSensor( i, sensors[ i ].dev.address, (int)tmag5273ReadBytes( &sensors[ i ].dev ), sensors[ i ].ok );
         }
@@ -321,7 +321,7 @@ void MagArray::recoverLostSensors( ) {
     for ( int i = 0; i < MAG_SENSOR_COUNT; i++ ) {
         MagSensorState& s = sensors[ i ];
         lost[ i ] = false;
-        if ( s.ok ) {
+        if ( s.ok || disabled[ i ] ) {
             continue;
         }
         uint8_t assigned = MAG_BASE_ADDRESS + i;
@@ -655,11 +655,61 @@ void MagArray::powerOff( ) {
     poweredOff = true;
 }
 
+void MagArray::powerOffFrom( int n ) {
+    if ( simulatedFrames )
+        return;
+    pauseSampler( );
+    for ( int i = 0; i < MAG_SENSOR_COUNT; i++ ) {
+        disabled[ i ] = i >= n;
+        if ( disabled[ i ] ) {
+            digitalWrite( magSensorPlaces[ i ].vccPin, LOW );
+            sensors[ i ].ok = false;
+        }
+    }
+    resumeSampler( );
+}
+
 void MagArray::powerOn( ) {
-    if ( !poweredOff )
+    bool anyOff = poweredOff;
+    for ( int i = 0; i < MAG_SENSOR_COUNT; i++ ) {
+        anyOff = anyOff || disabled[ i ];
+        disabled[ i ] = false;
+    }
+    if ( !anyOff )
         return;
     poweredOff = false;
+    pauseSampler( ); // the walk needs the bus to itself (as p does); begin() starts the sampler again
     begin( false );
+}
+
+void MagArray::holdSampler( bool hold ) {
+    samplerHeld = hold;
+    if ( hold ) {
+        pauseSampler( );
+    } else {
+        resumeSampler( );
+    }
+}
+
+void MagArray::setLowNoise( bool on ) {
+    if ( simulatedFrames )
+        return;
+    lowNoise = on;
+    pauseSampler( );
+    for ( int i = 0; i < MAG_SENSOR_COUNT; i++ ) {
+        if ( sensors[ i ].ok ) {
+            tmag5273SetLowNoise( &MAG_BUS, sensors[ i ].dev.address, on );
+        }
+    }
+    resumeSampler( );
+}
+
+int MagArray::enabledCount( ) const {
+    int n = 0;
+    for ( int i = 0; i < MAG_SENSOR_COUNT; i++ ) {
+        n += disabled[ i ] ? 0 : 1;
+    }
+    return n;
 }
 
 void MagArray::useSimulatedFrames( ) {
@@ -687,7 +737,7 @@ ServiceStatus MagArray::service( ) {
     if ( magSamplerParked( ) || poweredOff ) {
         return ServiceStatus::IDLE; // F: the other core is parked for a flash; or :load sensors off. Nothing to read, nothing to recover
     }
-    if ( sensorsOk( ) < MAG_SENSOR_COUNT && now >= nextRecoveryMs ) {
+    if ( sensorsOk( ) < enabledCount( ) && now >= nextRecoveryMs ) {
         nextRecoveryMs = now + RECOVERY_PERIOD_MS;
         recoverLostSensors( );
     }

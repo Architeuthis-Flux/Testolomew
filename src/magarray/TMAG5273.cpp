@@ -142,6 +142,10 @@ bool tmag5273Begin( TwoWire* bus, TMAG5273* dev, uint8_t address, uint8_t averag
     return ok;
 }
 
+bool tmag5273SetLowNoise( TwoWire* bus, uint8_t address, bool lowNoise ) {
+    return tmag5273WriteRegister( bus, address, REG_DEVICE_CONFIG_2, ( lowNoise ? LOW_NOISE_MODE : 0 ) | MODE_CONTINUOUS );
+}
+
 #if !TMAG_DIRECT_READ
 bool tmag5273BurstRead( int, uint8_t, uint8_t*, size_t ) {
     return false; // no I2C block on the host

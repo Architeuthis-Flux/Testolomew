@@ -106,12 +106,22 @@ class MagArray : public Service {
     void restoreBaseline( const Vec3* list, int count, const char* origin = "the saved zero" );
     void shiftBaseline( int i, Vec3 by );
 
-    // The sensors' supply pins driven low (and the sampler paused): every
-    // sensor off, for a power bisect. powerOn() is begin( false ): the walk
-    // again, the zero in use kept.
+    // For a power bisect (:load). powerOff(): every sensor's supply pin low
+    // and the sampler paused. powerOffFrom( n ): only the first n stay
+    // powered (the rest are left alone by the recovery). powerOn() is
+    // begin( false ): the walk again, the zero in use kept. holdSampler():
+    // the other core stops reading, the sensors stay powered and
+    // converting. setLowNoise( false ): the low-power conversion mode
+    // (2.3 mA a sensor instead of 3.0; a recovery puts low-noise back).
     void powerOff( );
+    void powerOffFrom( int n );
     void powerOn( );
+    void holdSampler( bool hold );
+    void setLowNoise( bool on );
     bool poweredOff = false;
+    bool samplerHeld = false;
+    bool lowNoise = true;
+    int enabledCount( ) const; // sensors not disabled by powerOffFrom()
 
     void startBaseline( );
     // Move the baseline a fraction of the way to the latest raw readings (the
@@ -140,6 +150,7 @@ class MagArray : public Service {
     MagArray( ) = default;
 
     MagSensorState sensors[ MAG_SENSOR_COUNT ];
+    bool disabled[ MAG_SENSOR_COUNT ] = { false }; // left unpowered on purpose (powerOffFrom)
     Vec3 baseline[ MAG_SENSOR_COUNT ];
     Vec3 baselineSum[ MAG_SENSOR_COUNT ];
     int baselineFrames[ MAG_SENSOR_COUNT ] = { 0 }; // frames each sensor contributed to the baseline being taken
