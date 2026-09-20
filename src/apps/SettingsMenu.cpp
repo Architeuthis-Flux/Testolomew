@@ -270,6 +270,7 @@ void settingsMenuBuild( Menu* m ) {
     menuAddNumber( m, controls, "direction ms", &input.navDirectionMs, 0.0f, 150.0f, 5.0f, "" );
     menuAddNumber( m, controls, "push guard ms", &input.navPushGuardMs, 0.0f, 200.0f, 5.0f, "" );
     menuAddNumber( m, controls, "joy menu at", &input.joyMenuAt, 0.1f, 0.9f, 0.05f, "" );
+    menuAddNumber( m, controls, "joy menu off", &input.joyMenuOff, 0.05f, 0.9f, 0.05f, "" ); // ...and over inside this (kept under 'at')
     int joystick = menuAddToggle( m, controls, "joystick", &ui.shell.absoluteJoystick ); // absolute: the stick's position is the cursor on Home and the menu pages
     menuSetToggleText( m, joystick, "absolute", "relative" );
 

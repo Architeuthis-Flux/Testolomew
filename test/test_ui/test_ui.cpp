@@ -277,7 +277,7 @@ void test_shell_home_selects_apps_and_remembers( void ) {
     tap( IN_BTN_A ); // Home, cursor on the current app
     TEST_ASSERT_EQUAL( PANE_HOME, uiShellTop( &shell ) );
     TEST_ASSERT_EQUAL( 0, shell.home.cursor );
-    send( IN_NAV_LEFT, IN_PRESS ); // wraps to the last cell
+    send( IN_NAV_LEFT, IN_PRESS ); // wraps within the row: to its last cell
     send( IN_NAV_LEFT, IN_RELEASE );
     TEST_ASSERT_EQUAL( 2, shell.home.cursor );
     send( IN_NAV_UP, IN_PRESS ); // clamps: one row only
@@ -410,8 +410,10 @@ void test_shell_absolute_joystick( void ) {
     tap( IN_BTN_A ); // Home: View, Settings, LEDs in one row
     tick( 0.9f, 0.0f );
     TEST_ASSERT_EQUAL( 2, shell.home.cursor ); // right band: the third cell
+    tick( 0.5f, 0.0f );                        // let go: back through the middle band...
+    tick( 0.2f, 0.0f );
     tick( 0.0f, 0.0f );
-    TEST_ASSERT_EQUAL( 2, shell.home.cursor ); // released: stays
+    TEST_ASSERT_EQUAL( 2, shell.home.cursor ); // ...and the cursor stays
     tick( 0.1f, 0.1f );
     TEST_ASSERT_EQUAL( 1, shell.home.cursor ); // a small deflection: the middle band
     tick( -0.9f, -0.9f );
@@ -431,6 +433,18 @@ void test_shell_absolute_joystick( void ) {
     TEST_ASSERT_EQUAL( 0, shell.menu.cursor );
     tick( 0.0f, 0.0f );
     TEST_ASSERT_EQUAL( 0, shell.menu.cursor );
+    // Point at the last row and let go: the stick springs back through the
+    // middle rows; the cursor stays on the last.
+    tick( 0.0f, -0.95f );
+    TEST_ASSERT_EQUAL( visible - 1, shell.menu.cursor );
+    tick( 0.0f, -0.6f );
+    tick( 0.0f, -0.2f );
+    tick( 0.0f, 0.1f );
+    tick( 0.0f, 0.0f );
+    TEST_ASSERT_EQUAL( visible - 1, shell.menu.cursor );
+    tick( 0.0f, 0.95f ); // out again: it follows again
+    TEST_ASSERT_EQUAL( 0, shell.menu.cursor );
+    tick( 0.0f, 0.0f );
     tap( IN_BTN_B ); // closed: the app has its stick as before
     tick( 0.0f, 0.0f );
     tick( 0.5f, 0.0f );

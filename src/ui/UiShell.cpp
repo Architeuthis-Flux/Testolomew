@@ -1,6 +1,7 @@
 // SPDX-License-Identifier: MIT
 #include "UiShell.h"
 
+#include <math.h>
 #include <string.h>
 
 static void noteChange( UiShell* s ) {
@@ -33,6 +34,8 @@ void uiShellInit( UiShell* s, const UiApp* apps, int appCount, int firstApp, int
     s->lastInputMs = 0;
     s->generation = 1;
     s->absoluteJoystick = false;
+    s->absolutePeak = 0.0f;
+    s->absoluteFrozen = false;
     s->menuRows = 9;
     s->menuScrollTop = 0;
     if ( firstApp >= 0 && firstApp < appCount ) {
@@ -314,10 +317,25 @@ static int stickBand( float v, int current ) {
     return v < -edge - slack ? 0 : ( v > edge + slack ? 2 : 1 );
 }
 
-// The stick's position as the cursor, while it is deflected.
+#define ABSOLUTE_CENTRE 0.12f  // inside this the stick is home again
+#define ABSOLUTE_RETRACT 0.15f // this much back from its furthest and it is on its way home
+
+// The stick's position as the cursor, while it is deflected and going out.
 static void steerAbsolute( UiShell* s, float x, float y ) {
-    if ( x == 0.0f && y == 0.0f )
+    float mag = sqrtf( x * x + y * y );
+    if ( mag > 1.0f )
+        mag = 1.0f;
+    if ( mag < ABSOLUTE_CENTRE ) {
+        s->absolutePeak = 0.0f;
+        s->absoluteFrozen = false;
         return;
+    }
+    if ( mag > s->absolutePeak )
+        s->absolutePeak = mag;
+    if ( s->absoluteFrozen || s->absolutePeak - mag > ABSOLUTE_RETRACT ) {
+        s->absoluteFrozen = true; // coming back: the cursor stays where it was pointed
+        return;
+    }
     if ( uiShellTop( s ) == PANE_HOME ) {
         int column = stickBand( x, s->home.cursor % HOME_COLUMNS );
         int row = stickBand( -y, s->home.cursor / HOME_COLUMNS );

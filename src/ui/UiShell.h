@@ -77,10 +77,16 @@ struct UiShell {
     // Absolute joystick (a setting): while it is deflected, the stick's
     // position IS the cursor - on Home the cell it points at (three bands
     // each way), on a menu page the row among those on screen - and its
-    // four-way events are ignored there. Off: the four-way steps.
+    // four-way events are ignored there. Let go and the cursor stays where
+    // it was pointed: the stick springs back THROUGH the middle, so the
+    // cursor follows only while the stick is going out, and freezes once
+    // it starts coming back until it has reached the centre. Off: the
+    // four-way steps.
     bool absoluteJoystick;
-    int menuRows;      // rows a menu page shows at once (the Ui says)
-    int menuScrollTop; // the first row shown (kept here so the stick and the drawing agree)
+    float absolutePeak;  // the furthest the stick has been since it last left the centre
+    bool absoluteFrozen; // ...and it is on its way back: the cursor stays where it was pointed
+    int menuRows;        // rows a menu page shows at once (the Ui says)
+    int menuScrollTop;   // the first row shown (kept here so the stick and the drawing agree)
 };
 
 void uiShellInit( UiShell* s, const UiApp* apps, int appCount, int firstApp, int settingsCell );

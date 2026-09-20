@@ -1,6 +1,7 @@
 // SPDX-License-Identifier: MIT
 #include "Input.h"
 
+#include <math.h>
 #include <stdlib.h>
 #include <string.h>
 
@@ -124,6 +125,7 @@ void Input::begin( ) {
         analogReadResolution( 12 );
         joyFullScale = (float)( ( 1 << analogReadResolutionBits( ) ) - 1 );
     }
+    stickDpadInit( &dpad, joyMenuAt, joyMenuOff, STICK_DPAD_HOLD_MS, STICK_DPAD_REARM_MS );
     consoleSetKeySink( keySink );
     consoleAddCommand( 'j', "the controls as read: joystick raw and scaled, nav stick contacts, buttons", onInputs );
     consoleAddCommand( 'J', "the nav stick's last 32 contact changes, with timing (press it first, then J)", onNavTrace );
@@ -213,8 +215,8 @@ void Input::printNavTrace( Stream* out ) const {
 void Input::printInputs( Stream* out ) const {
     char line[ 200 ];
     if ( joystickFitted ) {
-        snprintf( line, sizeof( line ), "joystick raw x %d y %d of %.0f (centre %.0f)  ->  linear x %+.2f y %+.2f (a menu direction past %.2f), expo x %+.2f y %+.2f (dead zone %.0f %%)  press %s (pin %s, %s)",
-                  analogRead( PIN_JOY_X ), analogRead( PIN_JOY_Y ), joyFullScale, 0.5f * joyFullScale, joyRawX, joyRawY, joyMenuAt, joyX, joyY, INPUT_JOY_DEAD * 100.0f,
+        snprintf( line, sizeof( line ), "joystick raw x %d y %d of %.0f (centre %.0f)  ->  linear x %+.2f y %+.2f, expo x %+.2f y %+.2f (dead zone %.0f %%, full at %.0f %%)  press %s (pin %s, %s)",
+                  analogRead( PIN_JOY_X ), analogRead( PIN_JOY_Y ), joyFullScale, 0.5f * joyFullScale, joyRawX, joyRawY, joyX, joyY, INPUT_JOY_DEAD * 100.0f, INPUT_JOY_OUTER * 100.0f,
                   trackers[ IN_JOY_PRESS ].down ? "DOWN" : "up", pinDown( IN_JOY_PRESS ) ? "reads pressed" : "reads released", sources[ IN_JOY_PRESS ].activeLow ? "active low" : "active high" );
     } else {
         snprintf( line, sizeof( line ), "joystick not fitted (PIN_JOY_X/Y are -1); typed: x %+.2f y %+.2f", joyX, joyY );
@@ -230,8 +232,11 @@ void Input::printInputs( Stream* out ) const {
     snprintf( line, sizeof( line ), "events: %d waiting, %lu dropped (ring of %d); held mask 0x%03lx%s", eventCount, (unsigned long)dropped, INPUT_EVENTS, (unsigned long)heldMask( ),
               simActive( ) ? "; a simulated control is active" : "" );
     out->println( line );
-    snprintf( line, sizeof( line ), "feel: a direction after %.0f ms (%.0f with the push contact closed), the press after %.0f ms alone, contacts settle %d ms; the stick is a menu direction past %.2f",
-              navDirectionMs, navPushGuardMs, navDirectionMs, INPUT_NAV_SETTLE_MS, joyMenuAt );
+    snprintf( line, sizeof( line ), "feel: a nav direction after %.0f ms (%.0f with the push contact closed), the press after %.0f ms alone, contacts settle %d ms; buttons %d ms bounce",
+              navDirectionMs, navPushGuardMs, navDirectionMs, INPUT_NAV_SETTLE_MS, INPUT_DEBOUNCE_MS );
+    out->println( line );
+    snprintf( line, sizeof( line ), "      the stick is a menu direction past %.2f (over inside %.2f), one axis at a time, after %lu ms (a click cancels it), re-armed after %lu ms at rest%s%s",
+              dpad.onAt, dpad.offAt, (unsigned long)dpad.holdMs, (unsigned long)dpad.rearmMs, dpad.armed[ 0 ] ? "" : "; x disarmed", dpad.armed[ 1 ] ? "" : "; y disarmed" );
     out->println( line );
 }
 
@@ -333,23 +338,25 @@ bool Input::takeKey( char c ) {
 
 // ---- reading -----------------------------------------------------------------------
 
-// The stick past its dead zone, linear (the four-way's) and with an expo
-// (fine control near the centre: the camera's).
-static float linear( float v ) {
-    float a = v < 0 ? -v : v;
-    if ( a < INPUT_JOY_DEAD ) {
-        return 0.0f;
+// The stick's dead zone, radial and scaled (a circle round the centre is
+// nothing, the ring from there to the outer edge is stretched to 0..1, so
+// there is no step at the dead zone's edge and no snap to the axes), into
+// the linear pair; the expo pair squares the magnitude (fine control near
+// the centre for the camera) and keeps the direction.
+static void shapeStick( float x, float y, float* linearX, float* linearY, float* expoX, float* expoY ) {
+    float mag = sqrtf( x * x + y * y );
+    if ( mag < INPUT_JOY_DEAD || mag <= 0.0f ) {
+        *linearX = *linearY = *expoX = *expoY = 0.0f;
+        return;
     }
-    float s = ( a - INPUT_JOY_DEAD ) / ( 1.0f - INPUT_JOY_DEAD );
+    float s = ( mag - INPUT_JOY_DEAD ) / ( INPUT_JOY_OUTER - INPUT_JOY_DEAD );
     if ( s > 1.0f )
         s = 1.0f;
-    return v < 0 ? -s : s;
-}
-
-static float expo( float linearValue ) {
-    float s = linearValue < 0 ? -linearValue : linearValue;
-    s = s * s;
-    return linearValue < 0 ? -s : s;
+    float ux = x / mag, uy = y / mag;
+    *linearX = ux * s;
+    *linearY = uy * s;
+    *expoX = ux * s * s;
+    *expoY = uy * s * s;
 }
 
 bool Input::pinDown( int c ) const {
@@ -477,10 +484,7 @@ ServiceStatus Input::service( ) {
             x = -x;
         if ( JOY_Y_REVERSED )
             y = -y;
-        joyRawX = linear( x );
-        joyRawY = linear( y );
-        joyX = expo( joyRawX );
-        joyY = expo( joyRawY );
+        shapeStick( x, y, &joyRawX, &joyRawY, &joyX, &joyY );
     } else {
         joyX = joyY = joyRawX = joyRawY = 0.0f;
     }
@@ -488,20 +492,17 @@ ServiceStatus Input::service( ) {
     bool navDown[ 5 ];
     decodeNav( now, navDown );
 
+    // Every control's level: the pins and the decoder, with the simulation
+    // on top (taps played one after another, and holds).
+    bool level[ IN_CONTROL_COUNT ];
     for ( int c = 0; c < IN_CONTROL_COUNT; c++ ) {
         InputSource& s = sources[ c ];
         bool down = false;
         if ( c >= IN_NAV_UP && c <= IN_NAV_PRESS ) {
             down = navDown[ c - IN_NAV_UP ];
-        } else if ( c >= IN_JOY_UP && c <= IN_JOY_RIGHT ) {
-            // The stick as a four-way: a small deflection of the raw stick,
-            // with hysteresis.
-            float v = c == IN_JOY_UP ? joyRawY : ( c == IN_JOY_DOWN ? -joyRawY : ( c == IN_JOY_RIGHT ? joyRawX : -joyRawX ) );
-            down = trackers[ c ].down ? v > INPUT_JOY_MENU_OFF * joyMenuAt : v > joyMenuAt;
-        } else {
+        } else if ( c < IN_JOY_UP || c > IN_JOY_RIGHT ) {
             down = pinDown( c );
         }
-        // The simulation on top: taps played one after another, and holds.
         if ( !s.emulated && s.taps > 0 && (int32_t)( now - s.nextTapMs ) >= 0 ) {
             s.emulated = true;
             s.emulatedUntil = now + INPUT_TAP_MS;
@@ -521,8 +522,19 @@ ServiceStatus Input::service( ) {
         if ( s.simDown ) {
             down = true;
         }
+        level[ c ] = down;
+    }
+    // The stick as a four-way (StickDpad.h): the settings may have moved.
+    dpad.onAt = joyMenuAt;
+    dpad.offAt = joyMenuOff < joyMenuAt ? joyMenuOff : 0.6f * joyMenuAt; // 'off' has to be under 'on' to be any use
+    stickDpadFeed( &dpad, joyRawX, joyRawY, level[ IN_JOY_PRESS ], now );
+    for ( int c = IN_JOY_UP; c <= IN_JOY_RIGHT; c++ ) {
+        level[ c ] = level[ c ] || dpad.down[ c - IN_JOY_UP ]; // (a :key jup tap on top)
+    }
+
+    for ( int c = 0; c < IN_CONTROL_COUNT; c++ ) {
         InputEventKind made[ 2 ];
-        int n = buttonFeed( &trackers[ c ], down, now, made );
+        int n = buttonFeed( &trackers[ c ], level[ c ], now, made );
         for ( int k = 0; k < n; k++ ) {
             post( (InputControl)c, made[ k ] );
         }

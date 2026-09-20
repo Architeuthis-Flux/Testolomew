@@ -12,11 +12,14 @@ bool homeKey( HomeGrid* h, MenuKey key ) {
     int was = h->cursor;
     switch ( key ) {
     case MENUKEY_LEFT:
-        h->cursor = ( h->cursor + h->count - 1 ) % h->count;
+    case MENUKEY_RIGHT: {
+        int column = h->cursor % HOME_COLUMNS;
+        int rowStart = h->cursor - column;
+        int rowCells = h->count - rowStart < HOME_COLUMNS ? h->count - rowStart : HOME_COLUMNS;
+        column = ( column + ( key == MENUKEY_RIGHT ? 1 : rowCells - 1 ) ) % rowCells;
+        h->cursor = rowStart + column;
         break;
-    case MENUKEY_RIGHT:
-        h->cursor = ( h->cursor + 1 ) % h->count;
-        break;
+    }
     case MENUKEY_UP:
         if ( h->cursor >= HOME_COLUMNS )
             h->cursor -= HOME_COLUMNS;

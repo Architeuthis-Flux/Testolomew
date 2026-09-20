@@ -5,7 +5,7 @@ void buttonInit( ButtonTracker* b, uint32_t debounceMs, bool autoRepeat ) {
     b->debounceMs = debounceMs;
     b->autoRepeat = autoRepeat;
     b->raw = b->down = false;
-    b->changedMs = b->downSinceMs = b->nextRepeatMs = 0;
+    b->changedMs = b->edgeMs = b->downSinceMs = b->nextRepeatMs = 0;
     b->holdFired = b->longFired = false;
     b->repeats = 0;
 }
@@ -15,8 +15,18 @@ int buttonFeed( ButtonTracker* b, bool rawDown, uint32_t nowMs, InputEventKind o
         b->raw = rawDown;
         b->changedMs = nowMs;
     }
-    if ( rawDown != b->down && (int32_t)( nowMs - b->changedMs ) >= (int32_t)b->debounceMs ) {
+    // Down: the first closed sample, unless within the bounce of the last
+    // edge. Up: open for the bounce time.
+    bool take = false;
+    if ( rawDown != b->down ) {
+        if ( rawDown )
+            take = (int32_t)( nowMs - b->edgeMs ) >= (int32_t)b->debounceMs || b->edgeMs == 0;
+        else
+            take = (int32_t)( nowMs - b->changedMs ) >= (int32_t)b->debounceMs;
+    }
+    if ( take ) {
         b->down = rawDown;
+        b->edgeMs = nowMs == 0 ? 1 : nowMs;
         if ( rawDown ) {
             b->downSinceMs = nowMs;
             b->nextRepeatMs = nowMs + BUTTON_REPEAT_DELAY_MS;

@@ -6,9 +6,12 @@
 // InputEvent.h: a port of JumperlOS's EncoderClickTracker::poll
 // (RotaryEncoder.cpp) with auto-repeat added for the direction keys.
 //
-// Debounce is by settling: the level has to hold debounceMs before it
-// counts (0 = at once, for a level that is already debounced, like the nav
-// stick decoder's). Then: PRESS on the down edge; while down, a repeating
+// Debounce: a PRESS is reported on the first sample that sees the contact
+// closed (no latency), and edges are then ignored for debounceMs (the
+// bounce); a RELEASE needs the contact open for debounceMs (release bounce
+// is the worse of the two, and a hold must not end on it). 0 = no
+// debounce, for a level that is already clean (the nav stick decoder's,
+// the joystick's four-way). Then: PRESS on the down edge; while down, a repeating
 // control fires REPEAT after BUTTON_REPEAT_DELAY_MS and then every
 // BUTTON_REPEAT_MS (BUTTON_REPEAT_FAST_MS after BUTTON_REPEAT_FAST_AFTER of
 // them: a number lever that runs), a non-repeating one fires HOLD at
@@ -33,7 +36,7 @@ struct ButtonTracker {
     uint32_t debounceMs;
     bool autoRepeat;
     bool raw, down; // the last raw level, and the debounced state
-    uint32_t changedMs, downSinceMs, nextRepeatMs;
+    uint32_t changedMs, edgeMs, downSinceMs, nextRepeatMs; // the raw level last changed; an edge was last taken
     bool holdFired, longFired;
     int repeats; // REPEATs fired in this press
 };

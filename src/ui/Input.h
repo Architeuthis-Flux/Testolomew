@@ -45,26 +45,32 @@
 #include "ButtonTracker.h"
 #include "InputEvent.h"
 #include "JumperlOS.h"
+#include "StickDpad.h"
 
 #define INPUT_PERIOD_US 5000
 #define INPUT_DEBOUNCE_MS BUTTON_DEBOUNCE_MS
 #define INPUT_HOLD_MS BUTTON_HOLD_MS
-#define INPUT_JOY_DEAD 0.04f        // fraction of travel ignored round the centre
-#define INPUT_JOY_MENU_AT 0.12f     // as a four-way: this much of the raw travel is a direction (the menu's; the setting "joy menu at")
-#define INPUT_JOY_MENU_OFF 0.08f     // ...released back inside this fraction of it (hysteresis)
+#define INPUT_JOY_DEAD 0.04f  // the inner dead zone: this much of the travel round the centre is nothing (a scaled radial one: no step at its edge)
+#define INPUT_JOY_OUTER 0.97f // ...and this much is full (a cheap stick does not quite reach the rails)
 #define INPUT_EMULATED_NUDGE_MS 150 // a typed joystick key holds the stick this long
 #define INPUT_TAP_MS 40             // a typed key or :key tap holds the control this long (and the next waits as long)
 #define INPUT_NAV_SETTLE_MS 10      // the nav contacts' pattern has to hold still this long (contact bounce)
 // The nav decoder's guards, the defaults of the settings "direction ms" and
-// "push guard ms" (2026-09-19: 60 and 130 made every tilt 170 ms late with
-// the tracker's debounce on top; Kevin wanted much less). One or two
-// contacts must hold INPUT_NAV_DIRECTION_MS to be a direction, and
-// INPUT_NAV_DIRECTION_WITH_PUSH_MS while the push contact is closed too
-// (a centre push wobbles the stick into a direction contact first; on this
-// unit the push contact closes on every tilt, so this is the one that
-// counts); the push alone must hold INPUT_NAV_DIRECTION_MS to be the press.
-#define INPUT_NAV_DIRECTION_MS 10
-#define INPUT_NAV_DIRECTION_WITH_PUSH_MS 20
+// "push guard ms" (a saved value wins over these until a reset). One or
+// two contacts must hold INPUT_NAV_DIRECTION_MS to be a direction, and
+// INPUT_NAV_DIRECTION_WITH_PUSH_MS while the push contact is closed too;
+// the push alone must hold INPUT_NAV_DIRECTION_MS to be the press. What
+// they guard against, from the 2026-09-18 contact traces
+// (tools/hostsim/navtest.cpp): on a tilt the push contact closes up to
+// 15 ms BEFORE the direction contact, so a push-alone guard under 20 ms
+// decodes tilts as presses; on a centre push the stick wobbles into a
+// direction contact for 30-100 ms first, so a push guard under that
+// decodes some presses as a step. 60/130 was safe and 170 ms late with
+// the tracker's debounce on top; 20/50 (2026-09-19) is the fast end that
+// still passes navtest - a wobble past 50 ms is a step, the trade Kevin
+// took. 10/20 was tried and decodes tilts as presses.
+#define INPUT_NAV_DIRECTION_MS 20
+#define INPUT_NAV_DIRECTION_WITH_PUSH_MS 50
 #define INPUT_NAV_TRACE 32          // nav pattern changes remembered for `J`
 #define INPUT_EVENTS 32             // the event ring; a full one drops its oldest (counted: `j`)
 
@@ -100,19 +106,23 @@ class Input : public Service {
     uint32_t heldMask( ) const; // bit c set while control c is down (debounced)
     uint32_t dropped = 0;       // events lost to a full ring
 
-    // The joystick, -1..1 each way, dead zone taken out, + = right / up:
-    // joyX/Y with the expo (fine near the centre: the camera's), joyRawX/Y
-    // linear (the four-way's).
+    // The joystick, -1..1 each way, + = right / up, the dead zone taken out
+    // radially and the rest scaled to fill the range: joyRawX/Y linear (the
+    // four-way's, StickDpad.h), joyX/Y with an expo on the magnitude (fine
+    // near the centre: the camera's).
     float joyX = 0.0f, joyY = 0.0f;
     float joyRawX = 0.0f, joyRawY = 0.0f;
     bool joystickFitted = false;
     float joyFullScale = 4095.0f; // what analogRead() returns at full deflection
+    StickDpad dpad;
 
-    // The feel (the Settings menu's controls page, saved): the decoder's
-    // guards in ms, and how far the stick goes before it is a menu direction.
+    // The feel (the Settings menu's controls page, saved - a saved value
+    // wins over the defines above until a reset): the decoder's guards in
+    // ms, and the stick's four-way thresholds.
     float navDirectionMs = INPUT_NAV_DIRECTION_MS;
     float navPushGuardMs = INPUT_NAV_DIRECTION_WITH_PUSH_MS;
-    float joyMenuAt = INPUT_JOY_MENU_AT;
+    float joyMenuAt = STICK_DPAD_ON;
+    float joyMenuOff = STICK_DPAD_OFF;
 
     // Console `j`: everything as read, for checking the wiring; `J`: what the
     // nav stick's contacts did lately.
