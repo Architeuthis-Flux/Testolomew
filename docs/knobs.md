@@ -43,6 +43,8 @@ The pages, item by item. Items marked *(saved)* persist; *(mode)* does not. Ever
 | gate | fixes further than this many sigmas from the track are dropped (a glitch) rather than followed | 4.0 |
 | presence | `presentMt` - the strongest smoothed reading (mT) above which a magnet is "there"; hysteresis to half of it | 0.04 |
 | far hold | how long a ROUGH track (the far glow) outlives its last rough fix (s) | 2.5 |
+| fit load | `burst`: the fit costs what it costs - a few ms a frame while tracking, and a cold start (the lattice, its refinement, up to seven seeds) as slices 25 ms apart while hunting. `steady`: exactly `fit iters` refinement iterations every frame with a magnet present, converged or not, the cold start resumed a slice a frame - the same work every 10 ms, so the V5F's supply current does not swing. On the nanoCH32H417 the LCD backlight hangs on the same LDO and showed the bursts (2026-09-20); steady was Kevin's idea | burst |
+| fit iters | the steady load's budget, iterations a frame (~0.85 ms each on the CH32H417; tracking needs two or three) | 6 |
 
 ### smoothing
 | item | what it does | default |

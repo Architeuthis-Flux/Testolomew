@@ -73,6 +73,19 @@
 // three iterations. So while there is no fix, a cold start is only attempted
 // this often, and the loop stays free for everything else.
 #define MAGLOC_COLD_START_PERIOD_MS 200
+// ...and since a cold start runs in slices (magFitSolveStep: the lattice,
+// its refinement, then up to seven seeds), the slices are spread evenly,
+// one every MAGLOC_COLD_SLICE_MS, with no pause between one cold start and
+// the next: the same work as a 25-38 ms burst every 200 ms, but as a steady
+// 40 Hz pattern the supply (and the LCD's backlight, 2026-09-20) does not
+// show, and never more than one slice's hold of the loop at a time.
+#define MAGLOC_COLD_SLICE_MS 25
+// The steady fit load (the tracker page's "fit load": steady, saved): every
+// frame with a magnet present runs exactly this many refinement iterations
+// - converged or not while tracking, one resumable slice of the cold start
+// while hunting - so the V5F's work, and its supply current, is the same
+// every 10 ms rather than a burst now and then. Kevin's idea, 2026-09-20.
+#define MAGLOC_STEADY_ITERATIONS 6 // the default of "fit iters" (an iteration is ~0.85 ms on the CH32H417; tracking needs two or three)
 
 // While tracking, this many frames in a row may fail to fit before the magnet
 // is called lost and the (slow, paced) cold start takes over. Each failed frame
@@ -273,7 +286,9 @@ class MagLocator : public Service {
         bool rough;
     };
     ProbeSim sim = { };
-    bool fitHeld = false; // :load fit off - the frames flow, nothing is fitted (the fit is the V5F's heaviest work)
+    bool fitHeld = false;   // :load fit off - the frames flow, nothing is fitted (the fit is the V5F's heaviest work)
+    bool steadyFit = false;                          // the fit's work the same every frame instead of bursts (the tracker page's "fit load")
+    float steadyIterations = MAGLOC_STEADY_ITERATIONS; // ...and how much: refinement iterations a frame ("fit iters", saved)
     uint32_t coldStarts = 0, coldStartUs = 0, coldSliceMaxUs = 0; // cold starts since boot; the last one's cost in all, and its longest slice (one per frame)
     void simProbeSet( Vec3 position, Vec3 shaft, float sigmaMm, bool rough, uint32_t ms );
     void simProbeOff( );

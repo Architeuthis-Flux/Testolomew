@@ -168,7 +168,10 @@ static Vec3 clampToBox( const FitProblem* fp, Vec3 p ) {
 
 // Levenberg-Marquardt over the magnet position, from `start`. Returns the
 // final cost; *pOut is where it ended up.
-static float refine( const FitProblem* fp, Vec3 start, Vec3* pOut, int* iterationsOut, int maxIterations = LM_MAX_ITERATIONS ) {
+// Levenberg-Marquardt from `start`: at most maxIterations, and (for a
+// steady load) at least minIterations even once converged; *convergedOut
+// (may be null) says it stopped on its own.
+static float refine( const FitProblem* fp, Vec3 start, Vec3* pOut, int* iterationsOut, int maxIterations = LM_MAX_ITERATIONS, int minIterations = 0, bool* convergedOut = nullptr ) {
     static float e0[ 3 * MAGFIT_MAX_SENSORS ];
     static float e1[ 3 * MAGFIT_MAX_SENSORS ];
     static float jac[ 3 * MAGFIT_MAX_SENSORS ][ 3 ];
@@ -178,6 +181,7 @@ static float refine( const FitProblem* fp, Vec3 start, Vec3* pOut, int* iteratio
     float cost = evaluate( fp, p, nullptr, e0 );
     float lambda = 1e-2f;
     int iter = 0;
+    bool converged = false;
 
     for ( ; iter < maxIterations; iter++ ) {
         // Numeric Jacobian of the residuals. Because evaluate() re-solves the
@@ -250,12 +254,17 @@ static float refine( const FitProblem* fp, Vec3 start, Vec3* pOut, int* iteratio
         }
 
         if ( !accepted || stepLength < LM_DONE_MM ) {
-            break;
+            converged = true;
+            if ( iter + 1 >= minIterations ) {
+                break;
+            }
         }
     }
 
     *pOut = p;
     *iterationsOut += iter;
+    if ( convergedOut != nullptr )
+        *convergedOut = converged;
     return cost;
 }
 
@@ -452,17 +461,24 @@ static const float coldSeeds[][ 3 ] = {
 
 bool magFitSolve( const Vec3* sensors, const Vec3* fields, const bool* use, int count,
                   float maxMisfit, MagFitResult* result ) {
-    bool ok;
     result->coldStage = 0; // a whole solve never continues an earlier cold start (nor trusts an uninitialised result)
-    do {
+    bool warm = result->valid;
+    bool ok = magFitSolveStep( sensors, fields, use, count, maxMisfit, result );
+    if ( !ok && warm && result->coldStage == 0 ) {
+        ok = magFitSolveStep( sensors, fields, use, count, maxMisfit, result ); // the warm start failed: a cold one, whole
+    }
+    while ( result->coldStage > 0 ) {
         ok = magFitSolveStep( sensors, fields, use, count, maxMisfit, result );
-    } while ( result->coldStage > 0 );
+    }
     return ok;
 }
 
 bool magFitSolveStep( const Vec3* sensors, const Vec3* fields, const bool* use, int count,
-                      float maxMisfit, MagFitResult* result ) {
-    if ( result->coldStage < 0 || result->coldStage > COLD_SEED_COUNT ) {
+                      float maxMisfit, MagFitResult* result, int budget ) {
+    int maxIt = budget > 0 ? budget : LM_MAX_ITERATIONS;
+    int seedIt = budget > 0 ? budget : LM_SEED_ITERATIONS;
+    int minIt = budget > 0 ? budget : 0;
+    if ( result->coldStage < 0 || result->coldStage > COLD_SEED_COUNT + 1 ) {
         result->coldStage = 0; // not a stage of ours
     }
     bool continuing = result->coldStage > 0;
@@ -516,20 +532,66 @@ bool magFitSolveStep( const Vec3* sensors, const Vec3* fields, const bool* use, 
     float bestCost = 1e30f;
     float misfitLimit = maxMisfit * maxMisfit * sumSquares;
 
-    if ( continuing ) {
-        // The next seed of a cold start begun on an earlier call.
+    if ( warm ) {
+        // A warm start: one refinement from the last answer. If it lands
+        // somewhere that does not explain the readings (the magnet jumped,
+        // or was swapped) that is simply no fix; the caller starts cold on
+        // a later call (magFitSolve does so at once).
+        bestCost = refine( &fp, warmStart, &best, &result->iterations, maxIt, minIt );
+    } else if ( !continuing ) {
+        // A cold start, stage 0: the lattice. Its best point is within a few
+        // mm of the answer wherever the magnet is, and one refinement from
+        // there (the next call) is usually the whole cold start.
+        Vec3 coarse;
+        float coarseCost = latticeSearch( &fp, sumSquares, &coarse );
+        if ( coarseCost >= 1e29f ) {
+            return false; // nothing to refine
+        }
+        result->coldStage = 1;
+        result->coldBest = coarse;
+        result->coldCost = 1e30f; // the lattice's cost is not a refined one: the refinement decides
+        result->coldIterations = 0;
+        return false;
+    } else if ( result->coldStage == 1 ) {
+        // Stage 1: refine the lattice's point - on a budget, resumed next
+        // call until it converges or the cap is spent.
+        best = result->coldBest;
+        bool converged = true;
+        int before = result->iterations;
+        bestCost = refine( &fp, best, &best, &result->iterations, maxIt, minIt, &converged );
+        result->coldIterations += result->iterations - before;
+        if ( budget > 0 && !converged && result->coldIterations < LM_MAX_ITERATIONS ) {
+            result->coldBest = best;
+            result->coldCost = bestCost;
+            return false; // more of the same next call
+        }
+        // A magnet close to the board and off to one side of a sensor has a
+        // false minimum pinned under that sensor, and it can fit to a few
+        // percent (a 6x3 mm N52 3 mm up beside the last sensor: 4.6 % misfit
+        // 9 mm away). The lattice cannot tell; only a start on the right side
+        // of it escapes. So a cold start that came out low, or that fits
+        // poorly, tries the seeds too - one per call from here.
+        if ( bestCost > misfitLimit * MAGFIT_COARSE_GOOD_ENOUGH || best.z < MAGFIT_COARSE_LOW_MM ) {
+            result->coldStage = 2;
+            result->coldBest = best;
+            result->coldCost = bestCost;
+            return false;
+        }
+        result->coldStage = 0;
+    } else {
+        // Stage k >= 2: seed k-2, on a short budget.
         best = result->coldBest;
         bestCost = result->coldCost;
-        int seed = result->coldStage - 1;
+        int seed = result->coldStage - 2;
         Vec3 start = { cx / cw + coldSeeds[ seed ][ 0 ], cy / cw + coldSeeds[ seed ][ 1 ], coldSeeds[ seed ][ 2 ] };
         Vec3 p;
-        float cost = refine( &fp, start, &p, &result->iterations, LM_SEED_ITERATIONS );
+        float cost = refine( &fp, start, &p, &result->iterations, seedIt, minIt );
         if ( cost < bestCost ) {
             bestCost = cost;
             best = p;
         }
         if ( seed + 1 < COLD_SEED_COUNT ) {
-            result->coldStage = seed + 2;
+            result->coldStage = seed + 3;
             result->coldBest = best;
             result->coldCost = bestCost;
             return false; // more seeds next call
@@ -538,44 +600,8 @@ bool magFitSolveStep( const Vec3* sensors, const Vec3* fields, const bool* use, 
         // The best of the seeds was found against an earlier frame's
         // readings: settle it on this frame's.
         if ( bestCost < 1e29f ) {
-            bestCost = refine( &fp, best, &best, &result->iterations );
+            bestCost = refine( &fp, best, &best, &result->iterations, maxIt, minIt );
         }
-    }
-
-    if ( warm ) {
-        bestCost = refine( &fp, warmStart, &best, &result->iterations );
-    }
-
-    // Cold start - also the fallback when a warm start lands somewhere that
-    // does not explain the readings (the magnet jumped, or was swapped).
-    bool cold = !warm && !continuing || ( warm && bestCost > misfitLimit );
-    if ( cold ) {
-        // First the lattice: its best point is within a few mm of the answer
-        // wherever the magnet is, and one refinement from there is usually the
-        // whole cold start (measured: a fifth of the seeds' time).
-        Vec3 coarse;
-        float coarseCost = latticeSearch( &fp, sumSquares, &coarse );
-        if ( coarseCost < 1e29f ) {
-            Vec3 p;
-            float cost = refine( &fp, coarse, &p, &result->iterations );
-            if ( cost < bestCost ) {
-                bestCost = cost;
-                best = p;
-            }
-        }
-    }
-    // A magnet close to the board and off to one side of a sensor has a false
-    // minimum pinned under that sensor, and it can fit to a few percent (a
-    // 6x3 mm N52 3 mm up beside the last sensor: 4.6 % misfit 9 mm away). The
-    // lattice cannot tell; only a start on the right side of it escapes. So a
-    // cold start that came out low, or that fits poorly, tries the seeds too.
-    if ( cold && ( bestCost > misfitLimit * MAGFIT_COARSE_GOOD_ENOUGH || best.z < MAGFIT_COARSE_LOW_MM ) ) {
-        // The seeds, one per call from here (the caller calls again next
-        // frame): the lattice's answer is kept as the best so far.
-        result->coldStage = 1;
-        result->coldBest = best;
-        result->coldCost = bestCost;
-        return false;
     }
 
     if ( bestCost >= 1e29f ) {

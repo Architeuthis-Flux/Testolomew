@@ -166,10 +166,15 @@ static void onLoadVerb( int argc, char** argv, Stream* out ) {
 #endif
             return;
         }
-        if ( strcmp( argv[ 1 ], "fit" ) == 0 && ( on || off ) ) {
+        if ( strcmp( argv[ 1 ], "fit" ) == 0 && ( on || off || strcmp( argv[ 2 ], "steady" ) == 0 || strcmp( argv[ 2 ], "burst" ) == 0 ) ) {
 #if MODULE_MAG_LOCATOR
-            magLocator.fitHeld = off;
-            consoleOk( out, on ? "fit running" : "fit held (the frames flow; nothing is fitted, so no fix, no tracking)" );
+            if ( on || off ) {
+                magLocator.fitHeld = off;
+                consoleOk( out, on ? "fit running" : "fit held (the frames flow; nothing is fitted, so no fix, no tracking)" );
+            } else {
+                magLocator.steadyFit = argv[ 2 ][ 0 ] == 's';
+                consoleOk( out, magLocator.steadyFit ? "fit load steady: 'fit iters' iterations every frame (the tracker page, saved)" : "fit load burst: the natural caps, cold-start slices every 25 ms" );
+            }
 #else
             consoleErr( out, "no locator in this build" );
 #endif
@@ -208,7 +213,7 @@ static void onLoadVerb( int argc, char** argv, Stream* out ) {
 #endif
             return;
         }
-        consoleErr( out, "usage: :load [strip|display|heartbeat|fit on|off] [sampler on|off|<ms>] [sensors on|off|lp|ln|<n>|only <list>] [lcd <MHz>]" );
+        consoleErr( out, "usage: :load [strip|display|heartbeat on|off] [fit on|off|steady|burst] [sampler on|off|<ms>] [sensors on|off|lp|ln|<n>|only <list>] [lcd <MHz>]" );
         return;
     }
     out->println( "load{" );
@@ -240,8 +245,9 @@ static void onLoadVerb( int argc, char** argv, Stream* out ) {
     out->println( line );
 #endif
 #if MODULE_MAG_LOCATOR
-    snprintf( line, sizeof( line ), "fit: %s, the last %lu us; %lu cold starts since boot, the last %lu us in all, its longest slice %lu us (one slice a frame) - the V5F's heaviest work",
-              magLocator.fitHeld ? "HELD" : "running", (unsigned long)magLocator.fix.fitUs, (unsigned long)magLocator.coldStarts, (unsigned long)magLocator.coldStartUs, (unsigned long)magLocator.coldSliceMaxUs );
+    snprintf( line, sizeof( line ), "fit: %s, %s load, the last %lu us; %lu cold starts since boot, the last %lu us in all, its longest slice %lu us - the V5F's heaviest work",
+              magLocator.fitHeld ? "HELD" : "running", magLocator.steadyFit ? "steady (fit iters a frame)" : "burst (slices every 25 ms)", (unsigned long)magLocator.fix.fitUs,
+              (unsigned long)magLocator.coldStarts, (unsigned long)magLocator.coldStartUs, (unsigned long)magLocator.coldSliceMaxUs );
     out->println( line );
 #endif
     snprintf( line, sizeof( line ), "heartbeat: %s (green LED, 1 k to VDDIO, ~2 mA at 1 Hz)", heartbeat.enabled ? "on" : "off" );
@@ -352,7 +358,7 @@ void setup( ) {
     // The dumps (:screen:ascii, :leds...) go out a row a tick from here.
     dump.begin( );
     jOS.registerService( &dump );
-    consoleAddVerb( "load", "[strip|display|heartbeat|fit on|off] [sampler on|off|<ms>] [sensors on|off|lp|ln|<n>|only <list>] [lcd <MHz>]", "what draws from the 3.3 V rail and changes; switches for a bisect", CONSOLE_CHANGES, onLoadVerb );
+    consoleAddVerb( "load", "[strip|display|heartbeat on|off] [fit on|off|steady|burst] [sampler on|off|<ms>] [sensors on|off|lp|ln|<n>|only <list>] [lcd <MHz>]", "what draws from the 3.3 V rail and changes; switches for a bisect", CONSOLE_CHANGES, onLoadVerb );
 
     console.printHelp( );
     boardLed( PIN_LED_BLUE, false );

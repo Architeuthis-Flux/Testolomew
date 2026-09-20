@@ -195,6 +195,9 @@ void settingsMenuBuild( Menu* m ) {
     menuAddNumber( m, tracker, "gate", &magLocator.track.gate, 2.0f, 10.0f, 0.5f, "sd" );
     menuAddNumber( m, tracker, "presence", &magLocator.presentMt, 0.02f, 0.20f, 0.01f, "mT" );
     menuAddNumber( m, tracker, "far hold", &magLocator.track.roughHoldS, 0.5f, 10.0f, 0.5f, "s" );
+    int fitLoad = menuAddToggle( m, tracker, "fit load", &magLocator.steadyFit ); // steady: the same work every frame (the supply shows bursts)
+    menuSetToggleText( m, fitLoad, "steady", "burst" );
+    menuAddNumber( m, tracker, "fit iters", &magLocator.steadyIterations, 2.0f, 16.0f, 1.0f, "" ); // ...how much, a frame (~0.85 ms each)
 
     int smoothing = menuAddSubmenu( m, MENU_ROOT, "smoothing" );
     menuAddNumber( m, smoothing, "view Hz", &magLocator.track.viewMinCutoff, 0.2f, 10.0f, 0.1f, "" );

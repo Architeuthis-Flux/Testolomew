@@ -627,16 +627,20 @@ ServiceStatus MagLocator::fitFrame( MagTrackInput* in ) {
     }
 
     bool wasTracking = result.valid;
-    bool continuing = result.coldStage > 0; // a cold start's next slice: every frame, no pacing
-    if ( !wasTracking && !continuing ) {
+    bool continuing = result.coldStage > 0;
+    if ( !wasTracking ) {
+        // A cold start's slices: one every MAGLOC_COLD_SLICE_MS, or every
+        // frame with the steady load.
         uint32_t now = millis( );
-        if ( now < nextColdStartMs ) {
+        if ( !steadyFit && now < nextColdStartMs ) {
             return ServiceStatus::IDLE;
         }
-        nextColdStartMs = now + MAGLOC_COLD_START_PERIOD_MS;
-        coldStarts++;
-        coldStartUs = 0;
-        coldSliceMaxUs = 0;
+        nextColdStartMs = now + MAGLOC_COLD_SLICE_MS;
+        if ( !continuing ) {
+            coldStarts++;
+            coldStartUs = 0;
+            coldSliceMaxUs = 0;
+        }
     }
     Vec3 lastGood = result.position;
 
@@ -645,7 +649,7 @@ ServiceStatus MagLocator::fitFrame( MagTrackInput* in ) {
     if ( knownStrength > 0.0f && !learning( ) ) {
         good = magFitSolveKnownStrength( magArray.position, smooth, magArray.fresh, magArray.sensorCount( ), MAGLOC_MAX_MISFIT, knownStrength, &result );
     } else {
-        good = magFitSolveStep( magArray.position, smooth, magArray.fresh, magArray.sensorCount( ), MAGLOC_MAX_MISFIT, &result );
+        good = magFitSolveStep( magArray.position, smooth, magArray.fresh, magArray.sensorCount( ), MAGLOC_MAX_MISFIT, &result, steadyFit ? (int)( steadyIterations + 0.5f ) : 0 );
     }
     fix.fitUs = micros( ) - start;
     if ( !wasTracking ) {

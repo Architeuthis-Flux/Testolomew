@@ -64,11 +64,13 @@ struct MagFitResult {
     float signal;   // RMS reading per axis, mT (residual/signal = fit quality)
     Vec3 sigma;     // 1-sigma error bar on position, mm, per axis (see below)
     int iterations;
-    // A cold start in slices (magFitSolveStep): 0 = none under way, k >= 1 =
-    // the seeds from seed k-1 are still to try; the best so far and its cost.
+    // A cold start in slices (magFitSolveStep): 0 = none under way, 1 = the
+    // lattice's point is to be refined, k >= 2 = the seeds from seed k-2 are
+    // still to try; the best so far and its cost.
     int coldStage;
     Vec3 coldBest;
     float coldCost;
+    int coldIterations; // spent on the lattice's point so far (a steady budget resumes it)
 };
 
 // The error bar. At the answer, the fit knows how much every reading would
@@ -105,14 +107,22 @@ Vec3 magFitDipoleField( Vec3 sensor, Vec3 magnet, Vec3 moment );
 bool magFitSolve( const Vec3* sensors, const Vec3* fields, const bool* use, int count,
                   float maxMisfit, MagFitResult* result );
 
-// The same, one slice at a time: a warm start is one call; a cold start is
-// the lattice and a refinement in the first call and, if that came out
-// poor or low, one seed per call after it (result->coldStage says one is
-// under way; the caller calls again next frame rather than waiting). A
-// whole cold start held the loop 25-38 ms on the CH32H417 (longer than an
-// LED frame period) and showed on the supply; a slice is a few ms.
+// The same, one slice at a time: a warm start is one call (and a failed
+// one is just that: the caller starts cold on a later call); a cold start
+// is the lattice search in one call, a refinement from its point in the
+// next, and, if that came out poor or low, one seed per call after it
+// (result->coldStage says one is under way; the caller calls again when
+// it likes rather than waiting). A whole cold start held the loop 25-38 ms
+// on the CH32H417 (longer than an LED frame period) and showed on the
+// supply; a slice is a few ms.
+// `budget` > 0 makes every call cost the same: exactly that many
+// iterations of the refinement, converged or not (a warm start that needs
+// more carries on next frame from where it got; the lattice's point is
+// resumed until it converges or the full cap is spent). So the fit's work
+// is a steady load on the supply instead of bursts (MagLocator's "fit
+// load: steady"). 0 = the natural caps.
 bool magFitSolveStep( const Vec3* sensors, const Vec3* fields, const bool* use, int count,
-                      float maxMisfit, MagFitResult* result );
+                      float maxMisfit, MagFitResult* result, int budget = 0 );
 
 // The same, for a magnet whose strength |moment| is already known - which a
 // probe's is: it carries one magnet. With the strength free, a magnet a little
