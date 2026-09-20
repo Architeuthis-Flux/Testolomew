@@ -121,6 +121,9 @@ class MagArray : public Service {
     bool poweredOff = false;
     bool samplerHeld = false;
     bool lowNoise = true;
+    uint32_t samplerPassPeriodMs = 0; // :load sampler <ms>: the V3F's passes paced (0 = free-running); applied at every start
+    void setSamplerPassPeriodMs( uint32_t ms );
+    float samplerPassesPerSecond( ); // measured since the last call
     int enabledCount( ) const; // sensors not disabled by powerOffFrom()
 
     void startBaseline( );

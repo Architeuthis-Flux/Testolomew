@@ -44,6 +44,14 @@ __itcm_func void loop1( ) {
         return; // the V5F is resetting the block: off the bus until it says so
     }
     s->state = MAGSAMPLER_RUN;
+    uint32_t period = s->passPeriodMs;
+    if ( period != 0 ) {
+        uint32_t now = millis( );
+        if ( now - s->lastPassMs < period ) {
+            return; // paced: not yet
+        }
+        s->lastPassMs = now;
+    }
     uint32_t count = s->count;
     if ( count > MAGSAMPLER_MAX_SENSORS ) {
         count = MAGSAMPLER_MAX_SENSORS;
@@ -97,6 +105,10 @@ __itcm_func void loop1( ) {
 // ---- the V5F ----------------------------------------------------------------
 void magSamplerSetBusHz( uint32_t hz ) {
     magSampler.busHz = hz;
+}
+
+void magSamplerSetPassPeriodMs( uint32_t ms ) {
+    magSampler.passPeriodMs = ms;
 }
 
 void magSamplerSetup( int peripheral, int count ) {

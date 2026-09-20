@@ -128,10 +128,31 @@ int MagArray::begin( bool zero ) {
 // The other core takes over the bus: told which sensors to read, and run.
 // samplerOn says whether it obeyed (loop1() is running there); if not, the
 // bus is read from here as before.
+void MagArray::setSamplerPassPeriodMs( uint32_t ms ) {
+    samplerPassPeriodMs = ms;
+#if MAG_SAMPLER_CORE1
+    magSamplerSetPassPeriodMs( ms );
+#endif
+}
+
+float MagArray::samplerPassesPerSecond( ) {
+#if MAG_SAMPLER_CORE1
+    uint32_t now = millis( );
+    uint32_t passes = magSampler.passes;
+    float rate = now > samplerPassesSeenMs ? ( passes - samplerPassesSeen ) * 1000.0f / ( now - samplerPassesSeenMs ) : 0.0f;
+    samplerPassesSeen = passes;
+    samplerPassesSeenMs = now;
+    return rate;
+#else
+    return 0.0f;
+#endif
+}
+
 void MagArray::startSampler( ) {
 #if MAG_SAMPLER_CORE1
     magSamplerSetup( busPeripheral, MAG_SENSOR_COUNT );
     magSamplerSetBusHz( MAG_I2C_HZ );
+    magSamplerSetPassPeriodMs( samplerPassPeriodMs );
     for ( int i = 0; i < MAG_SENSOR_COUNT; i++ ) {
         magSamplerSetSensor( i, sensors[ i ].dev.address, (int)tmag5273ReadBytes( &sensors[ i ].dev ), sensors[ i ].ok );
         samplerSeq[ i ] = 0;

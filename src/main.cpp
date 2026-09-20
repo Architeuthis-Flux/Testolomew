@@ -156,10 +156,19 @@ static void onLoadVerb( int argc, char** argv, Stream* out ) {
 #endif
             return;
         }
-        if ( strcmp( argv[ 1 ], "sampler" ) == 0 && ( on || off ) ) {
+        if ( strcmp( argv[ 1 ], "sampler" ) == 0 ) {
 #if MODULE_MAG_ARRAY
-            magArray.holdSampler( off );
-            consoleOk( out, on ? "sampler running" : "sampler held (the other core off the bus; the sensors stay powered and converting)" );
+            if ( on || off ) {
+                magArray.holdSampler( off );
+                consoleOk( out, on ? "sampler running" : "sampler held (the other core off the bus; the sensors stay powered and converting)" );
+            } else if ( argv[ 2 ][ 0 ] >= '0' && argv[ 2 ][ 0 ] <= '9' ) {
+                uint32_t ms = (uint32_t)atol( argv[ 2 ] );
+                magArray.setSamplerPassPeriodMs( ms );
+                snprintf( line, sizeof( line ), ms == 0 ? "sampler free-running" : "sampler paced: one pass over the sensors every %lu ms", (unsigned long)ms );
+                consoleOk( out, line );
+            } else {
+                consoleErr( out, "usage: :load sampler on|off|<ms> (a pass every that many ms; 0 = free-running)" );
+            }
 #else
             consoleErr( out, "no array in this build" );
 #endif
@@ -180,7 +189,7 @@ static void onLoadVerb( int argc, char** argv, Stream* out ) {
 #endif
             return;
         }
-        consoleErr( out, "usage: :load [strip|display|heartbeat|sampler on|off] [sensors on|off|lp|ln|<n>] [lcd <MHz>]" );
+        consoleErr( out, "usage: :load [strip|display|heartbeat on|off] [sampler on|off|<ms>] [sensors on|off|lp|ln|<n>] [lcd <MHz>]" );
         return;
     }
     out->println( "load{" );
@@ -200,9 +209,15 @@ static void onLoadVerb( int argc, char** argv, Stream* out ) {
     out->println( line );
 #endif
 #if MODULE_MAG_ARRAY
-    snprintf( line, sizeof( line ), "sensors: %s, %d of %d powered, %d answering, continuous %s conversion (~%.1f mA each, free-running) from their GPIO supplies; the sampler %s",
-              magArray.poweredOff ? "OFF" : "on", magArray.enabledCount( ), magArray.sensorCount( ), magArray.sensorsOk( ), magArray.lowNoise ? "low-noise" : "low-power", magArray.lowNoise ? 3.0f : 2.3f,
-              magArray.samplerHeld ? "HELD" : "running" );
+    snprintf( line, sizeof( line ), "sensors: %s, %d of %d powered, %d answering, continuous %s conversion (~%.1f mA each, ~400 results/s each on its own clock) from their GPIO supplies",
+              magArray.poweredOff ? "OFF" : "on", magArray.enabledCount( ), magArray.sensorCount( ), magArray.sensorsOk( ), magArray.lowNoise ? "low-noise" : "low-power", magArray.lowNoise ? 3.0f : 2.3f );
+    out->println( line );
+    float passes = magArray.samplerPassesPerSecond( );
+    if ( magArray.samplerPassPeriodMs != 0 ) {
+        snprintf( line, sizeof( line ), "sampler: %s, paced to a pass every %lu ms (%.0f passes/s since the last look; 0 = free-running)", magArray.samplerHeld ? "HELD" : "running", (unsigned long)magArray.samplerPassPeriodMs, passes );
+    } else {
+        snprintf( line, sizeof( line ), "sampler: %s, free-running (%.0f passes/s since the last look; :load sampler <ms> paces it)", magArray.samplerHeld ? "HELD" : "running", passes );
+    }
     out->println( line );
 #endif
     snprintf( line, sizeof( line ), "heartbeat: %s (green LED, 1 k to VDDIO, ~2 mA at 1 Hz)", heartbeat.enabled ? "on" : "off" );
@@ -313,7 +328,7 @@ void setup( ) {
     // The dumps (:screen:ascii, :leds...) go out a row a tick from here.
     dump.begin( );
     jOS.registerService( &dump );
-    consoleAddVerb( "load", "[strip|display|heartbeat|sampler on|off] [sensors on|off|lp|ln|<n>] [lcd <MHz>]", "what draws from the 3.3 V rail and changes; switches for a bisect", CONSOLE_CHANGES, onLoadVerb );
+    consoleAddVerb( "load", "[strip|display|heartbeat on|off] [sampler on|off|<ms>] [sensors on|off|lp|ln|<n>] [lcd <MHz>]", "what draws from the 3.3 V rail and changes; switches for a bisect", CONSOLE_CHANGES, onLoadVerb );
 
     console.printHelp( );
     boardLed( PIN_LED_BLUE, false );

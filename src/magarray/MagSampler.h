@@ -54,6 +54,13 @@ struct MagSamplerShared {
     volatile uint32_t resets;       // times the sampler asked for the I2C block to be reset for that
     volatile uint32_t resetWanted;  // set by the V3F (it stays off the bus), cleared by the V5F once the block is reset
     volatile uint32_t busHz;        // what to set it up at again
+    // Pacing (the V5F writes): no pass starts within passPeriodMs of the
+    // last one's start (0 = free-running, ~484 passes a second on the
+    // bench). The reads then come in a burst once a period rather than
+    // drifting against the sensors' own conversion clocks (:load sampler
+    // <ms>; the backlight showed the drift, 2026-09-20).
+    volatile uint32_t passPeriodMs;
+    volatile uint32_t lastPassMs;
 };
 #define MAGSAMPLER_RESET_AFTER_PASSES 2
 
@@ -65,6 +72,7 @@ extern MagSamplerShared magSampler;
 // running loop1() at all.
 void magSamplerSetup( int peripheral, int count );
 void magSamplerSetBusHz( uint32_t hz ); // for the sampler's own block resets (after setup)
+void magSamplerSetPassPeriodMs( uint32_t ms ); // 0 = free-running
 void magSamplerSetSensor( int i, uint8_t address, int bytes, bool enabled );
 bool magSamplerCommand( MagSamplerCommand command );
 bool magSamplerRunning( void );
