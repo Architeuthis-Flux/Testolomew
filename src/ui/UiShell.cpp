@@ -32,6 +32,9 @@ void uiShellInit( UiShell* s, const UiApp* apps, int appCount, int firstApp, int
     s->joyArmed = false;
     s->lastInputMs = 0;
     s->generation = 1;
+    s->absoluteJoystick = false;
+    s->menuRows = 9;
+    s->menuScrollTop = 0;
     if ( firstApp >= 0 && firstApp < appCount ) {
         s->app = firstApp;
         if ( apps[ firstApp ].enter != nullptr )
@@ -172,6 +175,10 @@ static int menuAction( UiShell* s, int action ) {
     return action;
 }
 
+static bool isJoystickDirection( InputControl c ) {
+    return c >= IN_JOY_UP && c <= IN_JOY_RIGHT;
+}
+
 int uiShellEvent( UiShell* s, InputEvent e, uint32_t nowMs ) {
     InputControl c = e.control;
     s->lastInputMs = nowMs == 0 ? 1 : nowMs;
@@ -184,6 +191,9 @@ int uiShellEvent( UiShell* s, InputEvent e, uint32_t nowMs ) {
         if ( e.kind == IN_RELEASE )
             s->swallow[ c ] = false;
         return -1;
+    }
+    if ( s->absoluteJoystick && isJoystickDirection( c ) && ( uiShellTop( s ) == PANE_HOME || uiShellTop( s ) == PANE_MENU ) ) {
+        return -1; // the stick's position steers these (uiShellTick), not its four-way
     }
     bool press = e.kind == IN_PRESS || e.kind == IN_REPEAT;
     bool repeat = e.kind == IN_REPEAT;
@@ -280,7 +290,75 @@ int uiShellEvent( UiShell* s, InputEvent e, uint32_t nowMs ) {
     return -1;
 }
 
-void uiShellTick( UiShell* s, uint32_t nowMs, float dtS, float joyX, float joyY, const bool* heldNow ) {
+void uiShellMenuWindow( UiShell* s ) {
+    int visible = menuVisibleCount( &s->menu );
+    int rows = visible < s->menuRows ? visible : s->menuRows;
+    if ( s->menu.cursor < s->menuScrollTop )
+        s->menuScrollTop = s->menu.cursor;
+    if ( s->menu.cursor >= s->menuScrollTop + rows )
+        s->menuScrollTop = s->menu.cursor - rows + 1;
+    if ( s->menuScrollTop > visible - rows )
+        s->menuScrollTop = visible - rows < 0 ? 0 : visible - rows;
+    if ( s->menuScrollTop < 0 )
+        s->menuScrollTop = 0;
+}
+
+// One axis of the stick into three bands (0, 1, 2) with hysteresis round
+// the band edges at a third of the travel.
+static int stickBand( float v, int current ) {
+    const float edge = 0.33f, slack = 0.06f;
+    if ( current == 0 )
+        return v > -edge + slack ? ( v > edge + slack ? 2 : 1 ) : 0;
+    if ( current == 2 )
+        return v < edge - slack ? ( v < -edge - slack ? 0 : 1 ) : 2;
+    return v < -edge - slack ? 0 : ( v > edge + slack ? 2 : 1 );
+}
+
+// The stick's position as the cursor, while it is deflected.
+static void steerAbsolute( UiShell* s, float x, float y ) {
+    if ( x == 0.0f && y == 0.0f )
+        return;
+    if ( uiShellTop( s ) == PANE_HOME ) {
+        int column = stickBand( x, s->home.cursor % HOME_COLUMNS );
+        int row = stickBand( -y, s->home.cursor / HOME_COLUMNS );
+        int rows = ( s->home.count + HOME_COLUMNS - 1 ) / HOME_COLUMNS;
+        if ( row >= rows )
+            row = rows - 1;
+        int cell = row * HOME_COLUMNS + column;
+        if ( cell >= s->home.count )
+            cell = s->home.count - 1;
+        if ( cell != s->home.cursor ) {
+            s->home.cursor = cell;
+            s->generation++;
+        }
+    } else if ( uiShellTop( s ) == PANE_MENU ) {
+        int visible = menuVisibleCount( &s->menu );
+        if ( visible == 0 )
+            return;
+        uiShellMenuWindow( s );
+        int rows = visible < s->menuRows ? visible : s->menuRows;
+        // Up is the top row: the stick's height over the rows on screen,
+        // with a little slack before the cursor moves a row.
+        float pos = ( 1.0f - y ) * 0.5f * rows; // 0 at the top .. rows at the bottom
+        int r = s->menu.cursor - s->menuScrollTop;
+        const float slack = 0.15f;
+        if ( pos < r - slack )
+            r = (int)( pos + slack );
+        else if ( pos >= r + 1.0f + slack )
+            r = (int)( pos - slack );
+        if ( r < 0 )
+            r = 0;
+        if ( r > rows - 1 )
+            r = rows - 1;
+        int cursor = s->menuScrollTop + r;
+        if ( cursor != s->menu.cursor ) {
+            s->menu.cursor = cursor;
+            s->generation++;
+        }
+    }
+}
+
+void uiShellTick( UiShell* s, uint32_t nowMs, float dtS, float joyX, float joyY, float joyRawX, float joyRawY, const bool* heldNow ) {
     // A release the ring lost: the raw state says it is up, so it is.
     if ( heldNow != nullptr ) {
         for ( int c = 0; c < IN_CONTROL_COUNT; c++ ) {
@@ -294,6 +372,11 @@ void uiShellTick( UiShell* s, uint32_t nowMs, float dtS, float joyX, float joyY,
     if ( s->depth > 0 && s->lastInputMs != 0 && nowMs - s->lastInputMs >= UISHELL_IDLE_MS ) {
         uiShellCloseAll( s );
         s->lastInputMs = nowMs == 0 ? 1 : nowMs;
+    }
+    if ( s->absoluteJoystick && s->depth > 0 ) {
+        if ( joyRawX != 0.0f || joyRawY != 0.0f )
+            s->lastInputMs = nowMs == 0 ? 1 : nowMs; // the stick counts as input
+        steerAbsolute( s, joyRawX, joyRawY );
     }
     // The stick is the app's only with nothing open, and only once it has
     // been seen centred since the focus last changed.

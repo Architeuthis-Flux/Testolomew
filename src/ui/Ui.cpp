@@ -24,6 +24,7 @@ static void onUiVerb( int argc, char** argv, Stream* out );
 
 void Ui::begin( const UiApp* apps, int appCount, int firstApp, int settingsCell ) {
     uiShellInit( &shell, apps, appCount, firstApp, settingsCell );
+    shell.menuRows = UI_MENU_ROWS;
     consoleAddVerb( "screen", "", "what the screen shows, as text: app, panes, menu page and items, the modules' state", CONSOLE_READS, onScreenVerb );
     consoleAddVerb( "log", "[n]", "the last n lines of the log (20)", CONSOLE_READS, onLogVerb );
     consoleAddVerb( "ui", "open|menu|close|back|enter|up|down|left|right|go <label>", "drive the screen: Home, Settings, the panes", CONSOLE_CHANGES, onUiVerb );
@@ -63,7 +64,7 @@ ServiceStatus Ui::service( ) {
     for ( int c = 0; c < IN_CONTROL_COUNT; c++ ) {
         heldNow[ c ] = ( mask >> c ) & 1;
     }
-    uiShellTick( &shell, now, dtS, input.joyX, input.joyY, heldNow );
+    uiShellTick( &shell, now, dtS, input.joyX, input.joyY, input.joyRawX, input.joyRawY, heldNow );
     if ( shell.depth == 0 && ( input.joyX != 0.0f || input.joyY != 0.0f ) ) {
         anything = true;
     }
@@ -151,38 +152,42 @@ static const char* homeCellName( const UiShell* s, int cell ) {
     return app < 0 ? "Settings" : s->apps[ app ].name;
 }
 
-// Home: the apps as icons, three across, the one under the cursor framed
-// and named beneath the grid.
+// Home: the apps as icons, three across, each named beneath its icon, the
+// one under the cursor framed.
 void Ui::drawHome( GFXcanvas16* canvas ) {
     canvas->fillScreen( UI_COLOR_BACKGROUND );
     int cells = shell.home.count;
     int rows = ( cells + HOME_COLUMNS - 1 ) / HOME_COLUMNS;
     int x0 = ( LCD_WIDTH - HOME_COLUMNS * UI_HOME_CELL ) / 2;
-    int y0 = ( LCD_HEIGHT - UI_LINE_H - 6 - rows * UI_HOME_CELL ) / 2;
+    int y0 = ( LCD_HEIGHT - rows * UI_HOME_CELL ) / 2;
     if ( y0 < 2 )
         y0 = 2;
+    const int iconSize = 24 * UI_ICON_SCALE, labelH = 8;
     for ( int cell = 0; cell < cells; cell++ ) {
         int cx = x0 + ( cell % HOME_COLUMNS ) * UI_HOME_CELL;
         int cy = y0 + ( cell / HOME_COLUMNS ) * UI_HOME_CELL;
         bool selected = cell == shell.home.cursor;
+        uint16_t colour = selected ? UI_COLOR_SELECTED : UI_COLOR_ICON;
         if ( selected ) {
             fastFillRect( canvas, cx + 2, cy + 2, UI_HOME_CELL - 4, UI_HOME_CELL - 4, UI_COLOR_PANEL );
             fastRect( canvas, cx + 2, cy + 2, UI_HOME_CELL - 4, UI_HOME_CELL - 4, UI_COLOR_SELECTED );
         }
         int app = uiShellHomeCellApp( &shell, cell );
         const uint8_t* icon = app < 0 ? shell.settingsIcon : shell.apps[ app ].icon;
-        int ix = cx + ( UI_HOME_CELL - 24 * UI_ICON_SCALE ) / 2, iy = cy + ( UI_HOME_CELL - 24 * UI_ICON_SCALE ) / 2;
+        const char* name = homeCellName( &shell, cell );
+        int ix = cx + ( UI_HOME_CELL - iconSize ) / 2, iy = cy + ( UI_HOME_CELL - iconSize - labelH - 4 ) / 2;
         if ( icon != nullptr ) {
-            uiDrawIcon( canvas, ix, iy, icon, UI_ICON_SCALE, selected ? UI_COLOR_SELECTED : UI_COLOR_ICON );
+            uiDrawIcon( canvas, ix, iy, icon, UI_ICON_SCALE, colour );
         } else {
-            // No art: the name's initial, large.
-            char initial[ 2 ] = { homeCellName( &shell, cell )[ 0 ], '\0' };
-            fastText( canvas, cx + UI_HOME_CELL / 2 - 9, cy + UI_HOME_CELL / 2 - 12, 3, selected ? UI_COLOR_SELECTED : UI_COLOR_ICON, initial );
+            char initial[ 2 ] = { name[ 0 ], '\0' };
+            fastText( canvas, cx + UI_HOME_CELL / 2 - 9, iy + iconSize / 2 - 12, 3, colour, initial );
         }
+        // The name under the icon, size 1, centred, cut to the cell.
+        char label[ 12 ];
+        snprintf( label, sizeof( label ), "%.*s", ( UI_HOME_CELL - 4 ) / 6, name );
+        int w = (int)strlen( label ) * 6;
+        fastText( canvas, cx + ( UI_HOME_CELL - w ) / 2, iy + iconSize + 3, 1, selected ? UI_COLOR_SELECTED : UI_COLOR_TEXT, label );
     }
-    const char* name = homeCellName( &shell, shell.home.cursor );
-    int w = (int)strlen( name ) * UI_CHAR_W;
-    fastText( canvas, ( LCD_WIDTH - w ) / 2, y0 + rows * UI_HOME_CELL + 4, UI_TEXT, UI_COLOR_TEXT, name );
 }
 
 void Ui::drawMenu( GFXcanvas16* canvas ) {
@@ -199,12 +204,8 @@ void Ui::drawMenu( GFXcanvas16* canvas ) {
     fastRect( canvas, x0, y0, w, h, UI_COLOR_FRAME );
     fastText( canvas, x0 + 4, y0 + 3, T, UI_COLOR_FRAME, menuTitle( &menu ) );
 
-    if ( menu.cursor < scrollTop )
-        scrollTop = menu.cursor;
-    if ( menu.cursor >= scrollTop + rows )
-        scrollTop = menu.cursor - rows + 1;
-    if ( scrollTop > visible - rows )
-        scrollTop = visible - rows < 0 ? 0 : visible - rows;
+    uiShellMenuWindow( &shell );
+    int scrollTop = shell.menuScrollTop;
 
     char text[ 48 ];
     for ( int r = 0; r < rows; r++ ) {

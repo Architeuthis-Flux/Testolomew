@@ -250,6 +250,46 @@
 @expect "app: View"
 @expect "play: off"
 
+# Absolute joystick (controls / joystick): the stick's position is the
+# Home cell while it is deflected; relative again afterwards.
+:key a
+@run 300
+:ui go settings
+:ui back
+:ui go controls
+@expect "ok{go controls}"
+:ui go joystick
+@expect "ok{go joystick}"
+:screen
+@expect "> joystick                 absolute"
+:ui back
+:key b
+@run 300
+:key a
+@run 300
+:joy 0.9 0.9 300
+@run 100
+:screen
+@expect "home: cursor 2 Terminal"
+@run 400
+:joy -0.9 -0.9 300
+@run 100
+:screen
+@expect "home: cursor 6 Calibrate"
+@run 400
+:ui go settings
+:ui go controls
+:ui go joystick
+:screen
+@expect "> joystick                 relative"
+:ui back
+:key b
+@run 300
+:key a
+@run 300
+:ui go view
+@run 200
+
 # The joystick from the console orbits the camera.
 :joy 0.8 0 400
 @expect "ok{joy"

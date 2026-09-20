@@ -106,6 +106,7 @@ Draw app controls, in paint mode: **joystick** moves the wheel's marker (4 radii
 | direction ms | how long one or two nav contacts must hold before they are a direction, and how long the push contact must be closed alone before it is the press | 20 |
 | push guard ms | the same for a direction while the push contact is closed too - on this stick the push contact closes on every tilt, so this is the one that counts. A centre push wobbles into a direction contact first (up to ~100 ms was seen on 2026-09-18): raise it if a press ever moves the cursor, lower it for speed | 50 |
 | joy menu at | how far the joystick goes (0-1 of its raw travel) before it counts as a menu direction; released again at 60 % of that | 0.25 |
+| joystick | `relative`: the stick is a four-way that steps the cursor. `absolute`: while the stick is deflected its position IS the cursor - on Home the cell it points at (three bands each way, a third of the travel apart), on a Settings page the row among those on screen (its height); let go and the cursor stays. The nav stick still steps either way; in an app the stick is the app's as before | relative |
 
 The contacts settle 10 ms before any of this; nothing is debounced twice. `j` prints the numbers in force. A press selects on its way DOWN in Home, the menu and the dialogs (the release-based click felt like nothing happening).
 

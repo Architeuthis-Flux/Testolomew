@@ -37,3 +37,5 @@
     0.1   +   116 ms  0 0 0 0  push 0  (released)
     0.1   + 34151 ms  0 0 1 0  push 1
     0.1   +   257 ms  0 0 0 0  push 0  (released)
+    0.0 Mnav stick contact changes, oldest first (ms since the previous one; up down left right, push):
+    0.0   (none yet)

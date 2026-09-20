@@ -75,7 +75,6 @@ class Ui : public Service {
     Ui( ) = default;
 
     uint32_t lastUs = 0;
-    int scrollTop = 0; // first menu row shown
 
     void runAction( int index );
     void drawHome( GFXcanvas16* canvas );

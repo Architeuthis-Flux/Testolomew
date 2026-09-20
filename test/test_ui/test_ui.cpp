@@ -267,7 +267,7 @@ static int hold( InputControl c ) {
 
 static void tick( float x, float y ) {
     t += 10;
-    uiShellTick( &shell, t, 0.01f, x, y, heldNow );
+    uiShellTick( &shell, t, 0.01f, x, y, x, y, heldNow ); // the raw stick as the shaped one, for these
 }
 
 void test_shell_home_selects_apps_and_remembers( void ) {
@@ -401,6 +401,42 @@ void test_shell_confirm_and_result( void ) {
     TEST_ASSERT_EQUAL( 0, fakes[ 0 ].events );
 }
 
+// Absolute joystick: the stick's position is the cursor while it is
+// deflected - a cell on Home, a row on a menu page - and the four-way's
+// events are ignored there; the app's own stick is untouched.
+void test_shell_absolute_joystick( void ) {
+    shellSetUp( );
+    shell.absoluteJoystick = true;
+    tap( IN_BTN_A ); // Home: View, Settings, LEDs in one row
+    tick( 0.9f, 0.0f );
+    TEST_ASSERT_EQUAL( 2, shell.home.cursor ); // right band: the third cell
+    tick( 0.0f, 0.0f );
+    TEST_ASSERT_EQUAL( 2, shell.home.cursor ); // released: stays
+    tick( 0.1f, 0.1f );
+    TEST_ASSERT_EQUAL( 1, shell.home.cursor ); // a small deflection: the middle band
+    tick( -0.9f, -0.9f );
+    TEST_ASSERT_EQUAL( 0, shell.home.cursor ); // down-left: the last row is the only row
+    send( IN_JOY_RIGHT, IN_PRESS ); // the four-way is ignored here
+    send( IN_JOY_RIGHT, IN_RELEASE );
+    TEST_ASSERT_EQUAL( 0, shell.home.cursor );
+    send( IN_NAV_RIGHT, IN_PRESS ); // the nav stick still steps
+    send( IN_NAV_RIGHT, IN_RELEASE );
+    TEST_ASSERT_EQUAL( 1, shell.home.cursor );
+    tap( IN_NAV_PRESS ); // Settings: a page of four rows (tracker, reset settings, latest fix... the root)
+    TEST_ASSERT_EQUAL( PANE_MENU, uiShellTop( &shell ) );
+    int visible = menuVisibleCount( &shell.menu );
+    tick( 0.0f, -0.95f ); // the stick at the bottom: the last row
+    TEST_ASSERT_EQUAL( visible - 1, shell.menu.cursor );
+    tick( 0.0f, 0.95f ); // at the top: the first
+    TEST_ASSERT_EQUAL( 0, shell.menu.cursor );
+    tick( 0.0f, 0.0f );
+    TEST_ASSERT_EQUAL( 0, shell.menu.cursor );
+    tap( IN_BTN_B ); // closed: the app has its stick as before
+    tick( 0.0f, 0.0f );
+    tick( 0.5f, 0.0f );
+    TEST_ASSERT_FLOAT_WITHIN( 0.001f, 0.5f, fakes[ 0 ].lastJoyX );
+}
+
 void test_shell_timeout_and_joystick( void ) {
     shellSetUp( );
     tick( 0.0f, 0.0f );
@@ -520,6 +556,7 @@ int main( int argc, char** argv ) {
     RUN_TEST( test_shell_swallows_a_held_control_across_a_focus_change );
     RUN_TEST( test_shell_confirm_and_result );
     RUN_TEST( test_shell_timeout_and_joystick );
+    RUN_TEST( test_shell_absolute_joystick );
     RUN_TEST( test_camera_glides_and_orbits );
     RUN_TEST( test_camera_turns_the_short_way );
     RUN_TEST( test_camera_pov_is_at_the_point_looking_down_the_shaft );

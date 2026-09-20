@@ -74,6 +74,13 @@ struct UiShell {
     bool joyArmed;                    // the stick has been centred since the last focus change
     uint32_t lastInputMs;
     uint32_t generation; // bumps on anything that changes the picture
+    // Absolute joystick (a setting): while it is deflected, the stick's
+    // position IS the cursor - on Home the cell it points at (three bands
+    // each way), on a menu page the row among those on screen - and its
+    // four-way events are ignored there. Off: the four-way steps.
+    bool absoluteJoystick;
+    int menuRows;      // rows a menu page shows at once (the Ui says)
+    int menuScrollTop; // the first row shown (kept here so the stick and the drawing agree)
 };
 
 void uiShellInit( UiShell* s, const UiApp* apps, int appCount, int firstApp, int settingsCell );
@@ -82,9 +89,12 @@ void uiShellInit( UiShell* s, const UiApp* apps, int appCount, int firstApp, int
 // confirmed one, or one that needs no confirmation), else -1.
 int uiShellEvent( UiShell* s, InputEvent e, uint32_t nowMs );
 // Every UI tick: heals lost releases from the raw held state (heldNow, one
-// bool per control, may be nullptr), closes idle overlays, and ticks the
-// app - with the stick only when it is the app's.
-void uiShellTick( UiShell* s, uint32_t nowMs, float dtS, float joyX, float joyY, const bool* heldNow );
+// bool per control, may be nullptr), closes idle overlays, steers the
+// panes with the raw stick in absolute mode, and ticks the app - with the
+// (shaped) stick only when it is the app's.
+void uiShellTick( UiShell* s, uint32_t nowMs, float dtS, float joyX, float joyY, float joyRawX, float joyRawY, const bool* heldNow );
+// The menu page's window: menuScrollTop brought to where the cursor is.
+void uiShellMenuWindow( UiShell* s );
 
 void uiShellSelectApp( UiShell* s, int app ); // swaps the base pane and closes the overlays
 void uiShellOpenHome( UiShell* s );
