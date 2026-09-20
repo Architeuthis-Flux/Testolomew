@@ -240,8 +240,8 @@ static void onLoadVerb( int argc, char** argv, Stream* out ) {
     out->println( line );
 #endif
 #if MODULE_MAG_LOCATOR
-    snprintf( line, sizeof( line ), "fit: %s, the last %lu us (a tracking fit), %lu cold starts since boot, the last %lu us - the V5F's heaviest work, in bursts", magLocator.fitHeld ? "HELD" : "running",
-              (unsigned long)magLocator.fix.fitUs, (unsigned long)magLocator.coldStarts, (unsigned long)magLocator.coldStartUs );
+    snprintf( line, sizeof( line ), "fit: %s, the last %lu us; %lu cold starts since boot, the last %lu us in all, its longest slice %lu us (one slice a frame) - the V5F's heaviest work",
+              magLocator.fitHeld ? "HELD" : "running", (unsigned long)magLocator.fix.fitUs, (unsigned long)magLocator.coldStarts, (unsigned long)magLocator.coldStartUs, (unsigned long)magLocator.coldSliceMaxUs );
     out->println( line );
 #endif
     snprintf( line, sizeof( line ), "heartbeat: %s (green LED, 1 k to VDDIO, ~2 mA at 1 Hz)", heartbeat.enabled ? "on" : "off" );

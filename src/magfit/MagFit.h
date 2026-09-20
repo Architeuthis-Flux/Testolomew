@@ -64,6 +64,11 @@ struct MagFitResult {
     float signal;   // RMS reading per axis, mT (residual/signal = fit quality)
     Vec3 sigma;     // 1-sigma error bar on position, mm, per axis (see below)
     int iterations;
+    // A cold start in slices (magFitSolveStep): 0 = none under way, k >= 1 =
+    // the seeds from seed k-1 are still to try; the best so far and its cost.
+    int coldStage;
+    Vec3 coldBest;
+    float coldCost;
 };
 
 // The error bar. At the answer, the fit knows how much every reading would
@@ -91,13 +96,23 @@ Vec3 magFitDipoleField( Vec3 sensor, Vec3 magnet, Vec3 moment );
 //
 // If result->valid is true on entry its position is the starting guess (warm
 // start - the normal case while tracking, a few iterations). Otherwise the
-// search starts over the strongest readings at a few heights.
+// search starts over the strongest readings at a few heights. This one
+// runs a cold start to its end in one call; result->coldStage is reset.
 //
 // Returns result->valid. maxMisfit is the residual/signal ratio above which
 // the fit is called invalid (0.25 is a reasonable start: a real magnet near
 // the array fits to a few percent, and junk does not fit at all).
 bool magFitSolve( const Vec3* sensors, const Vec3* fields, const bool* use, int count,
                   float maxMisfit, MagFitResult* result );
+
+// The same, one slice at a time: a warm start is one call; a cold start is
+// the lattice and a refinement in the first call and, if that came out
+// poor or low, one seed per call after it (result->coldStage says one is
+// under way; the caller calls again next frame rather than waiting). A
+// whole cold start held the loop 25-38 ms on the CH32H417 (longer than an
+// LED frame period) and showed on the supply; a slice is a few ms.
+bool magFitSolveStep( const Vec3* sensors, const Vec3* fields, const bool* use, int count,
+                      float maxMisfit, MagFitResult* result );
 
 // The same, for a magnet whose strength |moment| is already known - which a
 // probe's is: it carries one magnet. With the strength free, a magnet a little

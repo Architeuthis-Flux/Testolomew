@@ -627,13 +627,16 @@ ServiceStatus MagLocator::fitFrame( MagTrackInput* in ) {
     }
 
     bool wasTracking = result.valid;
-    if ( !wasTracking ) {
+    bool continuing = result.coldStage > 0; // a cold start's next slice: every frame, no pacing
+    if ( !wasTracking && !continuing ) {
         uint32_t now = millis( );
         if ( now < nextColdStartMs ) {
             return ServiceStatus::IDLE;
         }
         nextColdStartMs = now + MAGLOC_COLD_START_PERIOD_MS;
         coldStarts++;
+        coldStartUs = 0;
+        coldSliceMaxUs = 0;
     }
     Vec3 lastGood = result.position;
 
@@ -642,11 +645,19 @@ ServiceStatus MagLocator::fitFrame( MagTrackInput* in ) {
     if ( knownStrength > 0.0f && !learning( ) ) {
         good = magFitSolveKnownStrength( magArray.position, smooth, magArray.fresh, magArray.sensorCount( ), MAGLOC_MAX_MISFIT, knownStrength, &result );
     } else {
-        good = magFitSolve( magArray.position, smooth, magArray.fresh, magArray.sensorCount( ), MAGLOC_MAX_MISFIT, &result );
+        good = magFitSolveStep( magArray.position, smooth, magArray.fresh, magArray.sensorCount( ), MAGLOC_MAX_MISFIT, &result );
     }
     fix.fitUs = micros( ) - start;
-    if ( !wasTracking )
-        coldStartUs = fix.fitUs;
+    if ( !wasTracking ) {
+        coldStartUs += fix.fitUs; // a slice of the cold start
+        if ( fix.fitUs > coldSliceMaxUs )
+            coldSliceMaxUs = fix.fitUs;
+    }
+    if ( result.coldStage > 0 ) {
+        // More of the cold start next frame: nothing to say about this one.
+        fix.valid = false;
+        return ServiceStatus::BUSY;
+    }
     MagFitResult thisFrame = result; // as fitted, before the ride-through below may put the last good position back
     Vec3 position = result.position, sigma = result.sigma;
     float residual = result.residual, signal = result.signal;

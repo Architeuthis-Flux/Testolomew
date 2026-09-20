@@ -274,7 +274,7 @@ class MagLocator : public Service {
     };
     ProbeSim sim = { };
     bool fitHeld = false; // :load fit off - the frames flow, nothing is fitted (the fit is the V5F's heaviest work)
-    uint32_t coldStarts = 0, coldStartUs = 0; // cold starts since boot, and the last one's cost
+    uint32_t coldStarts = 0, coldStartUs = 0, coldSliceMaxUs = 0; // cold starts since boot; the last one's cost in all, and its longest slice (one per frame)
     void simProbeSet( Vec3 position, Vec3 shaft, float sigmaMm, bool rough, uint32_t ms );
     void simProbeOff( );
     bool simProbeActive( ) const { return sim.on; }

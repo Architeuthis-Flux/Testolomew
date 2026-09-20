@@ -435,9 +435,37 @@ bool magFitCoarse( const Vec3* sensors, const Vec3* fields, const bool* use, int
     return true;
 }
 
+// Seeds for a cold start whose lattice answer came out poor or low: over
+// the strongest readings at three heights, then a ring around that point
+// low down.
+static const float coldSeeds[][ 3 ] = {
+    { 0, 0, 5 },
+    { 0, 0, 15 },
+    { 0, 0, 40 },
+    { 7, 7, 6 },
+    { -7, 7, 6 },
+    { 7, -7, 6 },
+    { -7, -7, 6 },
+};
+#define COLD_SEED_COUNT ( (int)( sizeof( coldSeeds ) / sizeof( coldSeeds[ 0 ] ) ) )
+
 bool magFitSolve( const Vec3* sensors, const Vec3* fields, const bool* use, int count,
                   float maxMisfit, MagFitResult* result ) {
-    bool warm = result->valid;
+    bool ok;
+    result->coldStage = 0; // a whole solve never continues an earlier cold start (nor trusts an uninitialised result)
+    do {
+        ok = magFitSolveStep( sensors, fields, use, count, maxMisfit, result );
+    } while ( result->coldStage > 0 );
+    return ok;
+}
+
+bool magFitSolveStep( const Vec3* sensors, const Vec3* fields, const bool* use, int count,
+                      float maxMisfit, MagFitResult* result ) {
+    if ( result->coldStage < 0 || result->coldStage > COLD_SEED_COUNT ) {
+        result->coldStage = 0; // not a stage of ours
+    }
+    bool continuing = result->coldStage > 0;
+    bool warm = result->valid && !continuing;
     Vec3 warmStart = result->position;
     result->valid = false;
     result->iterations = 0;
@@ -485,6 +513,33 @@ bool magFitSolve( const Vec3* sensors, const Vec3* fields, const bool* use, int 
 
     Vec3 best = { 0, 0, 0 };
     float bestCost = 1e30f;
+    float misfitLimit = maxMisfit * maxMisfit * sumSquares;
+
+    if ( continuing ) {
+        // The next seed of a cold start begun on an earlier call.
+        best = result->coldBest;
+        bestCost = result->coldCost;
+        int seed = result->coldStage - 1;
+        Vec3 start = { cx / cw + coldSeeds[ seed ][ 0 ], cy / cw + coldSeeds[ seed ][ 1 ], coldSeeds[ seed ][ 2 ] };
+        Vec3 p;
+        float cost = refine( &fp, start, &p, &result->iterations );
+        if ( cost < bestCost ) {
+            bestCost = cost;
+            best = p;
+        }
+        if ( seed + 1 < COLD_SEED_COUNT ) {
+            result->coldStage = seed + 2;
+            result->coldBest = best;
+            result->coldCost = bestCost;
+            return false; // more seeds next call
+        }
+        result->coldStage = 0;
+        // The best of the seeds was found against an earlier frame's
+        // readings: settle it on this frame's.
+        if ( bestCost < 1e29f ) {
+            bestCost = refine( &fp, best, &best, &result->iterations );
+        }
+    }
 
     if ( warm ) {
         bestCost = refine( &fp, warmStart, &best, &result->iterations );
@@ -492,8 +547,7 @@ bool magFitSolve( const Vec3* sensors, const Vec3* fields, const bool* use, int 
 
     // Cold start - also the fallback when a warm start lands somewhere that
     // does not explain the readings (the magnet jumped, or was swapped).
-    float misfitLimit = maxMisfit * maxMisfit * sumSquares;
-    bool cold = !warm || bestCost > misfitLimit;
+    bool cold = !warm && !continuing || ( warm && bestCost > misfitLimit );
     if ( cold ) {
         // First the lattice: its best point is within a few mm of the answer
         // wherever the magnet is, and one refinement from there is usually the
@@ -515,26 +569,12 @@ bool magFitSolve( const Vec3* sensors, const Vec3* fields, const bool* use, int 
     // lattice cannot tell; only a start on the right side of it escapes. So a
     // cold start that came out low, or that fits poorly, tries the seeds too.
     if ( cold && ( bestCost > misfitLimit * MAGFIT_COARSE_GOOD_ENOUGH || best.z < MAGFIT_COARSE_LOW_MM ) ) {
-        // Seeds: over the strongest readings at three heights, then a ring
-        // around that point low down.
-        static const float seeds[][ 3 ] = {
-            { 0, 0, 5 },
-            { 0, 0, 15 },
-            { 0, 0, 40 },
-            { 7, 7, 6 },
-            { -7, 7, 6 },
-            { 7, -7, 6 },
-            { -7, -7, 6 },
-        };
-        for ( unsigned s = 0; s < sizeof( seeds ) / sizeof( seeds[ 0 ] ); s++ ) {
-            Vec3 seed = { cx / cw + seeds[ s ][ 0 ], cy / cw + seeds[ s ][ 1 ], seeds[ s ][ 2 ] };
-            Vec3 p;
-            float cost = refine( &fp, seed, &p, &result->iterations );
-            if ( cost < bestCost ) {
-                bestCost = cost;
-                best = p;
-            }
-        }
+        // The seeds, one per call from here (the caller calls again next
+        // frame): the lattice's answer is kept as the best so far.
+        result->coldStage = 1;
+        result->coldBest = best;
+        result->coldCost = bestCost;
+        return false;
     }
 
     if ( bestCost >= 1e29f ) {
