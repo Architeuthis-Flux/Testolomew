@@ -13,3 +13,4 @@ bool magSamplerRunning( void ) { return false; }
 bool magSamplerTake( int, uint32_t*, uint8_t*, uint32_t* ) { return false; }
 bool magSamplerParkForFlash( void ) { return false; }
 bool magSamplerParked( void ) { return false; }
+void magSamplerSetPassPeriodMs( uint32_t ) {}
