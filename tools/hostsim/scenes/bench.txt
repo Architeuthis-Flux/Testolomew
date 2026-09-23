@@ -98,6 +98,23 @@ l
 s
 @expect "strength=1839 measured"
 
+# A 70 ms glitch on three sensors (the LED strip's data line into SDA, a
+# corrupt read: the bus has no CRC) is ridden through from the last good
+# place: frames missed, no track end, no cold start.
+@bias 2 0.3 0.3 0.3
+@bias 3 0.3 0.3 0.3
+@bias 5 -0.3 0.3 0
+@run 70
+@bias 2 0 0 0
+@bias 3 0 0 0
+@bias 5 0 0 0
+@run 500
+:load
+@expect "2 cold starts since boot"
+@expect "0 the misses run out"
+l
+@expect "track: tracking"
+
 # Hover: a minute 30 mm over row 15. As it is: the strongest reading sits at
 # the presence level (0.04), the two stale zeros are a third of it, and the
 # fit fails at a 41 % misfit against the 40 % limit: no cold start, but

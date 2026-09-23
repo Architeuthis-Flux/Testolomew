@@ -1099,9 +1099,9 @@ ServiceStatus MagLocator::runFit( MagTrackInput* in, FrameScratch& f ) {
     bool keepTracking = f.good;
     if ( f.good ) {
         misses = 0;
-    } else if ( wasTracking && misses >= ( f.farOnly ? MAGLOC_FAR_MAX_MISSES : MAGLOC_MAX_MISSES ) ) {
+    } else if ( wasTracking && misses >= MAGLOC_MAX_MISSES ) {
         coldWhyMisses++; // the run of misses is over: the next frame starts cold
-    } else if ( wasTracking && misses < ( f.farOnly ? MAGLOC_FAR_MAX_MISSES : MAGLOC_MAX_MISSES ) ) {
+    } else if ( wasTracking && misses < MAGLOC_MAX_MISSES ) {
         // One frame that will not fit (the magnet moved fast enough to smear
         // the smoothed fields, a glitched reading) is not a lost magnet: no fix
         // for this frame, but the next one starts from the last good place

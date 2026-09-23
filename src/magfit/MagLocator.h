@@ -134,9 +134,15 @@
 #define MAGLOC_STEADY_ITERATIONS 2 // the default of "fit iters" (~0.85 ms each on the CH32H417). tools/hostsim/pencil.cpp: 2 a frame tracks exactly as the natural caps do (error, lag and jitter to the last digit); at 1 it loses 0.1 % of frames. More only makes the pulse the supply shows bigger (2026-09-20).
 
 // While tracking, this many frames in a row may fail to fit before the magnet
-// is called lost and the (slow, paced) cold start takes over. Each failed frame
-// has already cost a cold start inside the solver, so keep it small.
-#define MAGLOC_MAX_MISSES 2
+// is called lost and the (slow, paced) cold start takes over: a second. The
+// rejections come in runs and the smoothed fields change slowly; a frame
+// that will not fit is one warm refine from the last good place, not a cold
+// start (it was, under magFitSolve; magFitSolveStep's warm path just says
+// no). Until 2026-09-23 a near track had its own limit of 2 - dead code
+// since the far rule of 09-22 (a frame that fails is "far-sized" by
+// definition, and got the far limit): the bench's 75 track ends "the misses
+// run out" of 09-22 were the old code's. One limit now.
+#define MAGLOC_MAX_MISSES 100
 
 // Worst residual/signal ratio still called a fix (see magFitSolve). Far from
 // the array a real magnet fits to a few percent. Close in it does not: the
@@ -319,10 +325,6 @@
 // second for twelve minutes, 2026-09-22 evening.)
 #define MAGLOC_STEADY_FRACTION 0.10f
 #define MAGLOC_STEADY_ALPHA 0.02f
-// ...and a far track rides through this many frames that do not make it
-// (the near track's MAGLOC_MAX_MISSES is 2; far, at the edge of reach, a
-// frame in five fails on noise), starting each from the last good place.
-#define MAGLOC_FAR_MAX_MISSES 100 // a second: the rejections come in runs, the smoothed fields change slowly
 // A track lost moments ago is looked for first where it last was - one warm
 // fit from the last accepted fix - before any lattice search: the lattice
 // has no memory, and for a far probe it lands as readily in the mirror
