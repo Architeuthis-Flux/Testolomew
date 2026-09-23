@@ -187,7 +187,10 @@ struct MagSensorPlace {
 // The MMC5633NJL (2026-09-21): ONE, on the second bus (BoardPins.h: the
 // one that has worked; the TMAG-bus hookup never answered), at its fixed
 // 0x30, powered from 3.3 V for good, at the centre of the board and ON THE
-// BACK, about 2 mm below the plane of the TMAG dies (Kevin), so z = -2.
+// BACK, 'about 2 mm' below the plane of the TMAG dies (Kevin) - MEASURED
+// at 3.77 below by magcal on 2026-09-23 (its height searched with the
+// rest: z = -3.77, gain 0.936; with z held at -2 the gain came out 1.129,
+// a height error in a gain's clothing, and its readings cost 55 % more).
 // Its place, rotation, gain and face are MEASURED, by tools/magcal
 // (`only=8`) from tools/recordings/2026-09-21-mmc-centre-calibration.txt,
 // the probe's magnet run over the board. underside = false because the
@@ -209,7 +212,7 @@ static const MagSensorPlace magSensorPlaces[ MAG_SENSOR_COUNT ] = {
     { MAG_TMAG5273, PIN_MAG_VCC_5, PIN_MAG_GND_B, PIN_MAG_SCL, PIN_MAG_SDA, 0x00, 15.60f, 0.19f, 0.0f, 271.9f, false, 1.015f, true },
     { MAG_TMAG5273, PIN_MAG_VCC_6, PIN_MAG_GND_B, PIN_MAG_SCL, PIN_MAG_SDA, 0x00, 37.37f, 0.42f, 0.0f, 271.6f, false, 1.022f, true },
     { MAG_TMAG5273, PIN_MAG_VCC_7, PIN_MAG_GND_B, PIN_MAG_SCL, PIN_MAG_SDA, 0x00, 53.40f, 0.00f, 0.0f, 271.8f, false, 1.028f, true },
-    { MAG_MMC56X3, -1, -1, PIN_MAG2_SCL, PIN_MAG2_SDA, MMC56X3_ADDRESS, 27.65f, 25.13f, -2.0f, 260.7f, false, 1.129f, true }, // the centre, hanging under the board (magcal 2026-09-21)
+    { MAG_MMC56X3, -1, -1, PIN_MAG2_SCL, PIN_MAG2_SDA, MMC56X3_ADDRESS, 27.52f, 25.19f, -3.77f, 260.6f, false, 0.936f, true }, // the centre, hanging under the board: magcal 2026-09-23 with its HEIGHT searched on the 09-21 recording (cost 7.75 against 12.05 with z held at -2 and the gain 1.129 soaking up the height error)
 };
 
 // What each type is, for the array and its status line.
@@ -219,7 +222,7 @@ static inline const char* magSensorTypeName( MagSensorType type ) {
 // Its noise per frame (mT rms per axis, the measured TMAG figure and the
 // MMC's datasheet figure at MAG_MMC_BANDWIDTH with 1-2 results a frame).
 static inline float magSensorTypeNoiseMt( MagSensorType type ) {
-    return type == MAG_MMC56X3 ? 0.0002f : MAG_WEIGHT_REFERENCE_MT;
+    return type == MAG_MMC56X3 ? 0.0003f : MAG_WEIGHT_REFERENCE_MT; // the MMC's is the bench's (2026-09-21: 0.3 uT rms a frame per axis; the datasheet's 0.2 until 2026-09-23)
 }
 // A sensor's weight in the fit for a reading of this size: how much better
 // it is than a TMAG5273 reading the same field. Each sensor's error is its

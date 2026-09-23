@@ -27,6 +27,7 @@ The firmware's modules run on a PC against stubs of what the chip provides (`Ard
 | `@strip on\|off` | pretend a real LED chain is wired (the display's LED-first rule) |
 | `@type "text" [n] [gap ms]` | type text n times with a gap (a run of joystick nudges) |
 | `@expect "text" [ms]` | the text must appear in what the firmware printed for the previous script line (waiting up to ms) |
+| `@seen "text"` | the text must have appeared anywhere since the script began (a line whose moment is not known) |
 | `@seed <n>`, `@echo <text>`, `@quit` | |
 
 Two verbs exist only in the simulator: `:screen:png <file>` writes what the panel shows as a PNG, and `:screen:verify` checks that the dump path the board uses (`:screen:dump` → `MagView::copyShownRow`, which un-swaps the bytes the LCD push swapped in place) gives exactly what the panel received. The exit code is 1 if any `@expect` failed; the boot line checks that loading the settings did not switch the modes and that the menu table has room.

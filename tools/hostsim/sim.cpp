@@ -479,6 +479,19 @@ static bool directive( const std::vector<std::string>& w, int lineNo ) {
             snprintf( line, sizeof( line ), "EXPECT FAILED (line %d): %s", lineNo, w[ 1 ].c_str( ) );
             note( "%s", line );
         }
+    } else if ( d == "@seen" && w.size( ) >= 2 ) {
+        // Like @expect, but over everything printed since the script began: for a
+        // line whose moment is not known (the audit's correction fires whenever
+        // its samples have the spread, during a run of taps or after).
+        expects++;
+        if ( outText.find( w[ 1 ] ) != std::string::npos ) {
+            note( "seen ok: %s", w[ 1 ].c_str( ) );
+        } else {
+            failures++;
+            char line[ 200 ];
+            snprintf( line, sizeof( line ), "SEEN FAILED (line %d): %s", lineNo, w[ 1 ].c_str( ) );
+            note( "%s", line );
+        }
     } else if ( d == "@echo" ) {
         std::string text;
         for ( size_t i = 1; i < w.size( ); i++ )

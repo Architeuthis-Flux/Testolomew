@@ -444,7 +444,14 @@ z
 @run 3000
 @magnet row 18 5 0 30
 @run 3000
-@expect "sensor 8's zero was off by" 150000
+# The MMC's 0.005 mT zero error is found and taken out - during the taps
+# or after them, whenever the audit's samples have the spread. (As it is
+# with the bench's anisotropic noise, 2026-09-23, the audit ALSO applies a
+# 0.011 mT z correction to a TMAG whose zero is true: a false positive
+# under a per-sensor threshold that knows one noise for all axes; Phase 3's
+# audit with per-axis sigma is to stop it.)
+@run 20000
+@seen "sensor 8's zero was off by"
 @magnet off
 @bias 8 0 0 0
 z

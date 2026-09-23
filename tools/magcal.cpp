@@ -77,7 +77,7 @@ static Sensor sensors[ SENSORS ] = {
     // The MMC56x3: the centre of the board, hanging under it, 2 mm below the TMAG plane. Measured 2026-09-21 (only=8 on
     // tools/recordings/2026-09-21-mmc-centre-calibration.txt): zUp = true, its +z reads up in the board frame (MagArrayConfig.h:
     // underside = false); the other face cost 40x more. The gain soaks up a height error (z is not refined).
-    { 27.65f, 25.13f, -2.0f, 260.7f, 1.129f, 1.0f, true, 0, 0, 0 },
+    { 27.52f, 25.19f, -3.77f, 260.6f, 0.936f, 0.947f, true, 0, 0, 0 }, // its height searched (2026-09-23; with z held at -2 the gain was 1.129)
 };
 static int sensorCount = SENSORS; // how many the recording carries (8 in the ones before 2026-09-20)
 // The rows the FIRMWARE had when the recording was made: the stream is in
@@ -165,11 +165,11 @@ static void fitPoses( float* meanMisfit, float* worstMisfit, int* fitted ) {
     *meanMisfit = n ? (float)( sum / n ) : 1; *worstMisfit = worst; *fitted = n;
 }
 
-// Weighted squared misfit of sensor i with trial parameters { x, y, rotation, gain, ox, oy, oz, gainZ }, over all frames
+// Weighted squared misfit of sensor i with trial parameters { x, y, rotation, gain, ox, oy, oz, gainZ, z }, over all frames
 // (the offset, in the sensor's own frame, is what its zero was off by while the recording was made).
-static double sensorCost( int i, const float p[ 8 ] ) {
+static double sensorCost( int i, const float p[ 9 ] ) {
     double cost = 0;
-    Vec3 place = { p[ 0 ], p[ 1 ], sensors[ i ].z };
+    Vec3 place = { p[ 0 ], p[ 1 ], p[ 8 ] };
     for ( size_t f = 0; f < frames.size( ); f++ ) {
         const Frame& fr = frames[ f ];
         if ( !fr.used || fr.clipped[ i ] ) continue;
@@ -191,23 +191,26 @@ static double sensorCost( int i, const float p[ 8 ] ) {
 // bounded numbers per sensor cannot do that.)
 // The pattern search from p: the first four numbers (place, rotation, gain)
 // and, if withOffset, the sensor's zero error too.
-static double patternSearch( int i, float p[ 8 ], bool movable, bool withOffset ) {
-    float step[ 8 ] = { movable ? 1.0f : 0.0f, movable ? 1.0f : 0.0f, 2.0f, 0.02f, withOffset ? 0.01f : 0.0f, withOffset ? 0.01f : 0.0f, withOffset ? 0.01f : 0.0f, 0.02f };
+// A sensor being added (only=: withOffset) has its HEIGHT searched too (the MMC hangs under the board 'about 2 mm' - a
+// height error was soaked up by its gain, 1.129, until 2026-09-23); the TMAGs' z is the plane, 0, by definition.
+static double patternSearch( int i, float p[ 9 ], bool movable, bool withOffset ) {
+    float step[ 9 ] = { movable ? 1.0f : 0.0f, movable ? 1.0f : 0.0f, 2.0f, 0.02f, withOffset ? 0.01f : 0.0f, withOffset ? 0.01f : 0.0f, withOffset ? 0.01f : 0.0f, 0.02f, withOffset && movable ? 0.5f : 0.0f };
     double best = sensorCost( i, p );
     for ( int round = 0; round < 60; round++ ) {
         bool improved = false;
-        for ( int k = 0; k < 8; k++ ) {
+        for ( int k = 0; k < 9; k++ ) {
             if ( step[ k ] == 0 ) continue;
             for ( int dir = -1; dir <= 1; dir += 2 ) {
-                float q[ 8 ];
+                float q[ 9 ];
                 memcpy( q, p, sizeof( q ) );
                 q[ k ] += dir * step[ k ];
                 if ( q[ 3 ] < 0.8f || q[ 3 ] > 1.2f || q[ 7 ] < 0.8f || q[ 7 ] > 1.2f ) continue; // a TMAG5273's (or MMC56x3's) gain error is a few percent, on either axis
+                if ( q[ 8 ] < -10.0f || q[ 8 ] > 5.0f ) continue;                                     // a part hangs under the board or sits on it, within a centimetre
                 double c = sensorCost( i, q );
-                if ( c < best ) { best = c; memcpy( p, q, sizeof( float ) * 8 ); improved = true; break; }
+                if ( c < best ) { best = c; memcpy( p, q, sizeof( float ) * 9 ); improved = true; break; }
             }
         }
-        if ( !improved ) for ( int k = 0; k < 8; k++ ) step[ k ] *= 0.5f;
+        if ( !improved ) for ( int k = 0; k < 9; k++ ) step[ k ] *= 0.5f;
     }
     return best;
 }
@@ -221,12 +224,12 @@ static void refineSensor( int i, bool movable ) {
     // are searched from four starting angles first, the best kept, and only
     // then the offset joins the search.
     bool withOffset = onlyMode && onlyList[ i ];
-    float p[ 8 ] = { sensors[ i ].x, sensors[ i ].y, sensors[ i ].angle, sensors[ i ].gain, sensors[ i ].ox, sensors[ i ].oy, sensors[ i ].oz, sensors[ i ].gainZ };
+    float p[ 9 ] = { sensors[ i ].x, sensors[ i ].y, sensors[ i ].angle, sensors[ i ].gain, sensors[ i ].ox, sensors[ i ].oy, sensors[ i ].oz, sensors[ i ].gainZ, sensors[ i ].z };
     if ( withOffset ) {
-        float bestP[ 8 ];
+        float bestP[ 9 ];
         double bestCost = 1e300;
         for ( int start = 0; start < 4; start++ ) {
-            float q[ 8 ] = { sensors[ i ].x, sensors[ i ].y, sensors[ i ].angle + 90.0f * start, 1.0f, 0, 0, 0, 1.0f };
+            float q[ 9 ] = { sensors[ i ].x, sensors[ i ].y, sensors[ i ].angle + 90.0f * start, 1.0f, 0, 0, 0, 1.0f, sensors[ i ].z };
             double c = patternSearch( i, q, movable, false );
             if ( c < bestCost ) { bestCost = c; memcpy( bestP, q, sizeof( bestP ) ); }
         }
@@ -241,6 +244,7 @@ static void refineSensor( int i, bool movable ) {
     sensors[ i ].oy = p[ 5 ];
     sensors[ i ].oz = p[ 6 ];
     sensors[ i ].gainZ = p[ 7 ];
+    sensors[ i ].z = p[ 8 ];
     matrixFromAngle( sensors[ i ] );
 }
 
@@ -365,10 +369,10 @@ int main( int argc, char** argv ) {
                 sensors[ i ].zUp = sense == 0 ? asTable.zUp : !asTable.zUp;
                 matrixFromAngle( sensors[ i ] );
                 for ( int round = 0; round < 2; round++ ) refineSensor( i, true );
-                float p[ 8 ] = { sensors[ i ].x, sensors[ i ].y, sensors[ i ].angle, sensors[ i ].gain, sensors[ i ].ox, sensors[ i ].oy, sensors[ i ].oz, sensors[ i ].gainZ };
+                float p[ 9 ] = { sensors[ i ].x, sensors[ i ].y, sensors[ i ].angle, sensors[ i ].gain, sensors[ i ].ox, sensors[ i ].oy, sensors[ i ].oz, sensors[ i ].gainZ, sensors[ i ].z };
                 double c = sensorCost( i, p );
-                printf( "sensor %d with z %s: x %.2f y %.2f rotation %.1f gain %.3f (z %.3f), its zero off by (%+.4f %+.4f %+.4f) mT in its own frame, cost %.4g\n", i,
-                        sensors[ i ].zUp ? "up" : "down", p[ 0 ], p[ 1 ], p[ 2 ], p[ 3 ], p[ 7 ], p[ 4 ], p[ 5 ], p[ 6 ], c );
+                printf( "sensor %d with z %s: x %.2f y %.2f height %.2f rotation %.1f gain %.3f (z %.3f), its zero off by (%+.4f %+.4f %+.4f) mT in its own frame, cost %.4g\n", i,
+                        sensors[ i ].zUp ? "up" : "down", p[ 0 ], p[ 1 ], p[ 8 ], p[ 2 ], p[ 3 ], p[ 7 ], p[ 4 ], p[ 5 ], p[ 6 ], c );
                 if ( c < bestCost ) { bestCost = c; best = sensors[ i ]; }
             }
             sensors[ i ] = best;
@@ -388,7 +392,7 @@ int main( int argc, char** argv ) {
     printf( "\n #     x_mm    y_mm   rotation   gain   gainZ\n" );
     for ( int i = 0; i < sensorCount; i++ ) {
         bool mmc = i >= 8; // (the MMC slots; a TMAG's z sense is not searched)
-        printf( " %d  %7.2f %7.2f   %7.1f   %5.3f  %5.3f%s\n", i, sensors[ i ].x, sensors[ i ].y, sensors[ i ].angle, sensors[ i ].gain, sensors[ i ].gainZ,
+        printf( " %d  %7.2f %7.2f   %7.1f   %5.3f  %5.3f%s%s\n", i, sensors[ i ].x, sensors[ i ].y, sensors[ i ].angle, sensors[ i ].gain, sensors[ i ].gainZ, mmc ? "" : "",
                 !mmc ? "" : ( sensors[ i ].zUp ? "   (MMC56x3, z up: underside = false in the table)" : "   (MMC56x3, z DOWN: underside = true in the table)" ) );
     }
 
