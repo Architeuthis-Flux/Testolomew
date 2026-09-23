@@ -1,11 +1,11 @@
-# The probe off the end of the board with the MMC56x3 out (2026-09-23):
-# 22 mm past row 1 and 22 mm up, one TMAG5273 reads it plainly and four
-# faintly. The fit lands in a wrong basin (x -36, z 2 for a probe at x -22,
+# The probe off the end of the board with the MMC56x3 out (2026-09-23), at
+# two places. First 22 mm past row 1 and 22 mm up: one TMAG5273 reads it
+# plainly and four faintly, and the fit lands in a wrong basin (x -36, z 2 for a probe at x -22,
 # z 22); with Z weighed by its quietness that basin misfits at 49 % and is
 # REJECTED (at 26 % it was accepted as a rough fix). AS IT IS: the failed
 # fit is still OFFERED as a rough fix (MAGLOC_ROUGH_MAX_MISFIT 0.7), so a
-# wrong "about here" (x -40, z 4, for the probe moved 6 mm further out,
-# where only two notice it) lights the far glow. Phase 3's acceptance
+# wrong "about here" (x -40, z 4) lights the far glow at the second place,
+# 6 mm further out, where only two sensors notice the probe at all. Phase 3's acceptance
 # (residuals against each sensor's own sigma) is to make that "nothing";
 # this scene flips then. The lattice's memoryless offer is the MMC's far
 # regime and is not made with it out (MagLocator::tryCoarse).
