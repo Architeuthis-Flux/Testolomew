@@ -522,6 +522,9 @@ class MagLocator : public Service {
     uint32_t coldWhyAbsent = 0, coldWhyFew = 0, coldWhyMisses = 0, coldWhyRejected = 0; // what ended the track before each cold start: nothing present, too few noticing, the misses run out, a far cold start rejected
     uint32_t staleFrames[ MAGFIT_MAX_SENSORS ] = { 0 }; // frames in which a sensor was not read (the MMC56x3's 150 Hz against 100 Hz frames)
     uint32_t reacquired = 0, reacquireTries = 0; // times a lost track was found again from where it last was (MAGLOC_REACQUIRE_MS), and the frames that tried
+    uint32_t presenceToggles = 0; // times presence went on or off: the `d` stream prints no absent frame, so a toggle shows there only as a gap (the bench protocol, 2026-09-23)
+    uint32_t missFrames = 0;      // frames that would not fit while tracking and were ridden through (MAGLOC_MAX_MISSES): each a near miss of a cold start
+    float maxPeakLevel = 0.0f;    // the strongest smoothed reading (TMAG terms) since :load last printed it: the absent run's presence floor
     uint32_t presenceHeldFrames = 0; // frames in which presence rested on a sensor's last reading, the sensor not read that frame (MAGLOC_MISSED_HOLD_FRAMES)
     uint32_t coldStarts = 0, coldStartUs = 0, coldSliceMaxUs = 0; // cold starts since boot; the last one's cost in all, and its longest slice (one per frame)
     void simProbeSet( Vec3 position, Vec3 shaft, float sigmaMm, bool rough, uint32_t ms );

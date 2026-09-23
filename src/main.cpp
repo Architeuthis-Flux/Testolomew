@@ -433,6 +433,10 @@ static void onLoadVerb( int argc, char** argv, Stream* out ) {
               (unsigned long)magLocator.staleFrames[ 5 ], (unsigned long)magLocator.staleFrames[ 6 ], (unsigned long)magLocator.staleFrames[ 7 ], (unsigned long)magLocator.staleFrames[ 8 ], (unsigned long)magLocator.presenceHeldFrames,
               magLocator.knownStrength, (unsigned long)magLocator.strengthMeasured, (unsigned long)magLocator.strengthJumps, magLocator.strengthSaved );
     out->println( line );
+    snprintf( line, sizeof( line ), "  presence toggled %lu times; %lu frames missed while tracking; the strongest reading since the last look %.4f (TMAG terms; the presence level is %.3f)",
+              (unsigned long)magLocator.presenceToggles, (unsigned long)magLocator.missFrames, magLocator.maxPeakLevel, magLocator.presentMt );
+    out->println( line );
+    magLocator.maxPeakLevel = 0.0f;
 #endif
     snprintf( line, sizeof( line ), "heartbeat: %s (green LED, 1 k to VDDIO, ~2 mA at 1 Hz)", heartbeat.enabled ? "on" : "off" );
     out->println( line );

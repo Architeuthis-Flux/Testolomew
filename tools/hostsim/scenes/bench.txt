@@ -1,0 +1,20 @@
+# The bench as it is (2026-09-23): eight TMAG5273s, the MMC56x3 switched
+# out, the probe's magnet 1839 mT*mm^3 (measured 2026-09-22). check.txt and
+# strength.txt are the clean regression; this scene carries the bench's
+# numbers, and each change to the estimator tightens the expectation it
+# moves. `make check` runs it last.
+:mmc off
+@strength 1839
+@seed 3
+
+# The probe resting in row 15, hole 3: the counters the `d` stream lacks
+# are on the :load report (presence toggles, frames missed while tracking,
+# the strongest reading since the last look).
+@magnet row 15 3
+@run 3000
+:load
+@expect "presence toggled"
+@expect "frames missed while tracking"
+@expect "strongest reading since the last look"
+@magnet off
+@run 2000

@@ -822,6 +822,9 @@ void MagLocator::assessFrame( FrameScratch& f ) {
     }
     fix.peakMt = sqrtf( peakSq );
     fix.peakLevel = sqrtf( peakLevelSq );
+    if ( fix.peakLevel > maxPeakLevel ) {
+        maxPeakLevel = fix.peakLevel;
+    }
     // Stickiness, so a magnet at the threshold does not flicker in and out:
     // once present it stays so down to half the level.
     bool fixedLately = lastFixMs != 0 && millis( ) - lastFixMs < MAGLOC_PRESENT_HOLD_MS;
@@ -832,6 +835,9 @@ void MagLocator::assessFrame( FrameScratch& f ) {
         // alone is its zero (with the MMC out too: a probe near enough to
         // light one TMAG plainly lights its neighbour, 2026-09-22 late).
         evidence = ( haveMmc && mmcPresent ) || tmagSeen >= MAGLOC_PRESENT_TMAGS;
+    }
+    if ( evidence != fix.present ) {
+        presenceToggles++;
     }
     fix.present = evidence;
     if ( fix.present && peakHeld ) {
@@ -1093,6 +1099,7 @@ ServiceStatus MagLocator::runFit( MagTrackInput* in, FrameScratch& f ) {
         // for this frame, but the next one starts from the last good place
         // instead of waiting out the cold-start period.
         misses++;
+        missFrames++;
         result.position = lastGood;
         keepTracking = true;
     }
