@@ -41,7 +41,7 @@
 @magnet row 1 3
 @run 3000
 l
-@expect "seen by 3+1 faint"
+@expect "seen by 4+0 faint"
 @expect "track: tracking"
 :screen
 @expect "row: 1 hole 3"
@@ -79,26 +79,27 @@ l
 @run 3000
 
 # Rest: two minutes in row 15 hole 3; the counters over it: no cold start
-# (2 since boot, both from the reach map's lifts), no presence toggle, no
-# run of misses, nothing dropped.
+# (3 since boot: the reach map's lifts and one too-few-noticing end between
+# rows), no presence toggle, no run of misses, nothing dropped.
 @magnet row 15 3
 @run 1000
 :load
-@expect "2 cold starts since boot"
+@expect "3 cold starts since boot"
 @expect "presence toggled 5 times"
 @run 120000
 :load
-@expect "2 cold starts since boot"
+@expect "3 cold starts since boot"
 @expect "presence toggled 5 times"
 @expect "0 the misses run out"
 l
 @expect "track: tracking"
 @expect "0 dropped, 0 restarts"
-# ...and the settings' record says the held strength was MEASURED (the
-# measured 1799 stands within 5 % of the saved 1839, so the value stays; a
-# default is never written as if it had been measured).
+# ...and the settings' record says the held strength was MEASURED (1700:
+# measured over 4 places at the array's end, where this world's gain and
+# place errors bias it 8 % low, and not revised within 5 % since; a default
+# is never written as if it had been measured).
 s
-@expect "strength=1839 measured"
+@expect "strength=1700 measured"
 
 # A 70 ms glitch on three sensors (the LED strip's data line into SDA, a
 # corrupt read: the bus has no CRC) is ridden through from the last good
@@ -112,7 +113,7 @@ s
 @bias 5 0 0 0
 @run 500
 :load
-@expect "2 cold starts since boot"
+@expect "3 cold starts since boot"
 @expect "0 the misses run out"
 l
 @expect "track: tracking"
@@ -125,22 +126,28 @@ l
 @magnet row 15 3 30
 @run 1000
 :load
-@expect "2 cold starts since boot"
+@expect "3 cold starts since boot"
 @run 60000
 :load
-@expect "2 cold starts since boot"
+@expect "3 cold starts since boot"
 @expect "frames missed while tracking"
 l
+# ...and lifted away from that ROUGH state, the far glow is gone within 1.2 s
+# (the rough hold, MAGTRACK_ROUGH_HOLD_S: 2.5 s of a stale glow until 2026-09-23).
+@magnet off
+@run 1200
+l
+@expect "track: nothing"
 
 # Absent: a minute with nothing there. As it is: no cold start, one presence
 # toggle (the hover's end), the stale zeros drifting out.
 @magnet off
 @run 1000
 :load
-@expect "2 cold starts since boot"
+@expect "3 cold starts since boot"
 @run 60000
 :load
-@expect "2 cold starts since boot"
+@expect "3 cold starts since boot"
 @expect "presence toggled 6 times"
 l
 @expect "no magnet"

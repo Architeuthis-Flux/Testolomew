@@ -60,7 +60,7 @@
 #define MAGTRACK_REINIT_AFTER 3           // dropped fixes in a row that agree = the track was wrong
 #define MAGTRACK_REINIT_AGREE_MM 6.0f     // ...agree = within this of each other
 #define MAGTRACK_COAST_MS 400             // how long a track outlives its last fix
-#define MAGTRACK_ROUGH_HOLD_S 2.5f        // ...and how long a ROUGH one (the far glow) outlives its last rough fix (menu: far hold)
+#define MAGTRACK_ROUGH_HOLD_S 1.0f        // ...and how long a ROUGH one (the far glow) outlives its last rough fix (menu: far hold; 2.5 until 2026-09-23: a stale glow for two seconds after the probe had gone)
 #define MAGTRACK_ROUGH_SPREAD_MM_S 8.0f   // while it is held its bar widens this fast (the glow spreads and dims, honestly)
 #define MAGTRACK_ROUGH_CUTOFF_HZ 0.5f     // the far glow's own filter: a rough fix is "about here", and about here should not jitter (2026-09-21 night: the MMC as the far sensor, smoothly)
 #define MAGTRACK_COAST_TAU_S 0.15f        // velocity dies away with this time constant while coasting

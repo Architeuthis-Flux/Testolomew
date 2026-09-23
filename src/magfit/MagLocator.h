@@ -89,6 +89,15 @@
 // at the MMC, not a probe: the next try waits this long, not MAGLOC_FAR_RETRY_MS.
 #define MAGLOC_PHANTOM_RETRY_MS 2000
 #define MAGLOC_SEEN_MT 0.04f
+// The seen level (and the TMAG's plain level) was set for the 2026-09-18
+// magnet of 4232; a weaker magnet is seen plainly by fewer sensors at the
+// same level, so the level follows the learned strength (levelScale: the
+// ratio to this, 0.25-1), never below twice a frame's noise
+// (MAGLOC_SEEN_FLOOR_MT). The presence level does not follow it: below 0.04
+// mT it is the zeros' drift (0.015 of uncertainty) that decides, and the
+// absent run of the bench protocol sets its floor.
+#define MAGLOC_THRESHOLDS_TUNED_AT 4232.0f
+#define MAGLOC_SEEN_FLOOR_MT ( 2.0f * MAG_WEIGHT_REFERENCE_MT )
 #define MAGLOC_FAINT_MT 0.015f
 // A sensor is QUIET - nothing there for it, its zero free to follow its
 // drift and its absorb clock stopped - under this fraction of its faint
@@ -387,7 +396,7 @@
 // the evening made a real hover's absorption permanent).
 #define MAGLOC_AUDIT_PERIOD_MS 100 // one sensor a period, round robin: each about once a second
 #define MAGLOC_AUDIT_MAX_MISFIT 0.10f
-#define MAGLOC_AUDIT_MIN_SEEN 6
+#define MAGLOC_AUDIT_MIN_SEEN 5 // (6 until 2026-09-23: the 1839 magnet is seen plainly by six sensors from few places)
 #define MAGLOC_AUDIT_MAX_ERROR_MM 3.0f
 #define MAGLOC_AUDIT_MIN_SAMPLES 40
 #define MAGLOC_AUDIT_MAX_SAMPLES 400 // a window that never crosses the threshold starts again after this many (an hour's drift is not a week's)
@@ -561,6 +570,8 @@ class MagLocator : public Service {
     uint32_t surfaceLearned = 0; // times the surface came down to the floor
     void learnFloor( uint32_t nowMs );
     float presentMt = MAGLOC_PRESENT_MT; // the strongest smoothed reading that counts as a magnet (menu: presence)
+    float levelScale( ) const;           // the seen level's scale for the held strength (MAGLOC_THRESHOLDS_TUNED_AT)
+    float seenLevelMt( ) const;          // ...and the level itself
     // The last good fix (a sharp one, misfit under MAGLOC_LEARN_MAX_MISFIT):
     // kept in the settings, so that after a reboot with the probe lying where
     // it was, `Y` can take that magnet back out of the baseline the boot

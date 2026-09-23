@@ -99,7 +99,7 @@ static int tipCalCount = 0;
 
 static void onTipSample( Stream* out ) {
     const MagProbeFix& fix = magLocator.fix;
-    if ( !fix.valid || fix.rough || fix.seenBy < 5 ) {
+    if ( !fix.valid || fix.rough || fix.seenBy < 4 ) {
         out->println( "no fix to take: rest the point in a hole with the magnet in the array's reach, then q" );
         return;
     }
@@ -385,7 +385,7 @@ void MagLocator::begin( ) {
 
 // The surface from where the point bottoms out (MAGLOC_FLOOR_* in the header).
 void MagLocator::learnFloor( uint32_t nowMs ) {
-    if ( fix.valid && fix.misfit < MAGLOC_FLOOR_MISFIT && fix.seenBy >= 5 && fix.tip.z < floorWindowMinZ ) {
+    if ( fix.valid && fix.misfit < MAGLOC_FLOOR_MISFIT && fix.seenBy >= 4 && fix.tip.z < floorWindowMinZ ) {
         floorWindowMinZ = fix.tip.z;
     }
     if ( floorWindowStartMs == 0 ) {
@@ -723,7 +723,21 @@ bool MagLocator::filterFrame( FrameScratch& f ) {
 
 // Stage 2: the smoothed fields, each sensor's level (seen / faint / quiet,
 // plainly), its own clock for the absorb rule, and presence.
+float MagLocator::levelScale( ) const {
+    if ( knownStrength <= 0.0f ) {
+        return 1.0f;
+    }
+    float scale = knownStrength / MAGLOC_THRESHOLDS_TUNED_AT;
+    return scale < 0.25f ? 0.25f : ( scale > 1.0f ? 1.0f : scale );
+}
+
+float MagLocator::seenLevelMt( ) const {
+    float level = MAGLOC_SEEN_MT * levelScale( );
+    return level < MAGLOC_SEEN_FLOOR_MT ? MAGLOC_SEEN_FLOOR_MT : level;
+}
+
 void MagLocator::assessFrame( FrameScratch& f ) {
+    float seenMt = seenLevelMt( ); // the seen level for the magnet held (MAGLOC_THRESHOLDS_TUNED_AT)
     float peakSq = 0.0f, peakLevelSq = 0.0f;
     fix.seenBy = 0;
     fix.faintBy = 0;
@@ -799,7 +813,7 @@ void MagLocator::assessFrame( FrameScratch& f ) {
         // which fits); for a TMAG5273 its seen level is already three times
         // its noise, and one there with nothing fitting is its zero (after a
         // boot the restored zeros are 0.02-0.04 mT stale, 2026-09-22).
-        float plainLevel = magSensorPlaces[ i ].type == MAG_MMC56X3 ? MAGLOC_SEEN_ABSORB_LEVEL : MAGLOC_SEEN_MT;
+        float plainLevel = magSensorPlaces[ i ].type == MAG_MMC56X3 ? MAGLOC_SEEN_ABSORB_LEVEL : MAGLOC_SEEN_MT; // plainly is the HIGH bar, not scaled: the strength is learned and the absorb judged only on strong readings (scaled, the learning fired at the array's end where the calibration errors bias it most, 2026-09-23)
         if ( levelSq > plainLevel * plainLevel ) {
             f.plainHere[ i ] = true;
             f.plain++;
@@ -809,7 +823,7 @@ void MagLocator::assessFrame( FrameScratch& f ) {
             if ( levelSq > presentMt * presentMt )
                 mmcPresent = true;
         }
-        if ( levelSq > MAGLOC_SEEN_MT * MAGLOC_SEEN_MT ) {
+        if ( levelSq > seenMt * seenMt ) {
             fix.seenBy++;
             if ( magSensorPlaces[ i ].type != MAG_MMC56X3 )
                 tmagSeen++;
