@@ -929,8 +929,12 @@ ServiceStatus MagLocator::tryCoarse( MagTrackInput* in, const FrameScratch& f ) 
         result.valid = false; // next time is a cold start
         haveSmoothed = false;
         // Something is there but too few sensors notice it for a fit: the
-        // lattice search still says roughly where, at the cold-start pace.
-        if ( fix.present && millis( ) >= nextColdStartMs ) {
+        // lattice search still says roughly where, at the cold-start pace -
+        // with the MMC56x3 in, whose far regime this is. With the TMAG5273s
+        // alone the lattice has no memory and its "about here" for a probe off
+        // the end of the array was 15 mm out (2026-09-23, the bench-like sim):
+        // nothing is better than that.
+        if ( fix.present && magArray.useMmc && millis( ) >= nextColdStartMs ) {
             nextColdStartMs = millis( ) + MAGLOC_COLD_START_PERIOD_MS;
             MagFitResult coarse = { };
             uint32_t start = micros( );

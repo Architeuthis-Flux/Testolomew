@@ -109,7 +109,7 @@ k4232\r
 :ui down
 :ui right
 :screen
-@expect "> floor                    0.4mm"
+@expect "> floor                    0.5mm"
 :ui left
 :ui back
 :key b

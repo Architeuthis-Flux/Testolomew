@@ -61,6 +61,7 @@ check: sim
 	./sim scenes/check.txt -q
 	./sim scenes/strength.txt -q
 	./sim scenes/bench.txt -q
+	./sim scenes/edge.txt -q
 
 screens: sim
 	rm -rf out

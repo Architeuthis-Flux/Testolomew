@@ -314,9 +314,16 @@ void magTrackUpdate( MagTrack* t, float dtS, const MagTrackInput* in ) {
             t->lastGate = sqrtf( d2 );
             float sinceS = maxf( dtS, t->ageMs / 1000.0f );
             bool tooFast = sqrtf( jump2 ) / sinceS > MAGTRACK_MAX_SPEED_MM_S;
-            if ( d2 <= t->gate * t->gate && !tooFast ) {
+            float g2 = t->gate * t->gate;
+            if ( d2 <= MAGTRACK_GATE_DROP * MAGTRACK_GATE_DROP && !tooFast ) {
+                // Soft (Huber): inside the gate a fix counts in full; outside
+                // it counts for less, its variance grown by how far out it is
+                // (g^2/d^2), never for nothing until the drop line - a hard
+                // gate turned a fast onset into a staircase of drops and
+                // restarts (docs/magnetometer-fusion-prior-art.md 5.2).
+                float w = d2 <= g2 ? 1.0f : g2 / d2;
                 for ( int a = 0; a < 3; a++ ) {
-                    updateAxis( &t->axis[ a ], z[ a ], r[ a ] );
+                    updateAxis( &t->axis[ a ], z[ a ], r[ a ] / w );
                 }
                 t->accepted++;
                 t->droppedRun = 0;

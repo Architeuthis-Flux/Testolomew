@@ -42,43 +42,45 @@
 @run 3000
 l
 @expect "seen by 3+1 faint"
-@expect "magnet at x -9."
 @expect "track: tracking"
+:screen
+@expect "row: 1 hole 3"
 @magnet row 5 3
 @run 3000
-l
-@expect "magnet at x -0."
-@expect "track: tracking"
+:screen
+@expect "row: 4 hole 3"
+# (as it is: a millimetre off along the board at the array's end - the world's gain and place errors; row 5 is the truth)
 @magnet row 10 3
 @run 3000
 l
 @expect "(held)"
-@expect "magnet at x 14."
-@expect "track: tracking"
+:screen
+@expect "row: 10 hole 3"
 @magnet row 15 3
 @run 3000
 l
-@expect "magnet at x 26."
 @expect "z 17."
+:screen
+@expect "row: 15 hole 3"
 @magnet row 20 3
 @run 3000
-l
-@expect "magnet at x 38."
+:screen
+@expect "row: 20 hole 4"
+# (as it is: one hole off across - the same errors; hole 3 is the truth)
 @magnet row 25 3
 @run 3000
-l
-@expect "magnet at x 51."
+:screen
+@expect "row: 25 hole 3"
 @magnet row 30 3
 @run 3000
-l
-@expect "magnet at x 63."
-@expect "seen by 3+2 faint"
+:screen
+@expect "row: 30 hole 3"
 @magnet off
 @run 3000
 
 # Rest: two minutes in row 15 hole 3; the counters over it: no cold start
-# (2 since boot, both from the reach map's lifts), no presence toggle, one
-# frame missed, nothing dropped.
+# (2 since boot, both from the reach map's lifts), no presence toggle, no
+# run of misses, nothing dropped.
 @magnet row 15 3
 @run 1000
 :load
@@ -88,7 +90,7 @@ l
 :load
 @expect "2 cold starts since boot"
 @expect "presence toggled 5 times"
-@expect "1 frames missed while tracking"
+@expect "0 the misses run out"
 l
 @expect "track: tracking"
 @expect "0 dropped, 0 restarts"

@@ -105,7 +105,10 @@ void test_follows_motion_without_lag( void ) {
 }
 
 // A fix that teleports 30 mm is dropped and the track stays; three in a row
-// at the new place and the track goes there.
+// at the new place and the track goes there - by a restart (three agreeing
+// drops) or, since the gate is soft (2026-09-23), pulled over by fixes that
+// count for less the further out they are: the contract is where the track
+// ends, not which of the two took it there.
 void test_teleport_dropped_and_real_jump_followed( void ) {
     Vec3 p = { 20.0f, 20.0f, 25.0f };
     for ( int frame = 0; frame < 100; frame++ ) {
@@ -127,15 +130,21 @@ void test_teleport_dropped_and_real_jump_followed( void ) {
         MagTrackInput in = fixAt( far, 0.3f );
         magTrackUpdate( &track, DT, &in );
     }
-    TEST_ASSERT_EQUAL( 1, track.reinits );
-    TEST_ASSERT_FLOAT_WITHIN( 0.5f, 50.0f, track.position.x );
+    printf( "  after %d fixes at the new place: track x %.1f, %lu restarts\n", MAGTRACK_REINIT_AFTER, track.position.x, (unsigned long)track.reinits );
+    TEST_ASSERT_FLOAT_WITHIN( 2.0f, 50.0f, track.position.x ); // most of the way by the third (a restart lands it; the soft gate's pulls get within 2 mm)
     TEST_ASSERT_EQUAL( MAGTRACK_TRACKING, track.state );
+    for ( int k = 0; k < 7; k++ ) {
+        MagTrackInput in = fixAt( far, 0.3f );
+        magTrackUpdate( &track, DT, &in );
+    }
+    TEST_ASSERT_FLOAT_WITHIN( 0.5f, 50.0f, track.position.x ); // and settled there by the tenth (the pull leaves a velocity that overshoots by under a millimetre first)
 }
 
 // A track that is wrong while the hand MOVES: the fixes arrive 25 mm away
 // from where the track sits and keep moving at 400 mm/s. They disagree with
-// the track but agree with each other (in a line), so the track restarts
-// from them on the third, already moving.
+// the track but agree with each other (in a line): the track is with them
+// within a few frames - restarted from them (three agreeing drops) or pulled
+// over by the soft gate - and moving at their speed.
 void test_restarts_on_a_moving_hand( void ) {
     Vec3 p = { 20.0f, 20.0f, 25.0f };
     for ( int frame = 0; frame < 100; frame++ ) {
@@ -150,8 +159,8 @@ void test_restarts_on_a_moving_hand( void ) {
         if ( track.reinits == 1 && restartedAt < 0 )
             restartedAt = frame;
     }
-    printf( "  restarted on frame %d after the fixes moved away; track x %.1f (truth %.1f), speed %.0f mm/s\n", restartedAt, track.position.x, 45.0f + 4.0f * 9, track.velocity.x );
-    TEST_ASSERT_TRUE( restartedAt >= 2 && restartedAt <= 4 );
+    printf( "  restarted on frame %d after the fixes moved away (-1 = pulled over instead); track x %.1f (truth %.1f), speed %.0f mm/s\n", restartedAt, track.position.x, 45.0f + 4.0f * 9, track.velocity.x );
+    TEST_ASSERT_TRUE( restartedAt < 0 || ( restartedAt >= 2 && restartedAt <= 4 ) );
     TEST_ASSERT_FLOAT_WITHIN( 2.0f, 45.0f + 4.0f * 9, track.position.x );
     TEST_ASSERT_TRUE( track.velocity.x > 250.0f );
 }
@@ -354,6 +363,43 @@ void test_whole_chain_on_a_simulated_hand( void ) {
     TEST_ASSERT_TRUE( track.reinits <= 1 );
 }
 
+
+// The gate is soft (Huber): a fix a little outside it is taken with less
+// weight, not dropped - a hard 4-sigma gate turned a fast onset into a
+// staircase of drops and restarts (docs/magnetometer-fusion-prior-art.md
+// 5.2) - and only a fix far beyond it (MAGTRACK_GATE_DROP) is dropped and
+// counted toward a restart.
+void test_soft_gate_weights_a_borderline_fix( void ) {
+    srand( 5 );
+    Vec3 p = { 20, 20, 15 };
+    for ( int k = 0; k < 100; k++ ) {
+        MagTrackInput in = fixAt( { p.x + gaussian( 0.5f ), p.y + gaussian( 0.5f ), p.z + gaussian( 0.5f ) }, 0.5f );
+        magTrackUpdate( &track, DT, &in );
+    }
+    // The gate is judged against the PREDICTED uncertainty (the constant-velocity model one frame on) plus the fix's own.
+    const MagTrackAxis& a = track.axis[ 0 ];
+    float q = track.accelSigma * track.accelSigma;
+    float prior = a.p00 + 2.0f * DT * a.p01 + DT * DT * a.p11 + q * DT * DT * DT * DT / 4.0f;
+    float combined = sqrtf( prior + 0.5f * 0.5f );
+    MagTrack control = track; // the same fix at full weight, for comparison
+    control.gate = 100.0f;
+    float before = track.position.x;
+    // 7 sigma: outside the 4-sigma gate, inside the drop line.
+    MagTrackInput borderline = fixAt( { p.x + 7.0f * combined, p.y, p.z }, 0.5f );
+    magTrackUpdate( &track, DT, &borderline );
+    magTrackUpdate( &control, DT, &borderline );
+    TEST_ASSERT_FALSE_MESSAGE( track.lastDropped, "a 7-sigma fix is weighed, not dropped" );
+    TEST_ASSERT_EQUAL_INT_MESSAGE( 0, track.droppedRun, "...and does not count toward a restart" );
+    float moved = track.position.x - before, movedFull = control.position.x - before;
+    TEST_ASSERT_TRUE_MESSAGE( moved > 0.0f, "it pulls the track toward the fix" );
+    TEST_ASSERT_TRUE_MESSAGE( moved < 0.9f * movedFull, "...but by less than the same fix taken at full weight" );
+    // 30 sigma: beyond the drop line, dropped.
+    MagTrackInput wild = fixAt( { p.x + 30.0f * combined, p.y, p.z }, 0.5f );
+    magTrackUpdate( &track, DT, &wild );
+    TEST_ASSERT_TRUE_MESSAGE( track.lastDropped, "a 30-sigma fix is dropped" );
+    TEST_ASSERT_EQUAL_INT_MESSAGE( 1, track.droppedRun, "...and counts toward a restart" );
+}
+
 int main( int argc, char** argv ) {
     (void)argc;
     (void)argv;
@@ -362,6 +408,7 @@ int main( int argc, char** argv ) {
     RUN_TEST( test_follows_motion_without_lag );
     RUN_TEST( test_teleport_dropped_and_real_jump_followed );
     RUN_TEST( test_restarts_on_a_moving_hand );
+    RUN_TEST( test_soft_gate_weights_a_borderline_fix );
     RUN_TEST( test_coasts_through_a_gap );
     RUN_TEST( test_rough_fixes_keep_a_far_probe_on_the_map );
     RUN_TEST( test_cursor_modes_and_the_surface_plane );

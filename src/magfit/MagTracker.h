@@ -53,8 +53,9 @@
 
 #define MAGTRACK_ACCEL_SIGMA 10000.0f     // mm/s^2: how jerky a hand's motion may be (process noise). 3000 lagged 20 ms; this lags 10 with the same rest jitter after the 1-Euro (tools/hostsim/pencil.cpp)
 #define MAGTRACK_ROUGH_ACCEL_SIGMA 2000.0f // mm/s^2: the process noise while ROUGH (far, 12 mm fixes: averaging beats following)
-#define MAGTRACK_SIGMA_FLOOR_MM 0.3f      // the array's systematic error, not in the fit's bar
-#define MAGTRACK_GATE 4.0f                // fixes further than this many sigmas from the track are dropped
+#define MAGTRACK_SIGMA_FLOOR_MM 0.4f      // the array's systematic error, not in the fit's bar: sigma_R, the std of the fix's second differences over sqrt 6 (tools/fixstats.py), measured 0.16-0.19 mm at rest with the 4232 magnet (2026-09-19 capture) and scaled to the 1839 one; the bench protocol (knobs.md section 8) replaces it (0.3 until 2026-09-23)
+#define MAGTRACK_GATE 4.0f                // fixes further than this many sigmas from the track count for LESS (Huber: their variance grown by the square of the excess)...
+#define MAGTRACK_GATE_DROP 11.3f          // ...and only past this many are dropped (sqrt 8 x the gate: a fix weighed to an eighth is worth keeping, beyond that it is another place)
 #define MAGTRACK_MAX_SPEED_MM_S 3000.0f   // faster than a hand moves over a desk
 #define MAGTRACK_REINIT_AFTER 3           // dropped fixes in a row that agree = the track was wrong
 #define MAGTRACK_REINIT_AGREE_MM 6.0f     // ...agree = within this of each other

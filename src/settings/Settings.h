@@ -52,7 +52,7 @@
 // smoothing, and play/touch) change for the better: saved values of those from an
 // older tuning are then left out at boot, so the new defaults take, and the
 // next write carries the new version. The other pages are always kept.
-#define SETTINGS_TUNING_VERSION 3 // 3 (2026-09-19): play/touch 1 -> 2 mm
+#define SETTINGS_TUNING_VERSION 4 // 3 (2026-09-19): play/touch 1 -> 2 mm
 
 class SettingsService : public Service {
   public:
