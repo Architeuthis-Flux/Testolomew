@@ -85,6 +85,10 @@ enum MagSensorType {
 // Hall sensors; raise it once magcal has placed them (the console's `w`
 // tries a value without a rebuild). 0 = every sensor equal.
 #define MAG_WEIGHT_REFERENCE_MT 0.011f
+// ...and its Z axis, twice as quiet (the datasheet: 11 against 22 uT at 32x;
+// the bench 0.006 against 0.012 mT a frame, 2026-09-21): the fit weighs
+// every sensor's Z rows by the ratio (magFitSetAxisWeights, MagLocator::begin).
+#define MAG_NOISE_Z_MT 0.006f
 #define MAG_WEIGHT_CAP 40.0f // the most a quiet type may count for (an MMC56x3 where it reads noise: ~37 by its noise; the console's w changes it)
 // The share of a reading the dipole model does not explain, whatever the
 // sensor: the dipole approximation, the sensor's place and gain in the

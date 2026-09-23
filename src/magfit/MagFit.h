@@ -91,6 +91,16 @@ struct MagFitResult {
 // averaged frame's noise on the bench array.
 #define MAGFIT_NOISE_FLOOR_MT 0.005f
 
+// The axes' weights: each axis's rows (every sensor) scaled by this, on top
+// of the per-sensor weights below - the reference noise over that axis's
+// noise. The TMAG5273's Z is twice as quiet as its X and Y (11 against 22 uT
+// at 32x; the bench 0.006 against 0.012 mT a frame), so Z counts 2 (MagLocator
+// sets it from MAG_NOISE_Z_MT). The weight is in the frame the fields come in
+// (the board frame), which is each part's own only because every part turns
+// about z (MagArrayConfig.h); a part tilted on V6 wants it in its own frame.
+// Every axis at 1 (the default) is the plain fit to the bit.
+void magFitSetAxisWeights( float wx, float wy, float wz );
+
 // The forward model: field (mT) at `sensor` from a dipole `moment` at `magnet`.
 Vec3 magFitDipoleField( Vec3 sensor, Vec3 magnet, Vec3 moment );
 

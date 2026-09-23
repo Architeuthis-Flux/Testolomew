@@ -42,9 +42,9 @@ int main(int argc, char** argv){ console.begin(&Serial); magArray.begin(); magAr
   // MAG_BIAS=i,x,y,z in the environment: a zero error at sensor i (mT, board frame) on every frame
   if (getenv("MAG_WCAP")) { magArray.setWeightCap(atof(getenv("MAG_WCAP"))); printf("weight cap %s\n", getenv("MAG_WCAP")); }
   if (getenv("MAG_FREE")) { magLocator.forgetStrength(); printf("strength free (not held)\n"); }
-  // MAG_STRENGTH=<mT*mm^3>, MAG_NOISE=x,y,z (a TMAG's per-axis noise a frame), MAG_MMC=0 (the MMC56x3 out): the bench as it is (1839, 0.012/0.012/0.006, out) against the defaults the levers were set by (4200, 0.010, in)
+  // MAG_STRENGTH=<mT*mm^3>, MAG_NOISE=x,y,z (a TMAG's per-axis noise a frame), MAG_MMC=0 (the MMC56x3 out): the bench as it is (1839, out) against the defaults the levers were set by (4200, in)
   float strength = getenv("MAG_STRENGTH") ? atof(getenv("MAG_STRENGTH")) : 4200.0f;
-  Vec3 noise = {0.010f, 0.010f, 0.010f}; if (getenv("MAG_NOISE")) { if (sscanf(getenv("MAG_NOISE"), "%f,%f,%f", &noise.x, &noise.y, &noise.z)!=3) noise = {0.010f, 0.010f, 0.010f}; }
+  Vec3 noise = {0.012f, 0.012f, 0.006f}; if (getenv("MAG_NOISE")) { if (sscanf(getenv("MAG_NOISE"), "%f,%f,%f", &noise.x, &noise.y, &noise.z)!=3) noise = {0.012f, 0.012f, 0.006f}; } // the bench's anisotropy (isotropic 0.010 until 2026-09-23)
   if (getenv("MAG_MMC") && atoi(getenv("MAG_MMC"))==0) magArray.useMmc = false;
   printf("world: magnet %.0f, noise %.3f %.3f %.3f mT a frame, the MMC %s\n", strength, noise.x, noise.y, noise.z, magArray.useMmc ? "in" : "out");
   bool biasOn=false; int biasI=0; Vec3 bias={0,0,0}; if (getenv("MAG_BIAS")) { biasOn = sscanf(getenv("MAG_BIAS"), "%d,%f,%f,%f", &biasI, &bias.x, &bias.y, &bias.z)==4; if (biasOn) printf("bias: sensor %d %.4f %.4f %.4f mT\n", biasI, bias.x, bias.y, bias.z); }

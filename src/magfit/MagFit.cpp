@@ -47,19 +47,35 @@ static float sensorWeight( const FitProblem* fp, int i ) {
     return fp->weights == nullptr ? 1.0f : fp->weights[ i ];
 }
 
+// The axes' weights (magFitSetAxisWeights): 1, 1, 1 unless told otherwise.
+static float axisWeight[ 3 ] = { 1.0f, 1.0f, 1.0f };
+
+void magFitSetAxisWeights( float wx, float wy, float wz ) {
+    axisWeight[ 0 ] = wx > 0.0f ? wx : 1.0f;
+    axisWeight[ 1 ] = wy > 0.0f ? wy : 1.0f;
+    axisWeight[ 2 ] = wz > 0.0f ? wz : 1.0f;
+}
+
+// |field|^2 with each axis weighted: what the signal sums count.
+static float weightedFieldSq( Vec3 f ) {
+    float x = axisWeight[ 0 ] * f.x, y = axisWeight[ 1 ] * f.y, z = axisWeight[ 2 ] * f.z;
+    return x * x + y * y + z * z;
+}
+
 // The kernel of sensor i at magnet position p and its reading, both scaled
 // by the sensor's weight: the rows of a weighted least squares.
 static void weightedRow( const FitProblem* fp, int i, Vec3 p, float g[ 3 ][ 3 ], float b[ 3 ] ) {
     dipoleKernel( fp->sensors[ i ], p, g );
     float w = sensorWeight( fp, i );
     for ( int a = 0; a < 3; a++ ) {
+        float wa = w * axisWeight[ a ]; // the sensor's weight, and the axis's
         for ( int c = 0; c < 3; c++ ) {
-            g[ a ][ c ] *= w;
+            g[ a ][ c ] *= wa;
         }
     }
-    b[ 0 ] = w * fp->fields[ i ].x;
-    b[ 1 ] = w * fp->fields[ i ].y;
-    b[ 2 ] = w * fp->fields[ i ].z;
+    b[ 0 ] = w * axisWeight[ 0 ] * fp->fields[ i ].x;
+    b[ 1 ] = w * axisWeight[ 1 ] * fp->fields[ i ].y;
+    b[ 2 ] = w * axisWeight[ 2 ] * fp->fields[ i ].z;
 }
 
 // The symmetric 3x3 kernel G with B = G m, times KERNEL_SCALE.
@@ -406,7 +422,7 @@ static int describeProblem( FitProblem* fp, const Vec3* sensors, const Vec3* fie
         if ( sensors[ i ].y > fp->yMax )
             fp->yMax = sensors[ i ].y;
         float w2 = sensorWeight( fp, i ) * sensorWeight( fp, i );
-        *sumSquares += w2 * ( fields[ i ].x * fields[ i ].x + fields[ i ].y * fields[ i ].y + fields[ i ].z * fields[ i ].z );
+        *sumSquares += w2 * weightedFieldSq( fields[ i ] );
     }
     fp->xMin -= margin;
     fp->xMax += margin;
@@ -579,7 +595,7 @@ bool magFitSolveStep( const Vec3* sensors, const Vec3* fields, const bool* use, 
             fp.yMin = sensors[ i ].y;
         if ( sensors[ i ].y > fp.yMax )
             fp.yMax = sensors[ i ].y;
-        float w = fields[ i ].x * fields[ i ].x + fields[ i ].y * fields[ i ].y + fields[ i ].z * fields[ i ].z;
+        float w = weightedFieldSq( fields[ i ] );
         w *= sensorWeight( &fp, i ) * sensorWeight( &fp, i );
         sumSquares += w;
         cx += w * sensors[ i ].x;

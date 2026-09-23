@@ -601,6 +601,18 @@ ServiceStatus MagLocator::fitFrame( MagTrackInput* in ) {
     // (MagArray::frameWeights - the MMC56x3 counts for ~37 TMAGs where it
     // reads noise, for one close in).
     magArray.frameWeights( smooth, f.weights );
+    // The Z axis counts by its quietness, as far as the noise is the error: near
+    // the magnet the error is the model's share of the field (MAG_MODEL_ERROR:
+    // the table's gains and places, the dipole approximation), on every axis
+    // alike, and a Z weighed by its noise alone amplified those (2026-09-23,
+    // the bench-like sim: the middle rows a hole off across). So the weight is
+    // the X/Y error over the Z error at this frame's strongest reading: about
+    // 1 at writing height (0.3-0.7 mT), 1.9 in a far hover (0.04 mT).
+    {
+        float model = MAG_MODEL_ERROR * fix.peakMt;
+        float wz = sqrtf( MAG_WEIGHT_REFERENCE_MT * MAG_WEIGHT_REFERENCE_MT + model * model ) / sqrtf( MAG_NOISE_Z_MT * MAG_NOISE_Z_MT + model * model );
+        magFitSetAxisWeights( 1.0f, 1.0f, wz );
+    }
     // With the strength held and a direction to lean on, one sensor that
     // sees the magnet plainly is enough to try a fit (the far probe, seen
     // by the MMC alone); else it takes MAGLOC_MIN_SENSORS noticing it.

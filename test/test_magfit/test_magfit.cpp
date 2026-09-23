@@ -475,6 +475,48 @@ void test_strength_hint_keeps_the_lattice_off_the_weak_magnet_near( void ) {
     TEST_ASSERT_FLOAT_WITHIN( 1.0f, 90.0f, whole.position.z );
 }
 
+
+// The array's Z axis is twice as quiet as X and Y (the TMAG5273 at 32x: 11
+// against 22 uT; the bench 0.006 against 0.012 mT a frame), and a least
+// squares that knows it (magFitSetAxisWeights: each axis's rows scaled by
+// its 1/sigma) fits closer than one that weighs every axis the same. With
+// every axis at 1 the fit is the plain one to the bit.
+void test_axis_weights_use_the_quiet_z( void ) {
+    srand( 11 );
+    float weightedSq = 0.0f, plainSq = 0.0f;
+    int frames = 0;
+    for ( float x = 5.0f; x <= 55.0f; x += 5.0f ) {
+        for ( int repeat = 0; repeat < 6; repeat++ ) {
+            Vec3 magnet = { x, 10.0f, 20.0f };
+            Vec3 moment = tiltedMoment( 1839.0f, 15.0f, 40.0f );
+            Vec3 fields[ SENSOR_COUNT ];
+            for ( int i = 0; i < SENSOR_COUNT; i++ ) {
+                fields[ i ] = magFitDipoleField( sensors[ i ], magnet, moment );
+                fields[ i ].x += gaussian( 0.012f );
+                fields[ i ].y += gaussian( 0.012f );
+                fields[ i ].z += gaussian( 0.006f );
+            }
+            MagFitResult plain = { }, ones = { }, weighted = { };
+            magFitSetAxisWeights( 1.0f, 1.0f, 1.0f );
+            TEST_ASSERT_TRUE( magFitSolve( sensors, fields, nullptr, SENSOR_COUNT, 0.4f, &ones ) );
+            magFitSetAxisWeights( 1.0f, 1.0f, 2.0f );
+            TEST_ASSERT_TRUE( magFitSolve( sensors, fields, nullptr, SENSOR_COUNT, 0.4f, &weighted ) );
+            magFitSetAxisWeights( 1.0f, 1.0f, 1.0f );
+            TEST_ASSERT_TRUE( magFitSolve( sensors, fields, nullptr, SENSOR_COUNT, 0.4f, &plain ) );
+            TEST_ASSERT_EQUAL_FLOAT( plain.position.x, ones.position.x );
+            TEST_ASSERT_EQUAL_FLOAT( plain.position.z, ones.position.z );
+            TEST_ASSERT_EQUAL_FLOAT( plain.residual, ones.residual );
+            float ew = distance( weighted.position, magnet ), ep = distance( plain.position, magnet );
+            weightedSq += ew * ew;
+            plainSq += ep * ep;
+            frames++;
+        }
+    }
+    float rw = sqrtf( weightedSq / frames ), rp = sqrtf( plainSq / frames );
+    printf( "  z weighted 2: rms %.3f mm; every axis 1: %.3f mm (%d frames)\n", rw, rp, frames );
+    TEST_ASSERT_LESS_THAN_FLOAT( rp, rw );
+}
+
 int main( void ) {
     UNITY_BEGIN( );
     RUN_TEST( test_forward_model_on_axis );
@@ -488,6 +530,7 @@ int main( void ) {
     RUN_TEST( test_noise_alone_is_not_a_magnet );
     RUN_TEST( test_weak_magnet_seen_plainly_by_two_sensors );
     RUN_TEST( test_weights_favour_the_quiet_sensors );
+    RUN_TEST( test_axis_weights_use_the_quiet_z );
     RUN_TEST( test_far_probe_needs_the_held_strength_and_the_quiet_sensor );
     RUN_TEST( test_strength_hint_keeps_the_lattice_off_the_weak_magnet_near );
     return UNITY_END( );

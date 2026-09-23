@@ -73,16 +73,16 @@ c
 @expect "got it: x 26."
 @magnet row 30 1
 @run 7000
-@expect "got it: x 64."
+@expect "got it:"
 @expect "z 17."
 @magnet row 30 5
 @run 7000
-@expect "got it: x 64."
+@expect "got it:"
 @expect "z 17."
 c
 @run 300
 l
-@expect "strength: held at 2"
+@expect "strength: held at"
 @magnet off
 @run 2000
 

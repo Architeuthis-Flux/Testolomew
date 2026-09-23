@@ -98,7 +98,7 @@ class WorldService : public Service {
     float strength = 4232.0f; // the 2026-09-18 probe's magnet, which check.txt and strength.txt were written with (the firmware's default is the bench's current magnet; @strength changes it)
     float surfaceZ = MAGLOC_BOARD_Z_MM; // @surface: where the board's top really is (the locator's setting is its belief)
     float tipMm = -1.0f; // @tip: the magnet's centre this far up the shaft from the point (-1 = whatever the locator believes)
-    Vec3 noise = { 0.010f, 0.010f, 0.010f }; // a TMAG5273's noise a frame per axis at the reference (0.011 mT), the other types by their ratio; the bench measures 0.012 x/y, 0.006 z (@noise; 2026-09-21/23)
+    Vec3 noise = { 0.012f, 0.012f, 0.006f }; // a TMAG5273's noise a frame per axis, the bench's (2026-09-21: 0.012 x/y, 0.006 z; the datasheet's Z is half of X/Y), the other types by their ratio (@noise). Isotropic 0.010 until 2026-09-23: with the fit weighing Z by its quietness the sim must have the bench's anisotropy or it misjudges the weight.
     uint64_t dropoutUntilUs = 0;
     uint64_t deadUntilUs[ MAG_SENSOR_COUNT ] = { }; // @dead: one sensor not read until then
     Vec3 bias[ MAG_SENSOR_COUNT ] = { }; // @bias: a zero error at a sensor, added to every frame
