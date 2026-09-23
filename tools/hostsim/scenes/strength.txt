@@ -4,7 +4,14 @@
 # and with the 2026-09-18 probe's magnet (4232) the scenes were written with, told to the
 # locator as a known magnet (the firmware's default is the bench's current one).
 :mmc on
-k4232\r
+:strength 4232
+# The settings' record seals a strength as MEASURED only once the value it
+# holds is the measured one: for the minute the record still holds the boot
+# default it says so (2026-09-23: the seal was written a minute early, and a
+# reset inside it restored the default as measured).
+@run 3000
+s
+@expect "strength=1839 unconfirmed"
 
 @seed 7
 
@@ -83,6 +90,8 @@ c
 @run 300
 l
 @expect "strength: held at"
+s
+@expect " measured"
 @magnet off
 @run 2000
 

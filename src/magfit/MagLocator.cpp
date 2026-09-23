@@ -55,17 +55,35 @@ static void onLatest( Stream* out ) { magLocator.printFix( out ); }
 static void onOrientation( Stream* out ) { magLocator.printOrientationCheck( out ); }
 
 static void onLearn( Stream* out ) {
-    // k<number>: a magnet whose strength is known (mT*mm^3), held as if measured; k alone: hold what is held and measure it again.
-    long n = consoleReadNumber( out, "the magnet's strength in mT*mm^3 (Enter alone: hold it and measure it again): ", 8000 );
+    magLocator.startLearningStrength( );
+    char line[ 120 ];
+    snprintf( line, sizeof( line ), "holding the magnet's strength at %.0f and measuring it again: rest the probe on the board, or move it slowly 1-3 cm up", magLocator.knownStrength );
+    out->println( line );
+}
+
+// :strength <n> | learn | free - a known magnet held as measured (a verb, with
+// its number on the line: a key that waits for digits holds the whole loop,
+// the LED strip included, for up to 8 s on a terminal that sends none).
+static void onStrengthVerb( int argc, char** argv, Stream* out ) {
     char line[ 160 ];
-    if ( n > 0 ) {
-        magLocator.holdStrength( (float)n );
-        snprintf( line, sizeof( line ), "holding the magnet's strength at %.0f as measured; the ring watches for another magnet", magLocator.knownStrength );
+    if ( argc >= 2 && strcmp( argv[ 1 ], "learn" ) == 0 ) {
+        onLearn( out );
+        return;
+    }
+    if ( argc >= 2 && strcmp( argv[ 1 ], "free" ) == 0 ) {
+        magLocator.forgetStrength( );
+        out->println( "the magnet's strength is free: fitted every frame, never held (the far probe is then out of reach)" );
+        return;
+    }
+    float n = argc >= 2 ? (float)atof( argv[ 1 ] ) : 0.0f;
+    if ( n <= 0.0f ) {
+        snprintf( line, sizeof( line ), "strength: held at %.0f%s. :strength <mT*mm^3> holds a known magnet as measured; :strength learn measures it again (k); :strength free never holds it (K)", magLocator.knownStrength,
+                  magLocator.strengthIsMeasured ? " (measured)" : " (not measured)" );
         out->println( line );
         return;
     }
-    magLocator.startLearningStrength( );
-    snprintf( line, sizeof( line ), "holding the magnet's strength at %.0f and measuring it again: rest the probe on the board, or move it slowly 1-3 cm up", magLocator.knownStrength );
+    magLocator.holdStrength( n );
+    snprintf( line, sizeof( line ), "holding the magnet's strength at %.0f as measured; the ring watches for another magnet", magLocator.knownStrength );
     out->println( line );
 }
 
@@ -370,7 +388,8 @@ void MagLocator::begin( ) {
     consoleAddCommand( 'd', "stream probe fixes as CSV (toggle)", onStream );
     consoleAddCommand( 'l', "latest probe fix", onLatest );
     consoleAddCommand( 'o', "orientation check: hold a magnet 1-2 cm over the array first", onOrientation );
-    consoleAddCommand( 'k', "the magnet's strength (learned from the near fixes, held): k = hold it and measure it again from scratch; k<number> = a known magnet, mT*mm^3, held as measured (k4232<Enter>)", onLearn );
+    consoleAddCommand( 'k', "the magnet's strength (learned from the near fixes, held): hold it and measure it again from scratch (:strength <n> holds a known one)", onLearn );
+    consoleAddVerb( "strength", "<mT*mm^3> | learn | free", "the magnet's strength: a known one held as measured; learn = measure it again (k); free = never hold it (K)", CONSOLE_CHANGES, onStrengthVerb );
     consoleAddCommand( 'K', "never hold the magnet's strength (fit it freely; the far probe is then out of reach)", onForget );
     consoleAddCommand( 't', "the magnet's centre is <number> mm up the shaft from the probe's point (t12<Enter>)", onTipOffset );
     consoleAddCommand( 'T', "the magnet's angle to the shaft, <number> degrees: T0 = along it, T90 = a disc lying flat on it", onMagnetAngle );
@@ -742,6 +761,7 @@ void MagLocator::assessFrame( FrameScratch& f ) {
     fix.seenBy = 0;
     fix.faintBy = 0;
     bool haveMmc = false, mmcPresent = false;
+    int tmagPlain = 0; // TMAGs reading plainly (the unscaled level): what corroborates presence
     int tmagSeen = 0;
     bool peakHeld = false;
     f.plain = 0;
@@ -817,6 +837,8 @@ void MagLocator::assessFrame( FrameScratch& f ) {
         if ( levelSq > plainLevel * plainLevel ) {
             f.plainHere[ i ] = true;
             f.plain++;
+            if ( magSensorPlaces[ i ].type != MAG_MMC56X3 )
+                tmagPlain++;
         }
         if ( magSensorPlaces[ i ].type == MAG_MMC56X3 ) {
             haveMmc = true;
@@ -868,7 +890,11 @@ void MagLocator::assessFrame( FrameScratch& f ) {
         // The MMC's word, or two TMAGs' (MAGLOC_PRESENT_TMAGS): one TMAG
         // alone is its zero (with the MMC out too: a probe near enough to
         // light one TMAG plainly lights its neighbour, 2026-09-22 late).
-        evidence = ( haveMmc && mmcPresent ) || tmagSeen >= MAGLOC_PRESENT_TMAGS;
+        // ...reading PLAINLY (0.04), not merely above the scaled seen level: with
+        // the level scaled for a weak magnet (0.022) two post-boot stale zeros
+        // (0.03-0.045) flapped presence twelve times in half a minute with
+        // nothing there (2026-09-23, the review's scene, now scenes/edge.txt).
+        evidence = ( haveMmc && mmcPresent ) || tmagPlain >= MAGLOC_PRESENT_TMAGS;
     }
     if ( evidence != fix.present ) {
         presenceToggles++;
@@ -1582,6 +1608,7 @@ void MagLocator::restoreStrength( float strength, bool measured ) {
         return; // not a probe magnet's
     }
     strengthSaved = strength;
+    strengthSavedMeasured = measured;
     // A measured record is trusted until the ring says otherwise; a bare one
     // (2026-09-23: the boot default had been saved as if learned, and every
     // boot restored it as "taken") is held, and the first measurement over
@@ -1746,6 +1773,7 @@ void MagLocator::keepStrengthRecord( uint32_t nowMs ) {
         return;
     }
     strengthSaved = roundf( knownStrength / 20.0f ) * 20.0f;
+    strengthSavedMeasured = strengthIsMeasured;
     strengthAwaySinceMs = 0;
 }
 

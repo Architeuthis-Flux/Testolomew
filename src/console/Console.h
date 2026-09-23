@@ -31,7 +31,7 @@
 #include "JumperlOS.h"
 
 #define CONSOLE_MAX_COMMANDS 48 // 33 in use on 2026-09-18; a registration past the table is refused, silently but for "unknown command"
-#define CONSOLE_MAX_VERBS 20
+#define CONSOLE_MAX_VERBS 24 // 21 in use on 2026-09-23 (the simulator adds two); a registration past the table is refused with a console line
 #define CONSOLE_LINE_MAX 96
 #define CONSOLE_MAX_ARGS 12
 #define CONSOLE_LINE_IDLE_MS 2000

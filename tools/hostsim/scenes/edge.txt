@@ -23,3 +23,23 @@ l
 @expect "track: rough"
 @magnet off
 @run 2000
+
+# Two TMAG5273s with stale zeros after a boot (0.045 and 0.03 mT: the
+# post-boot range, knobs.md (7)-(8)) and nothing present: NOT a magnet.
+# With the seen level scaled for the weak magnet (0.022), two sensors above
+# it are not enough to say a probe is there - the corroboration takes two
+# TMAGs reading PLAINLY (0.04). Right after a probe has left (this scene's),
+# the 0.045 zero plus noise still puts two sensors over 0.04 now and then:
+# presence toggles twice in the half minute (twelve times at the scaled bar),
+# and the zeros drift out.
+@bias 2 0.045 0 0
+@bias 3 0.03 0 0
+:load
+@run 30000
+:load
+@expect "presence toggled 4 times"
+l
+@expect "no magnet"
+@bias 2 0 0 0
+@bias 3 0 0 0
+@run 2000

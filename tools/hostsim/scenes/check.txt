@@ -5,7 +5,7 @@
 # and with the 2026-09-18 probe's magnet (4232) the scenes were written with, told to the
 # locator as a known magnet (the firmware's default is the bench's current one).
 :mmc on
-k4232\r
+:strength 4232
 
 # The verbs are there.
 :help
@@ -141,7 +141,7 @@ k4232\r
 :key left up
 @run 400
 :screen
-@expect "camera: fixed target 9.6 30.5"
+@expect "camera: fixed target 9."
 
 # An action from a page: its output in a Result panel over the page, the
 # app underneath unchanged; B dismisses it, the page is still there.

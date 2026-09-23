@@ -120,8 +120,8 @@ int SettingsService::record( int step, char* out, int size ) {
         // The magnet's strength as learned (MagLocator::keepStrengthRecord
         // moves strengthSaved once the held value has stood a minute away
         // from it, so this is written a minute after a change at most).
-        // ` measured` marks a strength the ring found (this boot or a measured record restored); a default is never written as if it had been measured.
-        return snprintf( out, size, "strength=%.0f%s\n", (double)magLocator.strengthSaved, magLocator.strengthIsMeasured ? " measured" : "" );
+        // ` measured` marks a saved strength the ring found (this boot or a measured record restored); a default, or a value the ring has not yet replaced, is ` unconfirmed` - never written as measured.
+        return snprintf( out, size, "strength=%.0f %s\n", (double)magLocator.strengthSaved, magLocator.strengthSavedMeasured ? "measured" : "unconfirmed" );
     }
     step--;
 #if MODULE_ROW_COUNT
@@ -234,7 +234,7 @@ int SettingsService::apply( const char* text ) {
                 char* end = nullptr;
                 float strength = strtof( value, &end );
                 if ( strength > 0.0f ) {
-                    magLocator.restoreStrength( strength, end != nullptr && strstr( end, "measured" ) != nullptr );
+                    magLocator.restoreStrength( strength, strncmp( end, " measured", 9 ) == 0 ); // a bare record (before 2026-09-23) or ` unconfirmed`: held, not trusted
                     applied++;
                 }
             } else if ( keyLength == 6 && strncmp( line, "anchor", 6 ) == 0 ) {

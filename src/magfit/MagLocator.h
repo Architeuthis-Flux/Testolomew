@@ -93,9 +93,10 @@
 // magnet of 4232; a weaker magnet is seen plainly by fewer sensors at the
 // same level, so the level follows the learned strength (levelScale: the
 // ratio to this, 0.25-1), never below twice a frame's noise
-// (MAGLOC_SEEN_FLOOR_MT). The presence level does not follow it: below 0.04
-// mT it is the zeros' drift (0.015 of uncertainty) that decides, and the
-// absent run of the bench protocol sets its floor.
+// (MAGLOC_SEEN_FLOOR_MT). The presence level does not follow it, nor does
+// its corroboration (two TMAGs reading PLAINLY, at 0.04): below 0.04 mT it
+// is the zeros' drift (0.015 of uncertainty) that decides, and the absent
+// run of the bench protocol sets its floor.
 #define MAGLOC_THRESHOLDS_TUNED_AT 4232.0f
 #define MAGLOC_SEEN_FLOOR_MT ( 2.0f * MAG_WEIGHT_REFERENCE_MT )
 #define MAGLOC_FAINT_MT 0.015f
@@ -552,10 +553,11 @@ class MagLocator : public Service {
     uint32_t strengthMeasured = 0; // frames that measured it
     uint32_t strengthJumps = 0;    // times another magnet was taken at once (MAGLOC_STRENGTH_JUMP)
     void startLearningStrength( ); // k: hold it, and measure it again from scratch
-    void holdStrength( float strength ); // k<n>: a known magnet, held as measured
+    void holdStrength( float strength ); // :strength <n>: a known magnet, held as measured
     void forgetStrength( );        // K: never hold it (fit it freely)
     void restoreStrength( float strength, bool measured ); // the settings' record at boot: `strength=<n> measured` is trusted as learned; a bare record (a default that was saved) is held but not trusted, so the first measurement over enough places takes it as on a fresh board
-    bool strengthIsMeasured = false;                 // the held strength came from the ring (this boot or a measured record), not from a default: what the settings write as ` measured`
+    bool strengthIsMeasured = false;                 // the held strength came from the ring (this boot or a measured record), not from a default
+    bool strengthSavedMeasured = false;              // ...and so did the value the settings hold (strengthSaved): what they write as ` measured`, else ` unconfirmed` (the seal follows the saved value, not the held one: a minute apart, 2026-09-23)
 
     // How far the magnet's centre is up the shaft from the probe's point, and
     // the magnet's angle to the shaft.
