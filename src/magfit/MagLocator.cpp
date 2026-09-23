@@ -55,8 +55,16 @@ static void onLatest( Stream* out ) { magLocator.printFix( out ); }
 static void onOrientation( Stream* out ) { magLocator.printOrientationCheck( out ); }
 
 static void onLearn( Stream* out ) {
+    // k<number>: a magnet whose strength is known (mT*mm^3), held as if measured; k alone: hold what is held and measure it again.
+    long n = consoleReadNumber( out, "the magnet's strength in mT*mm^3 (Enter alone: hold it and measure it again): ", 8000 );
+    char line[ 160 ];
+    if ( n > 0 ) {
+        magLocator.holdStrength( (float)n );
+        snprintf( line, sizeof( line ), "holding the magnet's strength at %.0f as measured; the ring watches for another magnet", magLocator.knownStrength );
+        out->println( line );
+        return;
+    }
     magLocator.startLearningStrength( );
-    char line[ 120 ];
     snprintf( line, sizeof( line ), "holding the magnet's strength at %.0f and measuring it again: rest the probe on the board, or move it slowly 1-3 cm up", magLocator.knownStrength );
     out->println( line );
 }
@@ -362,7 +370,7 @@ void MagLocator::begin( ) {
     consoleAddCommand( 'd', "stream probe fixes as CSV (toggle)", onStream );
     consoleAddCommand( 'l', "latest probe fix", onLatest );
     consoleAddCommand( 'o', "orientation check: hold a magnet 1-2 cm over the array first", onOrientation );
-    consoleAddCommand( 'k', "the magnet's strength (learned from the near fixes, held): hold it and measure it again from scratch", onLearn );
+    consoleAddCommand( 'k', "the magnet's strength (learned from the near fixes, held): k = hold it and measure it again from scratch; k<number> = a known magnet, mT*mm^3, held as measured (k4232<Enter>)", onLearn );
     consoleAddCommand( 'K', "never hold the magnet's strength (fit it freely; the far probe is then out of reach)", onForget );
     consoleAddCommand( 't', "the magnet's centre is <number> mm up the shaft from the probe's point (t12<Enter>)", onTipOffset );
     consoleAddCommand( 'T', "the magnet's angle to the shaft, <number> degrees: T0 = along it, T90 = a disc lying flat on it", onMagnetAngle );
@@ -1523,6 +1531,15 @@ void MagLocator::startLearningStrength( ) {
     }
 }
 
+// k<n>: a known magnet, held as measured (the ring starts afresh and only
+// watches for another magnet from here).
+void MagLocator::holdStrength( float strength ) {
+    startLearningStrength( );
+    knownStrength = strength;
+    strengthTaken = true;
+    strengthIsMeasured = true;
+}
+
 // K: never hold it (the free fit's strength is what the readings say, and
 // the far probe is out of reach).
 void MagLocator::forgetStrength( ) {
@@ -1530,13 +1547,18 @@ void MagLocator::forgetStrength( ) {
 }
 
 // The settings' strength= record at boot: what was learned last time.
-void MagLocator::restoreStrength( float strength ) {
+void MagLocator::restoreStrength( float strength, bool measured ) {
     if ( strength < 0.25f * MAGLOC_MAGNET_STRENGTH || strength > 4.0f * MAGLOC_MAGNET_STRENGTH ) {
         return; // not a probe magnet's
     }
     strengthSaved = strength;
-    strengthTaken = true; // what was learned last time is trusted until the ring says otherwise
-    if ( knownStrength > 0.0f ) {
+    // A measured record is trusted until the ring says otherwise; a bare one
+    // (2026-09-23: the boot default had been saved as if learned, and every
+    // boot restored it as "taken") is held, and the first measurement over
+    // enough places takes it as on a fresh board.
+    strengthTaken = measured;
+    strengthIsMeasured = measured;
+    if ( knownStrength > 0.0f ) { // K (the strength free) stays free
         knownStrength = strength;
     }
 }
@@ -1607,6 +1629,7 @@ void MagLocator::measureStrength( float strength, Vec3 at ) {
         }
         knownStrength = median;
         strengthTaken = true;
+        strengthIsMeasured = true;
         strengthAwayFrames = 0;
         strengthPlaceCount = 0; // the places were the old magnet's
         strengthPlaceAt = 0;
@@ -1667,6 +1690,7 @@ void MagLocator::measureStrength( float strength, Vec3 at ) {
     }
     knownStrength = strengthPlaceMedian;
     strengthTaken = true;
+    strengthIsMeasured = true;
     strengthAwayFrames = 0;
     if ( out != nullptr ) {
         snprintf( line, sizeof( line ), "magnet strength %.0f mT*mm^3 - %s over %d places (was %.0f): held from now on%s", knownStrength, why, strengthPlaceCount, was,

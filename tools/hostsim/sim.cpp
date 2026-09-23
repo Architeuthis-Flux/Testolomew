@@ -95,7 +95,7 @@ class WorldService : public Service {
     bool on = false;
     Vec3 magnet = { 0, 0, 0 };
     Vec3 shaft = { 0, 0, 1 };
-    float strength = MAGLOC_MAGNET_STRENGTH; // the probe's, as the locator starts out holding (@strength changes it)
+    float strength = 4232.0f; // the 2026-09-18 probe's magnet, which check.txt and strength.txt were written with (the firmware's default is the bench's current magnet; @strength changes it)
     float surfaceZ = MAGLOC_BOARD_Z_MM; // @surface: where the board's top really is (the locator's setting is its belief)
     float tipMm = -1.0f; // @tip: the magnet's centre this far up the shaft from the point (-1 = whatever the locator believes)
     Vec3 noise = { 0.010f, 0.010f, 0.010f }; // a TMAG5273's noise a frame per axis at the reference (0.011 mT), the other types by their ratio; the bench measures 0.012 x/y, 0.006 z (@noise; 2026-09-21/23)

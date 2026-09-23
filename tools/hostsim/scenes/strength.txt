@@ -1,7 +1,10 @@
 # The magnet's strength learned, and a missing sensor's last reading carrying
 # presence (2026-09-22, evening). `make check` runs this after check.txt.
-# The regression runs with the MMC56x3 in (the board boots with it out: MAG_USE_MMC_AT_BOOT).
+# The regression runs with the MMC56x3 in (the board boots with it out: MAG_USE_MMC_AT_BOOT),
+# and with the 2026-09-18 probe's magnet (4232) the scenes were written with, told to the
+# locator as a known magnet (the firmware's default is the bench's current one).
 :mmc on
+k4232\r
 
 @seed 7
 

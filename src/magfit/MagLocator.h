@@ -160,7 +160,7 @@
 // the row calibration never took a tap: the fitted height failed its
 // on-the-board test. Held at 2900 the taps took, 3 mm high and up to 6 mm
 // off.) 0 = never hold it (the console's K).
-#define MAGLOC_MAGNET_STRENGTH 4232.0f // the probe's of 2026-09-18 (tools/magcal found 4213 +/- 4.5 % on the 2026-09-21 recording)
+#define MAGLOC_MAGNET_STRENGTH 1839.0f // the probe's, MEASURED on the bench 2026-09-22 23:50 (263 frames at 6 places); the 2026-09-18 probe's was 4232 (magcal 4213 +/- 4.5 %). A wiped board starts here; the learning takes over from the first near fixes
 // Why it is held from boot rather than learned (2026-09-21): far from the
 // array only the MMC56x3 reads the magnet plainly, and its three numbers
 // are fitted EXACTLY by a weak magnet just over it or the real one far up -
@@ -193,7 +193,7 @@
 // seconds of near fixes). The settings keep it once it has stood SAVE_STEP
 // from what they hold for SAVE_MS (one write a minute at most).
 #define MAGLOC_LEARN_MAX_MISFIT 0.10f
-#define MAGLOC_LEARN_MIN_SENSORS 5
+#define MAGLOC_LEARN_MIN_SENSORS 4 // (5 until 2026-09-23: with the 1839 magnet five sensors read it plainly only over the middle rows, and the ring starved)
 #define MAGLOC_STRENGTH_MAX_ERROR_MM 3.0f
 #define MAGLOC_STRENGTH_RING 32
 #define MAGLOC_STRENGTH_MIN_SAMPLES 16
@@ -541,8 +541,10 @@ class MagLocator : public Service {
     uint32_t strengthMeasured = 0; // frames that measured it
     uint32_t strengthJumps = 0;    // times another magnet was taken at once (MAGLOC_STRENGTH_JUMP)
     void startLearningStrength( ); // k: hold it, and measure it again from scratch
+    void holdStrength( float strength ); // k<n>: a known magnet, held as measured
     void forgetStrength( );        // K: never hold it (fit it freely)
-    void restoreStrength( float strength ); // the settings' record at boot
+    void restoreStrength( float strength, bool measured ); // the settings' record at boot: `strength=<n> measured` is trusted as learned; a bare record (a default that was saved) is held but not trusted, so the first measurement over enough places takes it as on a fresh board
+    bool strengthIsMeasured = false;                 // the held strength came from the ring (this boot or a measured record), not from a default: what the settings write as ` measured`
 
     // How far the magnet's centre is up the shaft from the probe's point, and
     // the magnet's angle to the shaft.

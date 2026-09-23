@@ -120,7 +120,8 @@ int SettingsService::record( int step, char* out, int size ) {
         // The magnet's strength as learned (MagLocator::keepStrengthRecord
         // moves strengthSaved once the held value has stood a minute away
         // from it, so this is written a minute after a change at most).
-        return snprintf( out, size, "strength=%.0f\n", (double)magLocator.strengthSaved );
+        // ` measured` marks a strength the ring found (this boot or a measured record restored); a default is never written as if it had been measured.
+        return snprintf( out, size, "strength=%.0f%s\n", (double)magLocator.strengthSaved, magLocator.strengthIsMeasured ? " measured" : "" );
     }
     step--;
 #if MODULE_ROW_COUNT
@@ -230,9 +231,10 @@ int SettingsService::apply( const char* text ) {
                     applied++;
                 }
             } else if ( keyLength == 8 && strncmp( line, "strength", 8 ) == 0 ) {
-                float strength = strtof( value, nullptr );
+                char* end = nullptr;
+                float strength = strtof( value, &end );
                 if ( strength > 0.0f ) {
-                    magLocator.restoreStrength( strength );
+                    magLocator.restoreStrength( strength, end != nullptr && strstr( end, "measured" ) != nullptr );
                     applied++;
                 }
             } else if ( keyLength == 6 && strncmp( line, "anchor", 6 ) == 0 ) {

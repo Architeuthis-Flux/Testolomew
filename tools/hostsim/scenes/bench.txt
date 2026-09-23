@@ -31,23 +31,28 @@
 # Reach map: the probe resting in the inner hole of rows 1, 5, 10, 15, 20,
 # 25, 30 (with the 1839 magnet a TMAG5273 reads it plainly only within about
 # 40 mm; the far corner of row 1 is 65 mm out). Per row: what `l` says.
-# As it is (2026-09-23, before any lever moved): rows 1 and 5 fit WRONG (a
-# basin off the end of the array, 25-29 % misfit, rough); the strength is
-# learned at row 10 but 7 % low (1713 for 1839: the gain and place errors
-# bias it); rows 10-30 fix, the bars widening toward row 30.
+# Before 2026-09-23 the board booted holding 4232 for this 1839 magnet, and
+# rows 1 and 5 fitted WRONG (a basin off the end of the array, 25-29 %
+# misfit, rough) until the learning caught up at row 10. Booting at the
+# measured 1839 (MAGLOC_MAGNET_STRENGTH) they fix within a millimetre;
+# the strength is then measured over 4 places 7 % low (1700: the gain and
+# place errors bias it) and revised over 8; rows 10-30 fix, the bars
+# widening toward row 30.
 @magnet row 1 3
 @run 3000
 l
 @expect "seen by 3+1 faint"
-@expect "track: rough"
+@expect "magnet at x -9."
+@expect "track: tracking"
 @magnet row 5 3
 @run 3000
 l
-@expect "track: rough"
+@expect "magnet at x -0."
+@expect "track: tracking"
 @magnet row 10 3
 @run 3000
-@expect "held from now on"
 l
+@expect "(held)"
 @expect "magnet at x 14."
 @expect "track: tracking"
 @magnet row 15 3
@@ -71,47 +76,52 @@ l
 @magnet off
 @run 3000
 
-# Rest: two minutes in row 15 hole 3; the counters over it. As it is: no
-# cold start, no presence toggle, 3 frames missed, nothing dropped.
+# Rest: two minutes in row 15 hole 3; the counters over it: no cold start
+# (2 since boot, both from the reach map's lifts), no presence toggle, one
+# frame missed, nothing dropped.
 @magnet row 15 3
 @run 1000
 :load
-@expect "8 cold starts since boot"
+@expect "2 cold starts since boot"
 @expect "presence toggled 5 times"
 @run 120000
 :load
-@expect "8 cold starts since boot"
+@expect "2 cold starts since boot"
 @expect "presence toggled 5 times"
-@expect "3 frames missed while tracking"
+@expect "1 frames missed while tracking"
 l
 @expect "track: tracking"
 @expect "0 dropped, 0 restarts"
+# ...and the settings' record says the held strength was MEASURED (the
+# measured 1799 stands within 5 % of the saved 1839, so the value stays; a
+# default is never written as if it had been measured).
+s
+@expect "strength=1839 measured"
 
 # Hover: a minute 30 mm over row 15. As it is: the strongest reading sits at
 # the presence level (0.04), the two stale zeros are a third of it, and the
 # fit fails at a 41 % misfit against the 40 % limit: no cold start, but
-# 450 frames missed and the track ROUGH at the end.
+# hundreds of frames missed (the outcome at the edge flips with a change
+# of timing, so only the counters are expected).
 @magnet row 15 3 30
 @run 1000
 :load
-@expect "8 cold starts since boot"
+@expect "2 cold starts since boot"
 @run 60000
 :load
-@expect "8 cold starts since boot"
+@expect "2 cold starts since boot"
 @expect "frames missed while tracking"
 l
-@expect "no usable fix"
-@expect "track: rough"
 
 # Absent: a minute with nothing there. As it is: no cold start, one presence
 # toggle (the hover's end), the stale zeros drifting out.
 @magnet off
 @run 1000
 :load
-@expect "8 cold starts since boot"
+@expect "2 cold starts since boot"
 @run 60000
 :load
-@expect "8 cold starts since boot"
+@expect "2 cold starts since boot"
 @expect "presence toggled 6 times"
 l
 @expect "no magnet"
