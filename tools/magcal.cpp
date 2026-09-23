@@ -38,7 +38,8 @@ struct Sensor {
     float x, y;  // mm
     float z;     // mm above the TMAG plane (the MMC on the back sits at -2; not refined)
     float angle; // package rotation, degrees (the table's rotationDeg)
-    float gain;  // what its readings are multiplied by
+    float gain;  // what its X and Y readings are multiplied by
+    float gainZ; // ...and its Z: a Hall structure of its own (the datasheet: Z-vs-X/Y mismatch 1 %, its drift up to 15 %; 2026-09-23)
     bool zUp;    // the part's own +z points out of its top (an MMC56x3; false = into it, a TMAG5273: MagArray's magSensorToBoard)
     float ox, oy, oz; // an offset in the sensor's own frame, subtracted from its readings: the error of its zero at recording time (fitted for only= sensors)
     // (rangeMt is by type: MMC_RANGE_MT for zUp parts, TMAG_RANGE_MT else - a reading past
@@ -66,24 +67,24 @@ struct Frame {
 // first recording (2026-09-17-bench-array-calibration.txt) still replays:
 //   ./magcal recording.txt 53.4 100 first
 static Sensor firstTable[ SENSORS ] = {
-    { 0, 45, 0, 90, 1, false, 0, 0, 0 }, { 15, 45, 0, 90, 1, false, 0, 0, 0 }, { 30, 45, 0, 90, 1, false, 0, 0, 0 }, { 45, 45, 0, 90, 1, false, 0, 0, 0 },
-    { 0, 0, 0, 270, 1, false, 0, 0, 0 }, { 15, 0, 0, 270, 1, false, 0, 0, 0 }, { 30, 0, 0, 270, 1, false, 0, 0, 0 }, { 45, 0, 0, 270, 1, false, 0, 0, 0 },
-    { 26.7f, 22.1f, -2.0f, 0, 1, false, 0, 0, 0 }, // placeholder: the first recording had no MMC (8 columns), so this row is never used with it
+    { 0, 45, 0, 90, 1, 1.0f, false, 0, 0, 0 }, { 15, 45, 0, 90, 1, 1.0f, false, 0, 0, 0 }, { 30, 45, 0, 90, 1, 1.0f, false, 0, 0, 0 }, { 45, 45, 0, 90, 1, 1.0f, false, 0, 0, 0 },
+    { 0, 0, 0, 270, 1, 1.0f, false, 0, 0, 0 }, { 15, 0, 0, 270, 1, 1.0f, false, 0, 0, 0 }, { 30, 0, 0, 270, 1, 1.0f, false, 0, 0, 0 }, { 45, 0, 0, 270, 1, 1.0f, false, 0, 0, 0 },
+    { 26.7f, 22.1f, -2.0f, 0, 1, 1.0f, false, 0, 0, 0 }, // placeholder: the first recording had no MMC (8 columns), so this row is never used with it
 };
 static Sensor sensors[ SENSORS ] = {
-    { 0.10f, 44.29f, 0, 85.0f, 0.987f, false, 0, 0, 0 }, { 16.75f, 44.04f, 0, 89.3f, 0.985f, false, 0, 0, 0 }, { 38.78f, 43.95f, 0, 89.7f, 0.977f, false, 0, 0, 0 }, { 54.18f, 44.72f, 0, 91.7f, 0.968f, false, 0, 0, 0 },
-    { 0.00f, 0.00f, 0, 271.5f, 1.019f, false, 0, 0, 0 }, { 15.60f, 0.19f, 0, 271.9f, 1.015f, false, 0, 0, 0 }, { 37.37f, 0.42f, 0, 271.6f, 1.022f, false, 0, 0, 0 }, { 53.40f, 0.00f, 0, 271.8f, 1.028f, false, 0, 0, 0 },
+    { 0.10f, 44.29f, 0, 85.0f, 0.987f, 1.0f, false, 0, 0, 0 }, { 16.75f, 44.04f, 0, 89.3f, 0.985f, 1.0f, false, 0, 0, 0 }, { 38.78f, 43.95f, 0, 89.7f, 0.977f, 1.0f, false, 0, 0, 0 }, { 54.18f, 44.72f, 0, 91.7f, 0.968f, 1.0f, false, 0, 0, 0 },
+    { 0.00f, 0.00f, 0, 271.5f, 1.019f, 1.0f, false, 0, 0, 0 }, { 15.60f, 0.19f, 0, 271.9f, 1.015f, 1.0f, false, 0, 0, 0 }, { 37.37f, 0.42f, 0, 271.6f, 1.022f, 1.0f, false, 0, 0, 0 }, { 53.40f, 0.00f, 0, 271.8f, 1.028f, 1.0f, false, 0, 0, 0 },
     // The MMC56x3: the centre of the board, hanging under it, 2 mm below the TMAG plane. Measured 2026-09-21 (only=8 on
     // tools/recordings/2026-09-21-mmc-centre-calibration.txt): zUp = true, its +z reads up in the board frame (MagArrayConfig.h:
     // underside = false); the other face cost 40x more. The gain soaks up a height error (z is not refined).
-    { 27.65f, 25.13f, -2.0f, 260.7f, 1.129f, true, 0, 0, 0 },
+    { 27.65f, 25.13f, -2.0f, 260.7f, 1.129f, 1.0f, true, 0, 0, 0 },
 };
 static int sensorCount = SENSORS; // how many the recording carries (8 in the ones before 2026-09-20)
 // The rows the FIRMWARE had when the recording was made: the stream is in
 // the board frame through that table (MagArray's magSensorToBoard), and it
 // is undone through the same rows, whatever the table here says now. A copy
 // of `sensors` unless the recording says otherwise with a line
-//   # streamed-with <i> <x> <y> <z> <rotation> <gain> <zUp 0|1>
+//   # streamed-with <i> <x> <y> <z> <rotation> <gain> <zUp 0|1> [<gainZ>]
 // (2026-09-21: the MMC was streamed at rotation 0, gain 1, flipped; once
 // its measured row went into the table, decoding the stream through the
 // new row put the misfit at 34 % - the recording has to carry its rows).
@@ -109,21 +110,21 @@ static float rangeOf( const Sensor& sn ) { return sn.zUp ? MMC_RANGE_MT : TMAG_R
 
 // Same conventions as MagArray.cpp (top-side parts): a part whose own z
 // points into its top (the TMAG5273) is a half turn about x from the board.
-static Vec3 sensorToBoard( Vec3 r, float angleDeg, float gain, bool zUp ) {
+static Vec3 sensorToBoard( Vec3 r, float angleDeg, float gain, float gainZ, bool zUp ) {
     float a = angleDeg * (float)M_PI / 180.0f, c = cosf( a ), s = sinf( a );
     float x = r.x, y = zUp ? r.y : -r.y, z = zUp ? r.z : -r.z;
-    Vec3 b = { gain * ( x * c - y * s ), gain * ( x * s + y * c ), gain * z };
+    Vec3 b = { gain * ( x * c - y * s ), gain * ( x * s + y * c ), gainZ * z };
     return b;
 }
-static Vec3 boardToSensor( Vec3 f, float angleDeg, float gain, bool zUp ) {
+static Vec3 boardToSensor( Vec3 f, float angleDeg, float gain, float gainZ, bool zUp ) {
     float a = angleDeg * (float)M_PI / 180.0f, c = cosf( a ), s = sinf( a ), k = 1.0f / gain;
-    float y = k * ( -f.x * s + f.y * c ), z = k * f.z;
+    float y = k * ( -f.x * s + f.y * c ), z = f.z / gainZ;
     Vec3 r = { k * ( f.x * c + f.y * s ), zUp ? y : -y, zUp ? z : -z };
     return r;
 }
 
 static void matrixFromAngle( Sensor& sn ) {
-    Vec3 ex = sensorToBoard( { 1, 0, 0 }, sn.angle, sn.gain, sn.zUp ), ey = sensorToBoard( { 0, 1, 0 }, sn.angle, sn.gain, sn.zUp ), ez = sensorToBoard( { 0, 0, 1 }, sn.angle, sn.gain, sn.zUp );
+    Vec3 ex = sensorToBoard( { 1, 0, 0 }, sn.angle, sn.gain, sn.gainZ, sn.zUp ), ey = sensorToBoard( { 0, 1, 0 }, sn.angle, sn.gain, sn.gainZ, sn.zUp ), ez = sensorToBoard( { 0, 0, 1 }, sn.angle, sn.gain, sn.gainZ, sn.zUp );
     float m[ 3 ][ 3 ] = { { ex.x, ey.x, ez.x }, { ex.y, ey.y, ez.y }, { ex.z, ey.z, ez.z } };
     memcpy( sn.m, m, sizeof( m ) );
 }
@@ -164,9 +165,9 @@ static void fitPoses( float* meanMisfit, float* worstMisfit, int* fitted ) {
     *meanMisfit = n ? (float)( sum / n ) : 1; *worstMisfit = worst; *fitted = n;
 }
 
-// Weighted squared misfit of sensor i with trial parameters { x, y, rotation, gain, ox, oy, oz }, over all frames
+// Weighted squared misfit of sensor i with trial parameters { x, y, rotation, gain, ox, oy, oz, gainZ }, over all frames
 // (the offset, in the sensor's own frame, is what its zero was off by while the recording was made).
-static double sensorCost( int i, const float p[ 7 ] ) {
+static double sensorCost( int i, const float p[ 8 ] ) {
     double cost = 0;
     Vec3 place = { p[ 0 ], p[ 1 ], sensors[ i ].z };
     for ( size_t f = 0; f < frames.size( ); f++ ) {
@@ -174,7 +175,7 @@ static double sensorCost( int i, const float p[ 7 ] ) {
         if ( !fr.used || fr.clipped[ i ] ) continue;
         Vec3 model = magFitDipoleField( place, fr.pose.position, fr.pose.moment );
         Vec3 r = { fr.reading[ i ].x - p[ 4 ], fr.reading[ i ].y - p[ 5 ], fr.reading[ i ].z - p[ 6 ] };
-        Vec3 meas = sensorToBoard( r, p[ 2 ], p[ 3 ], sensors[ i ].zUp );
+        Vec3 meas = sensorToBoard( r, p[ 2 ], p[ 3 ], p[ 7 ], sensors[ i ].zUp );
         float w = 1.0f / ( fr.signal * fr.signal ); // every frame counts by its misfit RATIO
         cost += w * ( ( meas.x - model.x ) * ( meas.x - model.x ) + ( meas.y - model.y ) * ( meas.y - model.y ) + ( meas.z - model.z ) * ( meas.z - model.z ) );
     }
@@ -190,23 +191,23 @@ static double sensorCost( int i, const float p[ 7 ] ) {
 // bounded numbers per sensor cannot do that.)
 // The pattern search from p: the first four numbers (place, rotation, gain)
 // and, if withOffset, the sensor's zero error too.
-static double patternSearch( int i, float p[ 7 ], bool movable, bool withOffset ) {
-    float step[ 7 ] = { movable ? 1.0f : 0.0f, movable ? 1.0f : 0.0f, 2.0f, 0.02f, withOffset ? 0.01f : 0.0f, withOffset ? 0.01f : 0.0f, withOffset ? 0.01f : 0.0f };
+static double patternSearch( int i, float p[ 8 ], bool movable, bool withOffset ) {
+    float step[ 8 ] = { movable ? 1.0f : 0.0f, movable ? 1.0f : 0.0f, 2.0f, 0.02f, withOffset ? 0.01f : 0.0f, withOffset ? 0.01f : 0.0f, withOffset ? 0.01f : 0.0f, 0.02f };
     double best = sensorCost( i, p );
     for ( int round = 0; round < 60; round++ ) {
         bool improved = false;
-        for ( int k = 0; k < 7; k++ ) {
+        for ( int k = 0; k < 8; k++ ) {
             if ( step[ k ] == 0 ) continue;
             for ( int dir = -1; dir <= 1; dir += 2 ) {
-                float q[ 7 ];
+                float q[ 8 ];
                 memcpy( q, p, sizeof( q ) );
                 q[ k ] += dir * step[ k ];
-                if ( q[ 3 ] < 0.8f || q[ 3 ] > 1.2f ) continue; // a TMAG5273's (or MMC56x3's) gain error is a few percent
+                if ( q[ 3 ] < 0.8f || q[ 3 ] > 1.2f || q[ 7 ] < 0.8f || q[ 7 ] > 1.2f ) continue; // a TMAG5273's (or MMC56x3's) gain error is a few percent, on either axis
                 double c = sensorCost( i, q );
-                if ( c < best ) { best = c; memcpy( p, q, sizeof( float ) * 7 ); improved = true; break; }
+                if ( c < best ) { best = c; memcpy( p, q, sizeof( float ) * 8 ); improved = true; break; }
             }
         }
-        if ( !improved ) for ( int k = 0; k < 7; k++ ) step[ k ] *= 0.5f;
+        if ( !improved ) for ( int k = 0; k < 8; k++ ) step[ k ] *= 0.5f;
     }
     return best;
 }
@@ -220,12 +221,12 @@ static void refineSensor( int i, bool movable ) {
     // are searched from four starting angles first, the best kept, and only
     // then the offset joins the search.
     bool withOffset = onlyMode && onlyList[ i ];
-    float p[ 7 ] = { sensors[ i ].x, sensors[ i ].y, sensors[ i ].angle, sensors[ i ].gain, sensors[ i ].ox, sensors[ i ].oy, sensors[ i ].oz };
+    float p[ 8 ] = { sensors[ i ].x, sensors[ i ].y, sensors[ i ].angle, sensors[ i ].gain, sensors[ i ].ox, sensors[ i ].oy, sensors[ i ].oz, sensors[ i ].gainZ };
     if ( withOffset ) {
-        float bestP[ 7 ];
+        float bestP[ 8 ];
         double bestCost = 1e300;
         for ( int start = 0; start < 4; start++ ) {
-            float q[ 7 ] = { sensors[ i ].x, sensors[ i ].y, sensors[ i ].angle + 90.0f * start, 1.0f, 0, 0, 0 };
+            float q[ 8 ] = { sensors[ i ].x, sensors[ i ].y, sensors[ i ].angle + 90.0f * start, 1.0f, 0, 0, 0, 1.0f };
             double c = patternSearch( i, q, movable, false );
             if ( c < bestCost ) { bestCost = c; memcpy( bestP, q, sizeof( bestP ) ); }
         }
@@ -239,6 +240,7 @@ static void refineSensor( int i, bool movable ) {
     sensors[ i ].ox = p[ 4 ];
     sensors[ i ].oy = p[ 5 ];
     sensors[ i ].oz = p[ 6 ];
+    sensors[ i ].gainZ = p[ 7 ];
     matrixFromAngle( sensors[ i ] );
 }
 
@@ -256,6 +258,7 @@ static void fixGauge( float span ) {
     }
     for ( int i = 0; i < SENSORS; i++ ) {
         sensors[ i ].gain *= sensorCount / gainSum; // overall gain is not observable: a stronger magnet looks the same
+        sensors[ i ].gainZ *= sensorCount / gainSum; // ...and Z keeps its ratio to X/Y, which is
         matrixFromAngle( sensors[ i ] );
     }
 }
@@ -282,11 +285,13 @@ int main( int argc, char** argv ) {
     memcpy( streamTable, sensors, sizeof( streamTable ) );
     while ( fgets( line, sizeof( line ), in ) ) {
         if ( strncmp( line, "# streamed-with ", 16 ) == 0 ) {
-            int i = -1, zUp = 0; float x, y, z, rot, gain;
-            if ( sscanf( line + 16, "%d %f %f %f %f %f %d", &i, &x, &y, &z, &rot, &gain, &zUp ) == 7 && i >= 0 && i < SENSORS ) {
-                streamTable[ i ].x = x; streamTable[ i ].y = y; streamTable[ i ].z = z; streamTable[ i ].angle = rot; streamTable[ i ].gain = gain; streamTable[ i ].zUp = zUp != 0;
+            int i = -1, zUp = 0; float x, y, z, rot, gain, gainZ = 1.0f;
+            int got = sscanf( line + 16, "%d %f %f %f %f %f %d %f", &i, &x, &y, &z, &rot, &gain, &zUp, &gainZ ); // the Z gain is the eighth number, 1 in recordings before 2026-09-23
+            if ( got >= 7 && i >= 0 && i < SENSORS ) {
+                if ( got < 8 ) gainZ = 1.0f;
+                streamTable[ i ].x = x; streamTable[ i ].y = y; streamTable[ i ].z = z; streamTable[ i ].angle = rot; streamTable[ i ].gain = gain; streamTable[ i ].gainZ = gainZ; streamTable[ i ].zUp = zUp != 0;
                 streamTableGiven[ i ] = true;
-                printf( "sensor %d was streamed through x %.2f y %.2f rotation %.1f gain %.3f z %s (the recording says)\n", i, x, y, rot, gain, zUp ? "up" : "down" );
+                printf( "sensor %d was streamed through x %.2f y %.2f rotation %.1f gain %.3f (z %.3f) z %s (the recording says)\n", i, x, y, rot, gain, gainZ, zUp ? "up" : "down" );
             } else printf( "cannot read: %s", line );
             continue;
         }
@@ -307,7 +312,7 @@ int main( int argc, char** argv ) {
             fr.clipped[ i ] = axisMax > CLIP_FRACTION * rangeOf( streamTable[ i ] ) / streamTable[ i ].gain; // (the stream is gained; compare in the part's own scale)
             if ( fr.clipped[ i ] ) { clipped++; continue; }
             sumSq += m * m; if ( m > peak ) peak = m; if ( m > SEEN_MT ) seen++;
-            fr.reading[ i ] = boardToSensor( b, streamTable[ i ].angle, streamTable[ i ].gain, streamTable[ i ].zUp ); // the firmware's rows, not this table's
+            fr.reading[ i ] = boardToSensor( b, streamTable[ i ].angle, streamTable[ i ].gain, streamTable[ i ].gainZ, streamTable[ i ].zUp ); // the firmware's rows, not this table's
         }
         fr.signal = sqrtf( (float)sumSq / ( 3 * ( sensorCount - clipped ) ) );
         // Keep frames enough sensors see clearly, and none with the magnet so close that it is no dipole.
@@ -360,10 +365,10 @@ int main( int argc, char** argv ) {
                 sensors[ i ].zUp = sense == 0 ? asTable.zUp : !asTable.zUp;
                 matrixFromAngle( sensors[ i ] );
                 for ( int round = 0; round < 2; round++ ) refineSensor( i, true );
-                float p[ 7 ] = { sensors[ i ].x, sensors[ i ].y, sensors[ i ].angle, sensors[ i ].gain, sensors[ i ].ox, sensors[ i ].oy, sensors[ i ].oz };
+                float p[ 8 ] = { sensors[ i ].x, sensors[ i ].y, sensors[ i ].angle, sensors[ i ].gain, sensors[ i ].ox, sensors[ i ].oy, sensors[ i ].oz, sensors[ i ].gainZ };
                 double c = sensorCost( i, p );
-                printf( "sensor %d with z %s: x %.2f y %.2f rotation %.1f gain %.3f, its zero off by (%+.4f %+.4f %+.4f) mT in its own frame, cost %.4g\n", i,
-                        sensors[ i ].zUp ? "up" : "down", p[ 0 ], p[ 1 ], p[ 2 ], p[ 3 ], p[ 4 ], p[ 5 ], p[ 6 ], c );
+                printf( "sensor %d with z %s: x %.2f y %.2f rotation %.1f gain %.3f (z %.3f), its zero off by (%+.4f %+.4f %+.4f) mT in its own frame, cost %.4g\n", i,
+                        sensors[ i ].zUp ? "up" : "down", p[ 0 ], p[ 1 ], p[ 2 ], p[ 3 ], p[ 7 ], p[ 4 ], p[ 5 ], p[ 6 ], c );
                 if ( c < bestCost ) { bestCost = c; best = sensors[ i ]; }
             }
             sensors[ i ] = best;
@@ -380,10 +385,10 @@ int main( int argc, char** argv ) {
         }
     }
 
-    printf( "\n #     x_mm    y_mm   rotation   gain\n" );
+    printf( "\n #     x_mm    y_mm   rotation   gain   gainZ\n" );
     for ( int i = 0; i < sensorCount; i++ ) {
         bool mmc = i >= 8; // (the MMC slots; a TMAG's z sense is not searched)
-        printf( " %d  %7.2f %7.2f   %7.1f   %5.3f%s\n", i, sensors[ i ].x, sensors[ i ].y, sensors[ i ].angle, sensors[ i ].gain,
+        printf( " %d  %7.2f %7.2f   %7.1f   %5.3f  %5.3f%s\n", i, sensors[ i ].x, sensors[ i ].y, sensors[ i ].angle, sensors[ i ].gain, sensors[ i ].gainZ,
                 !mmc ? "" : ( sensors[ i ].zUp ? "   (MMC56x3, z up: underside = false in the table)" : "   (MMC56x3, z DOWN: underside = true in the table)" ) );
     }
 
