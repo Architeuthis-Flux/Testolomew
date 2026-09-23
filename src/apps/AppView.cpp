@@ -424,7 +424,7 @@ static void drawText( ) {
         snprintf( line, sizeof( line ), "x%.1f y%.1f z%.1f", fix.magnet.x, fix.magnet.y, fix.magnet.z );
         textAt( canvas, 2, 2, T, COLOR_TEXT, line );
         snprintf( line, sizeof( line ), "+-%.1f %s%.0f %.0f%%%s", fix.errorMm, fix.rough ? "rough " : "tilt", fix.rough ? fix.errorMm : fix.tiltDeg, fix.misfit * 100.0f,
-                  magLocator.learning( ) ? " ?" : ( magLocator.knownStrength > 0.0f ? " =" : "" ) );
+                  magLocator.knownStrength > 0.0f ? " =" : "" );
         textAt( canvas, 2, 2 + H, T, COLOR_TEXT_DIM, line );
 #if MODULE_ROW_COUNT
         // Row mode: the counted row, large, coloured by how sure the track (or

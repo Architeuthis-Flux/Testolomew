@@ -83,15 +83,18 @@ static void onParkForFlash( Stream* out ) {
     out->flush( );
 }
 
-static void onWeightCap( Stream* out ) {
-    long tenths = consoleReadNumber( out, "how much more the fit trusts the quieter sensor types, in tenths (20 = 2.0x a TMAG5273; 0 = every sensor equal), then Enter: ", 8000 );
-    if ( tenths < 0 || tenths > 1000 ) {
-        out->println( "no number (0-1000) - nothing changed" );
+// :weight <cap> - how much more the fit trusts the quieter sensor types
+// (40 = up to 40x a TMAG5273, the boot default; 0 = every sensor equal).
+// (It was the `w` key, which the play score's `w` shadowed: 2026-09-22.)
+static void onWeightVerb( int argc, char** argv, Stream* out ) {
+    float cap = argc >= 2 ? (float)atof( argv[ 1 ] ) : -1.0f;
+    if ( argc < 2 || cap < 0.0f || cap > 100.0f ) {
+        consoleErr( out, "usage: :weight <cap> (0-100; 40 = the boot default, 0 = every sensor equal)" );
         return;
     }
-    magArray.setWeightCap( tenths / 10.0f );
+    magArray.setWeightCap( cap );
     char line[ 160 ];
-    snprintf( line, sizeof( line ), "weight cap %.1f (MAG_WEIGHT_CAP makes it permanent); weights now:", tenths / 10.0f );
+    snprintf( line, sizeof( line ), "weight cap %.1f (MAG_WEIGHT_CAP makes it permanent); weights now:", cap );
     out->print( line );
     for ( int i = 0; i < MAG_SENSOR_COUNT; i++ ) {
         snprintf( line, sizeof( line ), " %d:%.1f", i, magArray.weight[ i ] );
@@ -102,7 +105,12 @@ static void onWeightCap( Stream* out ) {
 
 static void onMmcVerb( int argc, char** argv, Stream* out ) {
     if ( argc < 2 ) {
-        out->println( "usage: :mmc <sensor> [cfg <odrHz> <bw 0-3> <autoSR 0|1>]" );
+        consoleErr( out, "usage: :mmc on|off (the MMC56x3 in or out of the fit; the menu's sensors/use MMC) | :mmc <sensor> [cfg <odrHz> <bw 0-3> <autoSR 0|1>]" );
+        return;
+    }
+    if ( strcmp( argv[ 1 ], "on" ) == 0 || strcmp( argv[ 1 ], "off" ) == 0 ) {
+        magArray.useMmc = argv[ 1 ][ 1 ] == 'n';
+        consoleOk( out, magArray.useMmc ? "the MMC56x3 is in the fit (and presence, and the far regime)" : "the MMC56x3 is out: read and shown, ignored by the locator - the eight TMAG5273s as before" );
         return;
     }
     int i = atoi( argv[ 1 ] );
@@ -279,8 +287,8 @@ int MagArray::begin( bool zero ) {
         consoleAddCommand( 'i', "identify: show the strongest sensor (toggle)", onIdentify );
         consoleAddCommand( 'b', "bus check: pull-ups, and what answers with each sensor powered alone", onBusCheck );
         consoleAddCommand( 'F', "before a reflash: stop the sampler and park the other core (it fetches the flash being written); reset brings it back", onParkForFlash );
-        consoleAddCommand( 'w', "weight cap: how much more the fit trusts the quieter sensor types (w400<Enter> = 40.0, the boot default; w20 = 2.0; 0 = equal)", onWeightCap );
-        consoleAddVerb( "mmc", "<sensor> [cfg <odrHz> <bw 0-3> <autoSR 0|1>]", "an MMC56x3's status and raw data three times 50 ms apart, reconfigured first if asked", CONSOLE_CHANGES, onMmcVerb );
+        consoleAddVerb( "weight", "<cap>", "how much more the fit trusts the quieter sensor types (40 = the boot default; 0 = every sensor equal)", CONSOLE_CHANGES, onWeightVerb );
+        consoleAddVerb( "mmc", "on|off | <sensor> [cfg <odrHz> <bw 0-3> <autoSR 0|1>]", "the MMC56x3 in or out of the fit (the menu's sensors/use MMC); or its status and raw data three times 50 ms apart, reconfigured first if asked", CONSOLE_CHANGES, onMmcVerb );
         consoleAddVerb( "watch", "<sensor>[,<sensor>...]|all|off", "look for sensors every half second while they are wired; the screen shows a line per sensor, green when it answers", CONSOLE_CHANGES, onWatchVerb );
     }
 
@@ -897,7 +905,7 @@ void MagArray::restoreBaseline( const Vec3* list, const bool* have, int count, c
 }
 
 bool MagArray::usedInFit( int i ) const {
-    if ( !fresh[ i ] ) {
+    if ( !fresh[ i ] || ignored( i ) ) {
         return false;
     }
     if ( trustAllSensors ) {
@@ -1322,6 +1330,7 @@ int MagArray::enabledCount( ) const {
 void MagArray::useSimulatedFrames( ) {
     simulatedFrames = true;
     trustAllSensors = true;
+    useMmc = true; // the simulated MMC56x3 is perfect: the benches (pencil, soak) keep their numbers, the scenes say :mmc on|off themselves
     samplerOn = false;
     for ( int i = 0; i < MAG_SENSOR_COUNT; i++ ) {
         zeroKnown[ i ] = true;
@@ -1531,7 +1540,7 @@ void MagArray::printStatus( Stream* out ) const {
             }
             snprintf( part, sizeof( part ), "TMAG5273%c%d", variant, s.dev.version );
         }
-        const char* fitUse = !magSensorPlaces[ i ].calibrated ? "uncal" : ( !zeroKnown[ i ] ? "nozero" : ( zeroProvisional[ i ] ? "prov" : "y" ) );
+        const char* fitUse = ignored( i ) ? "off" : ( !magSensorPlaces[ i ].calibrated ? "uncal" : ( !zeroKnown[ i ] ? "nozero" : ( zeroProvisional[ i ] ? "prov" : "y" ) ) );
         snprintf( line, sizeof( line ), "%2d  %3d  0x%02X  %-12s  %5.1f  %6.1f %5.1f  %3.1f  %-5s  %5u  %5lu  %+6.3f  %+6.3f  %+6.3f        %5.1f",
                   i, s.bus, s.address, part, s.rangeMt, position[ i ].x, position[ i ].y, weight[ i ], fitUse,
                   s.fails, (unsigned long)s.recoveries, field[ i ].x, field[ i ].y, field[ i ].z, temperatureC[ i ] );

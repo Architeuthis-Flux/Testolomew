@@ -10,7 +10,7 @@
 //
 // Console: d = stream fixes as CSV, l = one-line summary of the latest fix,
 // o = orientation check (which mounting of the sensors explains a held magnet),
-// k = learn this magnet's strength and hold the fit to it, K = forget it,
+// k = hold the magnet's strength and measure it again from scratch, K = fit it freely,
 // t = the magnet's centre is this far up the probe from its point (t12<Enter>),
 // T = the magnet's angle to the shaft (T90<Enter> = a disc lying flat on it),
 // u = cursor under the tip / where it points, S = surface height, g = tracker on/off.
@@ -75,6 +75,16 @@
 // (2026-09-22: 470 rejected cold starts before the board went quiet).
 // Without an MMC read this frame the old rule stands.
 #define MAGLOC_PRESENT_TMAGS 2
+// A sensor not read this frame: for this many frames its last smoothed
+// reading still says what is there - for presence and the counts, not the
+// fit. (The MMC56x3 on its hand-wired bus misses a frame every second or
+// so - 2026-09-22: with the probe lying beside the board, seen by the MMC
+// alone, its every missed frame ended the track "nothing present" and the
+// next frame found it again: 1030 times in 24 minutes, a flicker on the
+// LEDs.) The MMC's misses come in bursts of a frame or two (a NACK burst
+// of ~12 ms), so five frames; its return after three restarts its history
+// (filterFrame's resync) as before.
+#define MAGLOC_MISSED_HOLD_FRAMES 5
 // A far cold start the TMAGs disown (the consistency test) is a zero error
 // at the MMC, not a probe: the next try waits this long, not MAGLOC_FAR_RETRY_MS.
 #define MAGLOC_PHANTOM_RETRY_MS 2000
@@ -139,11 +149,18 @@
 // offered as a fix at all.
 #define MAGLOC_MAX_ERROR_MM 15.0f
 
-// The probe's magnet strength, mT*mm^3, if known: the fit then holds it fixed,
-// which about halves the height noise (see magFitSolveKnownStrength). 0 = not
-// known, fit it freely. The `k` console command measures it from live fixes
-// and locks it until reset; put the number it prints here to make it stick.
-#define MAGLOC_MAGNET_STRENGTH 4232.0f // the probe's (MAGLOC_REFERENCE_STRENGTH, 2026-09-18; tools/magcal found 4213 +/- 4.5 % on the 2026-09-21 recording)
+// The probe's magnet strength, mT*mm^3, that the fit starts out holding
+// (held, the height noise about halves - magFitSolveKnownStrength - and far
+// out it is what makes a fix at all). It is LEARNED from the first near
+// fixes on (MAGLOC_STRENGTH_*, MagLocator::measureStrength) and held at
+// what was learned, across boots too (settings: strength=): a weaker
+// magnet is not a setting to get right. (2026-09-22: "a bit weaker than
+// earlier" - held at 4232, a magnet of 2100 fitted 5 mm too high and 20-40
+// mm off along the board, "valid" at a 24 % misfit and a 1.6 mm bar, and
+// the row calibration never took a tap: the fitted height failed its
+// on-the-board test. Held at 2900 the taps took, 3 mm high and up to 6 mm
+// off.) 0 = never hold it (the console's K).
+#define MAGLOC_MAGNET_STRENGTH 4232.0f // the probe's of 2026-09-18 (tools/magcal found 4213 +/- 4.5 % on the 2026-09-21 recording)
 // Why it is held from boot rather than learned (2026-09-21): far from the
 // array only the MMC56x3 reads the magnet plainly, and its three numbers
 // are fitted EXACTLY by a weak magnet just over it or the real one far up -
@@ -161,10 +178,41 @@
 // two or three, and a frame's fit must not run long (the supply shows it).
 #define MAGLOC_REFINE_ITERATIONS 8
 
-// Learning the strength: this many good free fixes, and what counts as good.
-#define MAGLOC_LEARN_FIXES 150
+// Learning the strength (the comment at MAGLOC_MAGNET_STRENGTH): a frame
+// measures it when this many sensors read the magnet PLAINLY (the readings
+// pin the strength themselves; the free fit runs with no hint) and the free
+// fit is sharp (misfit, error bar). The answers go into a ring; the held
+// strength is TAKEN from the ring's median once the ring is MIN_SAMPLES
+// deep and its middle half agrees to MAX_SPREAD - once, and then held
+// still: a value that followed the median drifted with each place's own
+// few percent of calibration bias, and fixes taken a few seconds apart
+// disagreed (the tip solve from three angles went from 0.03 to 0.18 mm rms
+// in the sim). It is taken again when the median is JUMP away (another
+// magnet: at once), after `k`, or when the median has sat RETAKE_STEP
+// away for RETAKE_FRAMES measuring frames (a slow, real change, thirty
+// seconds of near fixes). The settings keep it once it has stood SAVE_STEP
+// from what they hold for SAVE_MS (one write a minute at most).
 #define MAGLOC_LEARN_MAX_MISFIT 0.10f
 #define MAGLOC_LEARN_MIN_SENSORS 5
+#define MAGLOC_STRENGTH_MAX_ERROR_MM 3.0f
+#define MAGLOC_STRENGTH_RING 32
+#define MAGLOC_STRENGTH_MIN_SAMPLES 16
+#define MAGLOC_STRENGTH_MAX_SPREAD 0.10f
+#define MAGLOC_STRENGTH_JUMP 0.20f
+#define MAGLOC_STRENGTH_RETAKE_STEP 0.05f
+#define MAGLOC_STRENGTH_RETAKE_FRAMES 3000
+// ...and a measurement is the median over PLACES: each full, agreeing ring
+// whose mean position is PLACE_APART from every place remembered adds a
+// place (the last PLACES kept); the strength is taken from MIN_PLACES of
+// them. One place's answer carries that place's own calibration bias (the
+// sim's 1-2 %, the bench's ±4.5 %), and frozen in it put the far fix and
+// the tip solve off; over places it averages out. (A jump - another
+// magnet - is taken from the ring alone, wherever the probe is.)
+#define MAGLOC_STRENGTH_PLACES 8
+#define MAGLOC_STRENGTH_MIN_PLACES 4
+#define MAGLOC_STRENGTH_PLACE_APART_MM 5.0f
+#define MAGLOC_STRENGTH_SAVE_STEP 0.05f
+#define MAGLOC_STRENGTH_SAVE_MS 60000
 // Settling a provisional zero (MagArray::zeroProvisional): after this many
 // good fixes running, and only when the magnet's field at the sensor is at
 // least this much (else nothing can be told about its zero).
@@ -262,9 +310,13 @@
 // 542 cold starts in three minutes with nothing there.)
 #define MAGLOC_CONFIRM_MIN_MT 0.012f
 #define MAGLOC_CONFIRM_MIN_GAIN 0.5f
-// The fast absorb runs only on a sensor whose smoothed reading has been
-// steady - within this fraction of a slow average of itself: a zero error
-// is static, a probe in a hand moves.
+// The fast absorb runs only on a sensor whose reading has been steady -
+// the reading AS MEASURED, before the baseline, smoothed, within this
+// fraction (of the baseline-removed reading's size) of a slow average of
+// itself: a zero error is static, a probe in a hand moves. (Judged on the
+// baseline-removed reading it ran in bursts, the absorb itself unsteadying
+// the sensor: a probe lying beside the board flapped the far track once a
+// second for twelve minutes, 2026-09-22 evening.)
 #define MAGLOC_STEADY_FRACTION 0.10f
 #define MAGLOC_STEADY_ALPHA 0.02f
 // ...and a far track rides through this many frames that do not make it
@@ -470,16 +522,24 @@ class MagLocator : public Service {
     uint32_t coldWhyAbsent = 0, coldWhyFew = 0, coldWhyMisses = 0, coldWhyRejected = 0; // what ended the track before each cold start: nothing present, too few noticing, the misses run out, a far cold start rejected
     uint32_t staleFrames[ MAGFIT_MAX_SENSORS ] = { 0 }; // frames in which a sensor was not read (the MMC56x3's 150 Hz against 100 Hz frames)
     uint32_t reacquired = 0, reacquireTries = 0; // times a lost track was found again from where it last was (MAGLOC_REACQUIRE_MS), and the frames that tried
+    uint32_t presenceHeldFrames = 0; // frames in which presence rested on a sensor's last reading, the sensor not read that frame (MAGLOC_MISSED_HOLD_FRAMES)
     uint32_t coldStarts = 0, coldStartUs = 0, coldSliceMaxUs = 0; // cold starts since boot; the last one's cost in all, and its longest slice (one per frame)
     void simProbeSet( Vec3 position, Vec3 shaft, float sigmaMm, bool rough, uint32_t ms );
     void simProbeOff( );
     bool simProbeActive( ) const { return sim.on; }
 
-    // The magnet strength the fit is held to (0 = free), and learning it.
+    // The magnet strength the fit is held to (0 = free: K), learned from
+    // the near fixes (MAGLOC_STRENGTH_*; the comment at MAGLOC_MAGNET_STRENGTH).
     float knownStrength = MAGLOC_MAGNET_STRENGTH;
-    void startLearningStrength( );
-    void forgetStrength( );
-    bool learning( ) const { return learnCount >= 0; }
+    float strengthMedian = 0.0f;   // the ring's median, the last time it was deep enough (0 = not yet)
+    int strengthPlaces( ) const { return strengthPlaceCount; }
+    float strengthSpread = 0.0f;   // ...and its middle half's spread, relative
+    float strengthSaved = MAGLOC_MAGNET_STRENGTH; // what the settings hold (they write it when this changes)
+    uint32_t strengthMeasured = 0; // frames that measured it
+    uint32_t strengthJumps = 0;    // times another magnet was taken at once (MAGLOC_STRENGTH_JUMP)
+    void startLearningStrength( ); // k: hold it, and measure it again from scratch
+    void forgetStrength( );        // K: never hold it (fit it freely)
+    void restoreStrength( float strength ); // the settings' record at boot
 
     // How far the magnet's centre is up the shaft from the probe's point, and
     // the magnet's angle to the shaft.
@@ -543,9 +603,18 @@ class MagLocator : public Service {
     uint32_t farRetryUntilMs = 0; // a far retry's wait, honoured in the steady load too
     int misses = 0; // frames in a row that would not fit, while tracking
     uint32_t streamTick = 0;
-    int learnCount = -1; // -1 = not learning, else good fixes collected so far
-    float learned[ MAGLOC_LEARN_FIXES ];
-    void learnFrom( float strength );
+    float strengthRing[ MAGLOC_STRENGTH_RING ]; // the free fit's strengths, the last frames that measured it
+    int strengthRingAt = 0, strengthRingCount = 0;
+    bool strengthTaken = false;    // the held strength has been measured (or restored): the ring only watches for a change now
+    uint32_t strengthAwayFrames = 0; // measuring frames in a row with the median MAGLOC_STRENGTH_RETAKE_STEP from the held value
+    Vec3 strengthRingPlace[ MAGLOC_STRENGTH_RING ]; // where each ring entry was measured
+    Vec3 strengthPlace[ MAGLOC_STRENGTH_PLACES ];   // the places measured at (MAGLOC_STRENGTH_PLACE_APART_MM apart)...
+    float strengthPlaceValue[ MAGLOC_STRENGTH_PLACES ]; // ...and the ring's median at each
+    int strengthPlaceCount = 0, strengthPlaceAt = 0;
+    float strengthPlaceMedian = 0.0f; // the median over the places (0 = fewer than MIN_PLACES yet)
+    void measureStrength( float strength, Vec3 at );
+    uint32_t strengthAwaySinceMs = 0; // since when the held strength has been MAGLOC_STRENGTH_SAVE_STEP from the settings' (0 = it is not)
+    void keepStrengthRecord( uint32_t nowMs );
 
     uint32_t lastTrackUs = 0;
     uint32_t checkedBaseline = 0;          // magArray.baselineCount last checked
@@ -568,6 +637,8 @@ class MagLocator : public Service {
         uint32_t nowMs = 0;
         float weights[ MAGFIT_MAX_SENSORS ]; // each sensor's weight in the fit this frame
         float held = 0.0f;                   // the strength held (0 = free)
+        int plain = 0;                       // sensors reading plainly (plainHere)
+        bool hintFree = false;               // the free fit ran with no strength hint: the readings pinned it (a measurement)
         bool enough = false;                 // enough sensors notice it to try a fit
         bool farOnly = false;                // the fit rests on fewer than two sensors seeing it plainly
         bool good = false;                   // the fit's verdict
@@ -593,7 +664,8 @@ class MagLocator : public Service {
     void auditZeros( const FrameScratch& f );
     float chiOf( const MagFitResult& r, const bool* use ) const; // the rms of residual over expected error over the sensors that voted
     void tmagConsistency( const MagFitResult& r, const bool* use, float* gain, float* predRms ) const; // the TMAGs' readings on the fit's predictions
-    Vec3 slowRef[ MAGFIT_MAX_SENSORS ] = { }; // a slow average of each smoothed reading, for MAGLOC_STEADY_FRACTION
+    Vec3 rawSmooth[ MAGFIT_MAX_SENSORS ] = { }; // each reading as measured (before the baseline), smoothed like `smooth`
+    Vec3 slowRef[ MAGFIT_MAX_SENSORS ] = { };   // a slow average of rawSmooth, for MAGLOC_STEADY_FRACTION
     bool absorbing[ MAGFIT_MAX_SENSORS ] = { false }; // this sensor's zero is following its reading fast (MAGLOC_ABSORB_FAST) until it reads quiet // true if it was offered
 
     Vec3 pointerOf( Vec3 tip, Vec3 shaft ) const;

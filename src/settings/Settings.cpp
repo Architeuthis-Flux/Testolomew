@@ -116,6 +116,13 @@ int SettingsService::record( int step, char* out, int size ) {
                          (double)( roundf( magLocator.lastGoodStrength / 20.0f ) * 20.0f ) );
     }
     step--;
+    if ( step == 0 ) {
+        // The magnet's strength as learned (MagLocator::keepStrengthRecord
+        // moves strengthSaved once the held value has stood a minute away
+        // from it, so this is written a minute after a change at most).
+        return snprintf( out, size, "strength=%.0f\n", (double)magLocator.strengthSaved );
+    }
+    step--;
 #if MODULE_ROW_COUNT
     const RowAnchor* anchors;
     int count = rowCounter.anchorList( &anchors );
@@ -220,6 +227,12 @@ int SettingsService::apply( const char* text ) {
                     magLocator.lastGoodAxis = a;
                     magLocator.lastGoodStrength = strength;
                     magLocator.haveLastGood = true;
+                    applied++;
+                }
+            } else if ( keyLength == 8 && strncmp( line, "strength", 8 ) == 0 ) {
+                float strength = strtof( value, nullptr );
+                if ( strength > 0.0f ) {
+                    magLocator.restoreStrength( strength );
                     applied++;
                 }
             } else if ( keyLength == 6 && strncmp( line, "anchor", 6 ) == 0 ) {

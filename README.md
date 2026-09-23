@@ -41,7 +41,7 @@ The board boots with its last zero: the array is zeroed once (`z`, with the prob
 | `p` | power-cycle and re-address every sensor |
 | `i` | identify: print which sensor reads strongest |
 | `b` | bus check: are there pull-ups on SCL/SDA (each bus), and what acknowledges with each sensor powered alone; whether the fixed-address parts answer |
-| `w` | weight cap: how much more the fit trusts the quieter sensor type, `w20⏎` = 2.0× a TMAG5273 (`MAG_WEIGHT_CAP`), `w0⏎` = every sensor equal |
+| `:weight <cap>` | weight cap: how much more the fit trusts the quieter sensor type, `:weight 2` = 2.0× a TMAG5273 (`MAG_WEIGHT_CAP` 40), `:weight 0` = every sensor equal (`w` is the play score) |
 | `:mmc <i> [cfg <odr> <bw> <autoSR>]` | an MMC56x3's Status1 and raw data bytes three times, 50 ms apart, from the main core; reconfigured first if asked |
 | `:watch <i>[,<j>...]|all|off` | while wiring: the listed sensors are looked for every half second and a banner on the screen shows a line per sensor, red with a clock until it answers, green blinking with its product ID and read count once it does |
 | `q`, `Q` | tip calibration: the point resting in one hole, `q` at each of three or more angles, `Q` solves the magnet-to-point distance and uses it (saved as cursor/tip) |
@@ -50,7 +50,8 @@ The board boots with its last zero: the array is zeroed once (`z`, with the prob
 | `F` | before a reflash by hand: stop the sampler and park the other core in ITCM (it would otherwise fetch the flash being written and the program would fail); nothing is read until the reset after the flash. `pio run -t upload` sends it itself |
 | `f` | stream field frames as CSV |
 | `l` | latest probe fix, with its own ± error bar in mm on each axis, and how many sensors see the magnet plainly + faintly |
-| `k` / `K` | learn this magnet's strength and hold the fit to it (steadier height) / forget it |
+| `k` / `K` | the magnet's strength is learned from the near fixes and held (steadier height, and the far probe needs it); `k` = measure it again from scratch, `K` = never hold it |
+| `:mmc on` / `:mmc off` | the MMC5633NJL in the fit, or read and shown but ignored (the eight TMAG5273s alone; the menu's `sensors / use MMC`, saved, OFF by default since 2026-09-22) |
 | `t` | where the probe's point is: `t12⏎` = the magnet's centre is 12 mm up the shaft from the point. The magnet is magnetised along the shaft, so its pole direction is the shaft, and the point is that far down it (down = the lower end; a probe is not held upside down). `MAGLOC_TIP_OFFSET_MM` makes it permanent |
 | `o` | orientation check: with a magnet held 1–2 cm over the array, which row order / rotation / board side explains it |
 | `d` | stream probe fixes as CSV (the columns after `raw_z` are the tracker's: state, position, bar, cursor, gate distance, drops) |

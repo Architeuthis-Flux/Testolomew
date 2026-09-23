@@ -95,7 +95,7 @@ class WorldService : public Service {
     bool on = false;
     Vec3 magnet = { 0, 0, 0 };
     Vec3 shaft = { 0, 0, 1 };
-    float strength = 4200.0f;
+    float strength = MAGLOC_MAGNET_STRENGTH; // the probe's, as the locator starts out holding (@strength changes it)
     float surfaceZ = MAGLOC_BOARD_Z_MM; // @surface: where the board's top really is (the locator's setting is its belief)
     float tipMm = -1.0f; // @tip: the magnet's centre this far up the shaft from the point (-1 = whatever the locator believes)
     float noise = 0.010f; // a TMAG5273's per-axis noise a frame at the reference (0.011 mT): 0.012 on the bench (2026-09-21), the MMC's 0.0003 by its ratio
@@ -427,6 +427,8 @@ static bool directive( const std::vector<std::string>& w, int lineNo ) {
         world.surfaceZ = (float)atof( w[ 1 ].c_str( ) );
     } else if ( d == "@tip" && w.size( ) >= 2 ) {
         world.tipMm = (float)atof( w[ 1 ].c_str( ) );
+    } else if ( d == "@strength" && w.size( ) >= 2 ) {
+        world.strength = (float)atof( w[ 1 ].c_str( ) ); // the magnet's |moment|, mT*mm^3 (the locator holds MAGLOC_MAGNET_STRENGTH)
     } else if ( d == "@gain" && w.size( ) >= 3 ) {
         int i = atoi( w[ 1 ].c_str( ) );
         if ( i >= 0 && i < MAG_SENSOR_COUNT )

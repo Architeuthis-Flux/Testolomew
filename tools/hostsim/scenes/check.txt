@@ -1,6 +1,9 @@
 # The regression set: `make check`. Every line's output is checked with
 # @expect against what the firmware printed for that line.
 
+# The regression runs with the MMC56x3 in (the board boots with it out: MAG_USE_MMC_AT_BOOT).
+:mmc on
+
 # The verbs are there.
 :help
 @expect "help{"
@@ -298,6 +301,7 @@
 # A reset leaves the modes alone: the chain stays on, row mode stays on.
 @strip on
 Z
+:mmc on
 @run 500
 :screen
 @expect "row: 14 hole 3"
@@ -339,7 +343,9 @@ s
 # The tip offset from taps (2026-09-21 night): the probe's magnet 6 mm up the
 # shaft from its point, the locator believing 0. The point rests in row 20
 # hole 2 at three angles, q takes each, Q solves t - and a tap at 40 degrees
-# then lights the row tapped, not the one the shaft points at.
+# then lights the row tapped, not the one the shaft points at. (The agreement
+# is 0.14 mm with the boot strength held - one hole measures no strength, see
+# MAGLOC_STRENGTH_PLACES; 0.03 with the strength the fit likes at that hole.)
 @tip 6
 @magnet row 20 2 0 5
 @run 2500
@@ -352,7 +358,7 @@ q
 @run 2500
 q
 Q
-@expect "mm from 3 angles (the points then agree to 0.0"
+@expect "mm from 3 angles (the points then agree to 0."
 @magnet row 20 2 0 40
 @run 3000
 :screen
@@ -365,13 +371,15 @@ t0\r
 
 # The probe far up (2026-09-21): only the MMC56x3 reads it plainly, the
 # TMAG5273s are at noise. The strength held and the direction leaning on the
-# last good fix's pole make a fix of that: 40 mm up it tracks; 90 mm up it
+# last good fix's pole make a fix of that: 40 mm up it tracks (39.9, with
+# the strength held at the magnet's own; 40.x when it was held 0.8 % high);
+# 90 mm up it
 # is a rough fix (the far glow) within a few mm of the truth, and it is not
 # "row 13 at 6 mm" (the free fit's answer, which the bench showed all day).
 @magnet 24 22 40 0 0 -1
 @run 3000
 l
-@expect "z 40."
+@expect "z 39."
 @expect "(held)"
 @magnet 24 22 90 0 0 -1
 @run 3000

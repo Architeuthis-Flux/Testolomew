@@ -1,0 +1,117 @@
+# The magnet's strength learned, and a missing sensor's last reading carrying
+# presence (2026-09-22, evening). `make check` runs this after check.txt.
+# The regression runs with the MMC56x3 in (the board boots with it out: MAG_USE_MMC_AT_BOOT).
+:mmc on
+
+@seed 7
+
+# A far probe, seen plainly by the MMC56x3 alone: the MMC missing a frame now
+# and then (its hand-wired bus does, about once a second on the bench) must
+# not end the track - before, every missed frame ended it "nothing present"
+# and the next frame found it again (1030 times in 24 minutes: a flicker).
+@magnet 24 22 65 0 0 -1
+@run 3000
+l
+@expect "z 6"
+@dead 8 12
+@run 400
+@dead 8 12
+@run 400
+@dead 8 12
+@run 400
+@dead 8 12
+@run 400
+@dead 8 12
+@run 400
+l
+@expect "z 6"
+:load
+@expect "0 times nothing present"
+@expect "found again from where it was 0 times"
+@expect "carried presence"
+@magnet off
+@run 6000
+
+# A static field at the MMC that nothing confirms - the bench's probe lying
+# beside the board (0.02 mT at the MMC, the TMAGs at their zeros) - is a far
+# fix until its clock runs out, then absorbed in ONE go: the track ends once,
+# and is not found again in bursts (steadiness is judged on the reading as
+# measured, not on the baseline-removed one the absorb itself moves: on the
+# bench the far track was found again 249 times in twelve minutes, 2026-09-22).
+@bias 8 0.006 0.005 -0.018
+@run 3000
+l
+@expect "magnet at"
+@run 40000
+l
+@expect "no magnet"
+:load
+@expect "found again from where it was 0 times"
+@bias 8 0 0 0
+z
+@run 3000
+
+# Another, weaker magnet - half the strength held at boot: learned from the
+# first near fixes (the readings pin it when five sensors read it plainly)
+# and the row calibration's taps then take, within a millimetre. (Held at
+# 4232 the same magnet fitted 5 mm too high and 20-40 mm off along the
+# board, "valid", and no tap ever took.)
+@strength 2100
+@magnet row 8 3 30 0
+@run 1500
+c
+@run 300
+@magnet row 15 1
+@run 7000
+@expect "held from now on"
+@expect "got it: x 26."
+@magnet row 15 5
+@run 7000
+@expect "got it: x 26."
+@magnet row 30 1
+@run 7000
+@expect "got it: x 64."
+@expect "z 17."
+@magnet row 30 5
+@run 7000
+@expect "got it: x 64."
+@expect "z 17."
+c
+@run 300
+l
+@expect "strength: held at 2"
+@magnet off
+@run 2000
+
+# The MMC56x3 switched out (the board's default since 2026-09-22 late: "the
+# readings have been 100x sketchier since we added that one"): the eight
+# TMAG5273s alone track a probe on the board and 40 mm up; 90 mm up is out
+# of reach; the status marks the MMC "off".
+:mmc off
+@expect "ignored by the locator"
+@magnet row 14 3
+@run 1500
+:screen
+@expect "row: 14 hole 3"
+l
+@expect "magnet at"
+@magnet 24 22 40 0 0 -1
+@run 3000
+l
+@expect "magnet at"
+@magnet 24 22 90 0 0 -1
+@run 3000
+l
+@expect "no magnet"
+m
+@expect "off"
+@magnet off
+@run 6000
+# ...and a lone TMAG5273 with a stale zero, the MMC out, is no magnet: no
+# presence, no lattice every 400 ms (the one-sensor shortcut is the MMC's).
+@bias 4 0.045 0 0
+@run 3000
+l
+@expect "no magnet"
+@bias 4 0 0 0
+@run 1000

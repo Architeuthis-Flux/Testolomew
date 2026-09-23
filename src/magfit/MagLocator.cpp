@@ -56,12 +56,14 @@ static void onOrientation( Stream* out ) { magLocator.printOrientationCheck( out
 
 static void onLearn( Stream* out ) {
     magLocator.startLearningStrength( );
-    out->println( "learning this magnet: move it slowly over the array, 1.5-3 cm up, for about ten seconds" );
+    char line[ 120 ];
+    snprintf( line, sizeof( line ), "holding the magnet's strength at %.0f and measuring it again: rest the probe on the board, or move it slowly 1-3 cm up", magLocator.knownStrength );
+    out->println( line );
 }
 
 static void onForget( Stream* out ) {
     magLocator.forgetStrength( );
-    out->println( "magnet strength forgotten: fitting it freely again" );
+    out->println( "magnet strength not held: fitting it freely (k holds it again)" );
 }
 
 static void onTipOffset( Stream* out ) {
@@ -360,8 +362,8 @@ void MagLocator::begin( ) {
     consoleAddCommand( 'd', "stream probe fixes as CSV (toggle)", onStream );
     consoleAddCommand( 'l', "latest probe fix", onLatest );
     consoleAddCommand( 'o', "orientation check: hold a magnet 1-2 cm over the array first", onOrientation );
-    consoleAddCommand( 'k', "learn this magnet's strength and hold the fit to it", onLearn );
-    consoleAddCommand( 'K', "forget the magnet strength (fit it freely)", onForget );
+    consoleAddCommand( 'k', "the magnet's strength (learned from the near fixes, held): hold it and measure it again from scratch", onLearn );
+    consoleAddCommand( 'K', "never hold the magnet's strength (fit it freely; the far probe is then out of reach)", onForget );
     consoleAddCommand( 't', "the magnet's centre is <number> mm up the shaft from the probe's point (t12<Enter>)", onTipOffset );
     consoleAddCommand( 'T', "the magnet's angle to the shaft, <number> degrees: T0 = along it, T90 = a disc lying flat on it", onMagnetAngle );
     consoleAddCommand( 'u', "cursor: under the tip / where the tip points (toggle)", onCursorMode );
@@ -566,6 +568,7 @@ ServiceStatus MagLocator::service( ) {
         lastStatus = sim.on ? simFrame( &in ) : fitFrame( &in );
     }
     learnFloor( millis( ) );
+    keepStrengthRecord( millis( ) );
     track.surfaceZ = boardZ;
     track.tipOffsetMm = tipOffsetMm;
     magTrackUpdate( &track, dtS, &in );
@@ -593,8 +596,12 @@ ServiceStatus MagLocator::fitFrame( MagTrackInput* in ) {
     // With the strength held and a direction to lean on, one sensor that
     // sees the magnet plainly is enough to try a fit (the far probe, seen
     // by the MMC alone); else it takes MAGLOC_MIN_SENSORS noticing it.
-    f.held = knownStrength > 0.0f && !learning( ) ? knownStrength : 0.0f;
-    f.enough = fix.seenBy + fix.faintBy >= MAGLOC_MIN_SENSORS || ( f.held > 0.0f && fix.seenBy >= 1 );
+    f.held = knownStrength;
+    // (One plainly-seeing sensor is enough only with the MMC56x3 in: it is
+    // the sensor that sees a far probe alone. Without it, one TMAG5273 above
+    // the seen level is its stale zero after a boot, and this clause would
+    // run the lattice on it every 400 ms until the absorb took it.)
+    f.enough = fix.seenBy + fix.faintBy >= MAGLOC_MIN_SENSORS || ( f.held > 0.0f && magArray.useMmc && fix.seenBy >= 1 );
     if ( !fix.present || !f.enough ) {
         if ( result.valid ) {
             if ( !fix.present )
@@ -702,29 +709,59 @@ void MagLocator::assessFrame( FrameScratch& f ) {
     fix.faintBy = 0;
     bool haveMmc = false, mmcPresent = false;
     int tmagSeen = 0;
+    bool peakHeld = false;
+    f.plain = 0;
     for ( int i = 0; i < magArray.sensorCount( ); i++ ) {
         f.quiet[ i ] = false;
         f.plainHere[ i ] = false;
         f.steady[ i ] = false;
-        if ( !magArray.fresh[ i ] ) {
+        if ( magArray.ignored( i ) ) {
+            continue; // the MMC56x3 switched out (sensors / use MMC): not here at all
+        }
+        // Not read this frame: its last smoothed reading still says what is
+        // there for a frame or two (MAGLOC_MISSED_HOLD_FRAMES) - presence
+        // and the counts, not the fit (usedInFit wants it fresh).
+        bool held = !magArray.fresh[ i ];
+        if ( held && missedFrames[ i ] > MAGLOC_MISSED_HOLD_FRAMES ) {
             continue;
         }
         Vec3& b = smooth[ i ];
-        float k = f.resync[ i ] ? 1.0f : f.alpha;
-        b.x += k * ( f.filtered[ i ].x - b.x );
-        b.y += k * ( f.filtered[ i ].y - b.y );
-        b.z += k * ( f.filtered[ i ].z - b.z );
-        float sq = b.x * b.x + b.y * b.y + b.z * b.z;
-        // Steady? Against a slow average of itself (MAGLOC_STEADY_*).
-        Vec3& ref = slowRef[ i ];
-        if ( f.resync[ i ] )
-            ref = b;
-        float dx = b.x - ref.x, dy = b.y - ref.y, dz = b.z - ref.z;
-        float refSq = ref.x * ref.x + ref.y * ref.y + ref.z * ref.z;
-        f.steady[ i ] = dx * dx + dy * dy + dz * dz < MAGLOC_STEADY_FRACTION * MAGLOC_STEADY_FRACTION * refSq + 0.002f * 0.002f;
-        ref.x += MAGLOC_STEADY_ALPHA * dx;
-        ref.y += MAGLOC_STEADY_ALPHA * dy;
-        ref.z += MAGLOC_STEADY_ALPHA * dz;
+        float sq;
+        if ( !held ) {
+            float k = f.resync[ i ] ? 1.0f : f.alpha;
+            b.x += k * ( f.filtered[ i ].x - b.x );
+            b.y += k * ( f.filtered[ i ].y - b.y );
+            b.z += k * ( f.filtered[ i ].z - b.z );
+            sq = b.x * b.x + b.y * b.y + b.z * b.z;
+            // Steady? The reading AS MEASURED (before the baseline), smoothed
+            // the same way, against a slow average of itself (MAGLOC_STEADY_*):
+            // what a static probe or a zero error holds still while the
+            // absorb (keepZeros) moves the baseline under it. Judged on the
+            // baseline-removed reading, the absorb made the sensor "unsteady"
+            // itself and stopped, the slow average caught up, it went on: a
+            // probe lying beside the board was absorbed in bursts, and
+            // presence and the far track flapped once a second for twelve
+            // minutes (the bench, 2026-09-22 22:44-22:56: found again 249
+            // times). The threshold is still a fraction of the baseline-
+            // removed reading: that is the size of what is there.
+            const Vec3& r = magArray.raw[ i ];
+            Vec3& rs = rawSmooth[ i ];
+            if ( f.resync[ i ] )
+                rs = r;
+            rs.x += k * ( r.x - rs.x );
+            rs.y += k * ( r.y - rs.y );
+            rs.z += k * ( r.z - rs.z );
+            Vec3& ref = slowRef[ i ];
+            if ( f.resync[ i ] )
+                ref = rs;
+            float dx = rs.x - ref.x, dy = rs.y - ref.y, dz = rs.z - ref.z;
+            f.steady[ i ] = dx * dx + dy * dy + dz * dz < MAGLOC_STEADY_FRACTION * MAGLOC_STEADY_FRACTION * sq + 0.002f * 0.002f;
+            ref.x += MAGLOC_STEADY_ALPHA * dx;
+            ref.y += MAGLOC_STEADY_ALPHA * dy;
+            ref.z += MAGLOC_STEADY_ALPHA * dz;
+        } else {
+            sq = b.x * b.x + b.y * b.y + b.z * b.z;
+        }
         if ( sq > peakSq ) {
             peakSq = sq;
         }
@@ -736,6 +773,7 @@ void MagLocator::assessFrame( FrameScratch& f ) {
         float levelSq = sq / ( scale * scale );
         if ( levelSq > peakLevelSq ) {
             peakLevelSq = levelSq;
+            peakHeld = held;
         }
         // Plainly: for the MMC56x3 twice its seen level (a probe within 80 mm,
         // which fits); for a TMAG5273 its seen level is already three times
@@ -744,6 +782,7 @@ void MagLocator::assessFrame( FrameScratch& f ) {
         float plainLevel = magSensorPlaces[ i ].type == MAG_MMC56X3 ? MAGLOC_SEEN_ABSORB_LEVEL : MAGLOC_SEEN_MT;
         if ( levelSq > plainLevel * plainLevel ) {
             f.plainHere[ i ] = true;
+            f.plain++;
         }
         if ( magSensorPlaces[ i ].type == MAG_MMC56X3 ) {
             haveMmc = true;
@@ -770,6 +809,9 @@ void MagLocator::assessFrame( FrameScratch& f ) {
         // kept presence on and the TMAGs' own 0.02 mT zero errors, below
         // presence, from ever following their drift: hence any reading, not
         // only one above presence.)
+        if ( held ) {
+            continue; // its clock, like its history, is left alone by a frame it was not read in
+        }
         uint32_t nowHere = millis( );
         if ( !f.quiet[ i ] ) {
             if ( presentSinceMs[ i ] == 0 )
@@ -785,11 +827,16 @@ void MagLocator::assessFrame( FrameScratch& f ) {
     bool fixedLately = lastFixMs != 0 && millis( ) - lastFixMs < MAGLOC_PRESENT_HOLD_MS;
     float level = fix.present && fixedLately ? MAGLOC_PRESENT_LOW * presentMt : presentMt;
     bool evidence = fix.peakLevel > level;
-    if ( haveMmc && evidence && !fixedLately ) {
-        // The MMC's word, or two TMAGs' (MAGLOC_PRESENT_TMAGS): one TMAG alone is its zero.
-        evidence = mmcPresent || tmagSeen >= MAGLOC_PRESENT_TMAGS;
+    if ( evidence && !fixedLately ) {
+        // The MMC's word, or two TMAGs' (MAGLOC_PRESENT_TMAGS): one TMAG
+        // alone is its zero (with the MMC out too: a probe near enough to
+        // light one TMAG plainly lights its neighbour, 2026-09-22 late).
+        evidence = ( haveMmc && mmcPresent ) || tmagSeen >= MAGLOC_PRESENT_TMAGS;
     }
     fix.present = evidence;
+    if ( fix.present && peakHeld ) {
+        presenceHeldFrames++;
+    }
     f.nowMs = millis( );
     if ( fix.present ) {
         lastPresentMs = f.nowMs == 0 ? 1 : f.nowMs;
@@ -809,8 +856,23 @@ void MagLocator::keepZeros( const FrameScratch& f ) {
         // good, 2026-09-21 - and a probe that hovers there for the 20 s
         // it takes to be absorbed costs the near fit less than that
         // sensor's noise.)
-        for ( int i = 0; i < MAGFIT_MAX_SENSORS; i++ )
-            absorbing[ i ] = false; // nothing here: the slow drift takes it from here
+        // An absorb under way finishes here (fast, while the reading is
+        // steady, until the sensor reads quiet): what is left of it is
+        // below presence now, and left to the slow drift it sat at the seen
+        // level for tens of seconds with presence and the far track
+        // flickering at it (the sim, 2026-09-22 evening: the track found
+        // again once during each absorb).
+        bool fast[ MAG_SENSOR_COUNT ];
+        bool any = false;
+        for ( int i = 0; i < magArray.sensorCount( ); i++ ) {
+            if ( f.quiet[ i ] )
+                absorbing[ i ] = false; // done
+            fast[ i ] = absorbing[ i ] && f.steady[ i ];
+            any = any || fast[ i ];
+        }
+        if ( any ) {
+            magArray.driftBaseline( MAGLOC_ABSORB_FAST, fast );
+        }
         if ( lastPresentMs == 0 || f.nowMs - lastPresentMs > MAGLOC_DRIFT_HOLDOFF_MS ) {
             magArray.driftBaseline( MAGLOC_BASELINE_DRIFT );
             // (What the zero drifts to stays in the live baseline only: the
@@ -911,7 +973,22 @@ ServiceStatus MagLocator::runFit( MagTrackInput* in, FrameScratch& f ) {
     // seeds: one a call) with the held strength as the lattice's hint; then,
     // once it has an answer, the refinement with the strength held and the
     // direction leaning on the last good fix's pole (MAGLOC_AXIS_PRIOR_MT).
-    f.good = magFitSolveStep( magArray.position, smooth, f.use, magArray.sensorCount( ), MAGLOC_MAX_MISFIT, &result, steadyFit ? (int)( steadyIterations + 0.5f ) : 0, f.weights, f.held );
+    // With MAGLOC_LEARN_MIN_SENSORS reading the magnet plainly the readings
+    // pin its strength themselves: no hint that frame, and the free fit's
+    // answer MEASURES the magnet (measureStrength; the held strength
+    // follows). Fewer, and the held strength is the hint - the lattice's
+    // too: far out, without it, a weak magnet near fits as well as the real
+    // one far.
+    f.hintFree = f.held > 0.0f && f.plain >= MAGLOC_LEARN_MIN_SENSORS;
+    f.good = magFitSolveStep( magArray.position, smooth, f.use, magArray.sensorCount( ), MAGLOC_MAX_MISFIT, &result, steadyFit ? (int)( steadyIterations + 0.5f ) : 0, f.weights, f.hintFree ? 0.0f : f.held );
+    if ( f.hintFree && f.good && result.coldStage == 0 && result.signal > 0.0f && result.strength > 0.0f ) {
+        float freeMisfit = result.residual / result.signal;
+        float freeErr = sqrtf( result.sigma.x * result.sigma.x + result.sigma.y * result.sigma.y + result.sigma.z * result.sigma.z );
+        if ( freeMisfit < MAGLOC_LEARN_MAX_MISFIT && freeErr < MAGLOC_STRENGTH_MAX_ERROR_MM ) {
+            measureStrength( result.strength, result.position );
+            f.held = knownStrength; // this frame's refinement holds what was just learned
+        }
+    }
     if ( f.held > 0.0f && result.coldStage == 0 && result.signal > 0.0f && result.strength > 0.0f ) {
         f.good = magFitRefineKnownStrength( magArray.position, smooth, f.use, magArray.sensorCount( ), MAGLOC_MAX_MISFIT, f.held, &result, f.weights,
                                           haveLastGood ? &lastGoodAxis : nullptr, MAGLOC_AXIS_PRIOR_MT,
@@ -1021,9 +1098,6 @@ ServiceStatus MagLocator::runFit( MagTrackInput* in, FrameScratch& f ) {
     }
     result.valid = keepTracking;
 
-    if ( f.good && learning( ) && fix.misfit < MAGLOC_LEARN_MAX_MISFIT && fix.seenBy >= MAGLOC_LEARN_MIN_SENSORS ) {
-        learnFrom( result.strength );
-    }
     if ( !fix.valid ) {
         // Not a fix, but the fit's best answer is still roughly right when it
         // is not far off: a rough fix for the tracker, with its wide bar. One
@@ -1426,38 +1500,192 @@ bool MagLocator::offerRough( MagTrackInput* in, const MagFitResult* r ) const {
     return true;
 }
 
+// k: hold the strength (again), and measure it from scratch.
 void MagLocator::startLearningStrength( ) {
-    learnCount = 0;
+    strengthRingCount = 0;
+    strengthRingAt = 0;
+    strengthMedian = 0.0f;
+    strengthSpread = 0.0f;
+    strengthTaken = false;
+    strengthAwayFrames = 0;
+    strengthPlaceCount = 0;
+    strengthPlaceAt = 0;
+    strengthPlaceMedian = 0.0f;
+    if ( knownStrength <= 0.0f ) {
+        knownStrength = strengthSaved > 0.0f ? strengthSaved : MAGLOC_MAGNET_STRENGTH;
+    }
 }
 
+// K: never hold it (the free fit's strength is what the readings say, and
+// the far probe is out of reach).
 void MagLocator::forgetStrength( ) {
-    learnCount = -1;
     knownStrength = 0.0f;
 }
 
-// Collect good free fixes; when there are enough, take the median (a few wild
-// ones do not matter) and hold the fit to it from then on.
-void MagLocator::learnFrom( float strength ) {
-    int at = learnCount++;
-    while ( at > 0 && learned[ at - 1 ] > strength ) { // keep the list sorted
-        learned[ at ] = learned[ at - 1 ];
-        at--;
+// The settings' strength= record at boot: what was learned last time.
+void MagLocator::restoreStrength( float strength ) {
+    if ( strength < 0.25f * MAGLOC_MAGNET_STRENGTH || strength > 4.0f * MAGLOC_MAGNET_STRENGTH ) {
+        return; // not a probe magnet's
     }
-    learned[ at ] = strength;
-    if ( learnCount < MAGLOC_LEARN_FIXES ) {
+    strengthSaved = strength;
+    strengthTaken = true; // what was learned last time is trusted until the ring says otherwise
+    if ( knownStrength > 0.0f ) {
+        knownStrength = strength;
+    }
+}
+
+// One frame's measurement of the magnet: the free fit's strength from a
+// frame the readings pinned on their own (MAGLOC_LEARN_MIN_SENSORS plain,
+// no hint, a sharp fit). Into the ring; the ring's median (a few wild
+// answers do not matter), once the ring is deep enough and its middle half
+// agrees, is TAKEN as the held strength - once - and after that only
+// watched: taken again if it is another magnet's (MAGLOC_STRENGTH_JUMP,
+// at once) or has sat MAGLOC_STRENGTH_RETAKE_STEP away for
+// MAGLOC_STRENGTH_RETAKE_FRAMES (a slow, real change).
+static float medianOf( const float* values, int n ) {
+    float sorted[ MAGLOC_STRENGTH_RING > MAGLOC_STRENGTH_PLACES ? MAGLOC_STRENGTH_RING : MAGLOC_STRENGTH_PLACES ];
+    for ( int i = 0; i < n; i++ ) { // insertion sort: a few dozen numbers, a few microseconds
+        float v = values[ i ];
+        int at = i;
+        while ( at > 0 && sorted[ at - 1 ] > v ) {
+            sorted[ at ] = sorted[ at - 1 ];
+            at--;
+        }
+        sorted[ at ] = v;
+    }
+    return sorted[ n / 2 ];
+}
+
+void MagLocator::measureStrength( float strength, Vec3 at ) {
+    strengthRing[ strengthRingAt ] = strength;
+    strengthRingPlace[ strengthRingAt ] = at;
+    strengthRingAt = ( strengthRingAt + 1 ) % MAGLOC_STRENGTH_RING;
+    if ( strengthRingCount < MAGLOC_STRENGTH_RING ) {
+        strengthRingCount++;
+    }
+    strengthMeasured++;
+    if ( strengthRingCount < MAGLOC_STRENGTH_MIN_SAMPLES ) {
         return;
     }
-    knownStrength = learned[ MAGLOC_LEARN_FIXES / 2 ];
-    float spread = ( learned[ MAGLOC_LEARN_FIXES * 3 / 4 ] - learned[ MAGLOC_LEARN_FIXES / 4 ] ) / knownStrength;
-    learnCount = -1;
-
+    int n = strengthRingCount;
+    float median = medianOf( strengthRing, n );
+    if ( median <= 0.0f ) {
+        return;
+    }
+    // The middle half's spread: the sorted ring's quartiles.
+    float sorted[ MAGLOC_STRENGTH_RING ];
+    for ( int i = 0; i < n; i++ ) {
+        float v = strengthRing[ i ];
+        int at = i;
+        while ( at > 0 && sorted[ at - 1 ] > v ) {
+            sorted[ at ] = sorted[ at - 1 ];
+            at--;
+        }
+        sorted[ at ] = v;
+    }
+    strengthMedian = median;
+    strengthSpread = ( sorted[ n * 3 / 4 ] - sorted[ n / 4 ] ) / median;
+    if ( strengthSpread > MAGLOC_STRENGTH_MAX_SPREAD || knownStrength <= 0.0f ) {
+        return; // the answers disagree (the probe moving fast, a glitch), or K: nothing to move
+    }
+    float was = knownStrength;
     Stream* out = console.port( );
+    char line[ 200 ];
+    // A ring nothing like what is held is another magnet: taken at once,
+    // wherever the probe is (at boot, with the compiled default held, the
+    // first ring of a different probe's magnet counts as measured).
+    if ( fabsf( median - knownStrength ) > MAGLOC_STRENGTH_JUMP * knownStrength ) {
+        if ( strengthTaken ) {
+            strengthJumps++;
+        }
+        knownStrength = median;
+        strengthTaken = true;
+        strengthAwayFrames = 0;
+        strengthPlaceCount = 0; // the places were the old magnet's
+        strengthPlaceAt = 0;
+        strengthPlaceMedian = 0.0f;
+        if ( out != nullptr ) {
+            snprintf( line, sizeof( line ), "magnet strength %.0f mT*mm^3 - %s (was %.0f; the last %d free fits agree to %.1f %%): held from now on%s",
+                      knownStrength, strengthJumps > 0 ? "another magnet" : "measured", was, n, strengthSpread * 100.0f,
+                      fabsf( knownStrength - strengthSaved ) > MAGLOC_STRENGTH_SAVE_STEP * strengthSaved ? ", and saved in a minute" : "" );
+            out->println( line );
+        }
+        return;
+    }
+    // This ring's place: its mean position. A new place (MAGLOC_STRENGTH_PLACE_APART_MM
+    // from every one remembered) is added with the ring's median; the
+    // measurement is the median over the places.
+    Vec3 mean = { 0, 0, 0 };
+    for ( int i = 0; i < n; i++ ) {
+        mean.x += strengthRingPlace[ i ].x;
+        mean.y += strengthRingPlace[ i ].y;
+        mean.z += strengthRingPlace[ i ].z;
+    }
+    mean.x /= n;
+    mean.y /= n;
+    mean.z /= n;
+    bool newPlace = true;
+    for ( int k = 0; k < strengthPlaceCount; k++ ) {
+        float dx = mean.x - strengthPlace[ k ].x, dy = mean.y - strengthPlace[ k ].y, dz = mean.z - strengthPlace[ k ].z;
+        if ( dx * dx + dy * dy + dz * dz < MAGLOC_STRENGTH_PLACE_APART_MM * MAGLOC_STRENGTH_PLACE_APART_MM ) {
+            newPlace = false;
+            strengthPlaceValue[ k ] = median; // the same place again: its latest answer
+            break;
+        }
+    }
+    if ( newPlace ) {
+        strengthPlace[ strengthPlaceAt ] = mean;
+        strengthPlaceValue[ strengthPlaceAt ] = median;
+        strengthPlaceAt = ( strengthPlaceAt + 1 ) % MAGLOC_STRENGTH_PLACES;
+        if ( strengthPlaceCount < MAGLOC_STRENGTH_PLACES ) {
+            strengthPlaceCount++;
+        }
+    }
+    if ( strengthPlaceCount < MAGLOC_STRENGTH_MIN_PLACES ) {
+        return;
+    }
+    strengthPlaceMedian = medianOf( strengthPlaceValue, strengthPlaceCount );
+    const char* why = nullptr;
+    if ( !strengthTaken ) {
+        why = "measured"; // the first measurement over enough places since boot or k
+    } else if ( fabsf( strengthPlaceMedian - knownStrength ) > MAGLOC_STRENGTH_RETAKE_STEP * knownStrength ) {
+        if ( ++strengthAwayFrames >= MAGLOC_STRENGTH_RETAKE_FRAMES ) {
+            why = "it has changed"; // slowly, but for thirty seconds of near fixes
+        }
+    } else {
+        strengthAwayFrames = 0;
+    }
+    if ( why == nullptr ) {
+        return;
+    }
+    knownStrength = strengthPlaceMedian;
+    strengthTaken = true;
+    strengthAwayFrames = 0;
     if ( out != nullptr ) {
-        char line[ 160 ];
-        snprintf( line, sizeof( line ), "magnet strength %.0f mT*mm^3 (middle half of the fixes within %.1f %%) - held from now on. MAGLOC_MAGNET_STRENGTH makes it permanent.",
-                  knownStrength, spread * 100.0f );
+        snprintf( line, sizeof( line ), "magnet strength %.0f mT*mm^3 - %s over %d places (was %.0f): held from now on%s", knownStrength, why, strengthPlaceCount, was,
+                  fabsf( knownStrength - strengthSaved ) > MAGLOC_STRENGTH_SAVE_STEP * strengthSaved ? ", and saved in a minute" : "" );
         out->println( line );
     }
+}
+
+// The settings' copy follows the held strength once it has stood
+// MAGLOC_STRENGTH_SAVE_STEP away from it for MAGLOC_STRENGTH_SAVE_MS: a
+// write a minute at most, and a probe waved over the board for a moment
+// writes nothing.
+void MagLocator::keepStrengthRecord( uint32_t nowMs ) {
+    if ( knownStrength <= 0.0f || fabsf( knownStrength - strengthSaved ) < MAGLOC_STRENGTH_SAVE_STEP * strengthSaved ) {
+        strengthAwaySinceMs = 0;
+        return;
+    }
+    if ( strengthAwaySinceMs == 0 ) {
+        strengthAwaySinceMs = nowMs == 0 ? 1 : nowMs;
+        return;
+    }
+    if ( nowMs - strengthAwaySinceMs < MAGLOC_STRENGTH_SAVE_MS ) {
+        return;
+    }
+    strengthSaved = roundf( knownStrength / 20.0f ) * 20.0f;
+    strengthAwaySinceMs = 0;
 }
 
 void MagLocator::printFixCsv( Stream* out ) const {
@@ -1491,9 +1719,16 @@ void MagLocator::printFix( Stream* out ) const {
     } else {
         snprintf( line, sizeof( line ), "magnet at x %.1f +/-%.1f  y %.1f +/-%.1f  z %.1f +/-%.1f mm   tilt %.0f deg   strength %.0f%s   misfit %.0f %%   seen by %d+%d faint   fit %lu us",
                   fix.magnet.x, fix.sigma.x, fix.magnet.y, fix.sigma.y, fix.magnet.z, fix.sigma.z, fix.tiltDeg, fix.strength,
-                  learning( ) ? " (learning)" : ( knownStrength > 0.0f ? " (held)" : "" ), fix.misfit * 100.0f, fix.seenBy, fix.faintBy, (unsigned long)fix.fitUs );
+                  knownStrength > 0.0f ? " (held)" : " (free)", fix.misfit * 100.0f, fix.seenBy, fix.faintBy, (unsigned long)fix.fitUs );
     }
     out->println( line );
+    if ( knownStrength > 0.0f || strengthMeasured > 0 ) {
+        snprintf( line, sizeof( line ), "  strength: %s %.0f mT*mm^3%s; measured by %lu frames at %d places (the last %d fits agree to %.1f %% about %.0f; over the places %.0f); another magnet taken %lu times; the settings hold %.0f",
+                  knownStrength > 0.0f ? "held at" : "not held, last measured about", knownStrength > 0.0f ? knownStrength : strengthMedian,
+                  knownStrength > 0.0f && !strengthTaken ? " (not measured yet: the boot default)" : "", (unsigned long)strengthMeasured, strengthPlaceCount, strengthRingCount,
+                  strengthSpread * 100.0f, strengthMedian, strengthPlaceMedian, (unsigned long)strengthJumps, strengthSaved );
+        out->println( line );
+    }
     if ( baselinePolluted ) {
         snprintf( line, sizeof( line ), "BASELINE POLLUTED (a magnet of about %.0f fitted it at %.0f %% misfit): move the probe away and press z", baselineMagnetStrength, baselineMagnetMisfit * 100.0f );
         out->println( line );

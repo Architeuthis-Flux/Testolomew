@@ -129,6 +129,10 @@ class MagArray : public Service {
     // fresh[], to the fit; everything else (the scene, `m`, `f`) sees it.
     bool usedInFit( int i ) const;
     bool trustAllSensors = false; // the host simulation: every simulated sensor is calibrated and zeroed
+    // The MMC56x3 in or out (MAG_USE_MMC_AT_BOOT; the menu's "sensors / use
+    // MMC"): out, it is read and shown but ignored by the locator entirely.
+    bool useMmc = MAG_USE_MMC_AT_BOOT;
+    bool ignored( int i ) const { return i >= 0 && i < MAG_SENSOR_COUNT && magSensorPlaces[ i ].type == MAG_MMC56X3 && !useMmc; }
     bool saturated[ MAG_SENSOR_COUNT ] = { false }; // it read full scale in the latest frame
     float temperatureC[ MAG_SENSOR_COUNT ] = { 0 }; // die temperature of each sensor (TMAG5273 with the channel on)
     // How much the fit should trust each sensor, from its type's noise

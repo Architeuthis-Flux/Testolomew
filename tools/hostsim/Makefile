@@ -5,7 +5,7 @@
 # `pio run` once first.
 #
 #   make sim        the simulator
-#   make check      the regression scenes (scenes/check.txt)
+#   make check      the regression scenes (scenes/check.txt, scenes/strength.txt)
 #   make screens    every screen as a PNG under out/, and the montage in docs/
 #   make soak pencil navtest
 #   make clean
@@ -59,6 +59,7 @@ $(O)/%.o: %.cpp
 
 check: sim
 	./sim scenes/check.txt -q
+	./sim scenes/strength.txt -q
 
 screens: sim
 	rm -rf out

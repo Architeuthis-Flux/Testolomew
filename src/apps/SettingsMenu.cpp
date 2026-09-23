@@ -75,9 +75,7 @@ static void sensorsInfo( char* buffer, int length ) {
 }
 
 static void magnetInfo( char* buffer, int length ) {
-    if ( magLocator.learning( ) ) {
-        snprintf( buffer, length, "learning" );
-    } else if ( magLocator.knownStrength > 0.0f ) {
+    if ( magLocator.knownStrength > 0.0f ) {
         snprintf( buffer, length, "%.0f held", magLocator.knownStrength );
     } else {
         snprintf( buffer, length, "free" );
@@ -289,6 +287,7 @@ void settingsMenuBuild( Menu* m ) {
     // The sensors and the machine: m, b, p, X, s.
     int sensors = menuAddSubmenu( m, MENU_ROOT, "sensors" );
     menuAddInfo( m, sensors, "sensors", sensorsInfo );
+    menuAddToggle( m, sensors, "use MMC", &magArray.useMmc ); // the MMC56x3 in the fit or ignored (MAG_USE_MMC_AT_BOOT: off)
     menuAddAction( m, sensors, "array status", 'm', runConsoleKey, false );
     menuAddAction( m, sensors, "bus check", 'b', runConsoleKey, false );
     menuAddAction( m, sensors, "power-cycle", 'p', runConsoleKey, true );

@@ -64,6 +64,15 @@ enum MagSensorType {
 // quieter per frame; 6.6 ms / 75 Hz leaves some frames without a result.)
 #define MAG_MMC_BANDWIDTH MMC56X3_BW_3_5MS
 #define MAG_MMC_ODR_HZ 150
+// Whether the MMC56x3 takes part at boot (the menu's "sensors / use MMC",
+// saved; the console's `:mmc on|off`). Off: it is read and shown (`m`) but
+// is out of the fit, out of presence and the counts, and the far regime
+// with it - the array is the eight TMAG5273s as it was before 2026-09-21.
+// Kevin, 2026-09-22 late: "the readings have been 100x sketchier since we
+// added that one" - off by default until its calibration close in (the
+// lumped gain 12 % off) and its bus (a missed frame or two every second)
+// are sorted.
+#define MAG_USE_MMC_AT_BOOT false
 
 // How much the fit trusts each sensor: weight = MAG_WEIGHT_REFERENCE_MT /
 // (the type's noise a frame), capped at MAG_WEIGHT_CAP - so a TMAG5273 is
