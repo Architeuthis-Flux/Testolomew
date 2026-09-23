@@ -6,6 +6,15 @@
 :mmc off
 @strength 1839
 @seed 3
+# The bench's errors: anisotropic noise (0.012 mT x/y, 0.006 z a frame,
+# measured), two sensors' gains a few percent off (the datasheet's +/-5 %),
+# two zero errors, and one sensor 1 mm from where the table says.
+@noise 0.012 0.012 0.006
+@gain 2 1.03
+@gain 5 0.96
+@bias 1 0.015 0 0
+@bias 6 0 -0.012 0.008
+@place 5 0.8 0.5 0
 
 # The probe resting in row 15, hole 3: the counters the `d` stream lacks
 # are on the :load report (presence toggles, frames missed while tracking,
@@ -18,3 +27,111 @@
 @expect "strongest reading since the last look"
 @magnet off
 @run 2000
+
+# Reach map: the probe resting in the inner hole of rows 1, 5, 10, 15, 20,
+# 25, 30 (with the 1839 magnet a TMAG5273 reads it plainly only within about
+# 40 mm; the far corner of row 1 is 65 mm out). Per row: what `l` says.
+# As it is (2026-09-23, before any lever moved): rows 1 and 5 fit WRONG (a
+# basin off the end of the array, 25-29 % misfit, rough); the strength is
+# learned at row 10 but 7 % low (1713 for 1839: the gain and place errors
+# bias it); rows 10-30 fix, the bars widening toward row 30.
+@magnet row 1 3
+@run 3000
+l
+@expect "seen by 3+1 faint"
+@expect "track: rough"
+@magnet row 5 3
+@run 3000
+l
+@expect "track: rough"
+@magnet row 10 3
+@run 3000
+@expect "held from now on"
+l
+@expect "magnet at x 14."
+@expect "track: tracking"
+@magnet row 15 3
+@run 3000
+l
+@expect "magnet at x 26."
+@expect "z 17."
+@magnet row 20 3
+@run 3000
+l
+@expect "magnet at x 38."
+@magnet row 25 3
+@run 3000
+l
+@expect "magnet at x 51."
+@magnet row 30 3
+@run 3000
+l
+@expect "magnet at x 63."
+@expect "seen by 3+2 faint"
+@magnet off
+@run 3000
+
+# Rest: two minutes in row 15 hole 3; the counters over it. As it is: no
+# cold start, no presence toggle, 3 frames missed, nothing dropped.
+@magnet row 15 3
+@run 1000
+:load
+@expect "8 cold starts since boot"
+@expect "presence toggled 5 times"
+@run 120000
+:load
+@expect "8 cold starts since boot"
+@expect "presence toggled 5 times"
+@expect "3 frames missed while tracking"
+l
+@expect "track: tracking"
+@expect "0 dropped, 0 restarts"
+
+# Hover: a minute 30 mm over row 15. As it is: the strongest reading sits at
+# the presence level (0.04), the two stale zeros are a third of it, and the
+# fit fails at a 41 % misfit against the 40 % limit: no cold start, but
+# 450 frames missed and the track ROUGH at the end.
+@magnet row 15 3 30
+@run 1000
+:load
+@expect "8 cold starts since boot"
+@run 60000
+:load
+@expect "8 cold starts since boot"
+@expect "frames missed while tracking"
+l
+@expect "no usable fix"
+@expect "track: rough"
+
+# Absent: a minute with nothing there. As it is: no cold start, one presence
+# toggle (the hover's end), the stale zeros drifting out.
+@magnet off
+@run 1000
+:load
+@expect "8 cold starts since boot"
+@run 60000
+:load
+@expect "8 cold starts since boot"
+@expect "presence toggled 6 times"
+l
+@expect "no magnet"
+
+# Lift: the probe taken away; the track is gone within 1.2 s (a tracking
+# track coasts 400 ms; a ROUGH one is held 2.5 s: the far glow).
+@magnet row 15 3
+@run 3000
+@magnet off
+@run 1200
+l
+@expect "track: nothing"
+
+# The MMC56x3 clips at 3 mT: the probe touched down over it (the magnet 9 mm
+# from the part) saturates it, and a saturated sensor is out of that frame.
+:mmc on
+@magnet 27.65 25.13 7 0 0 1
+@run 500
+m
+@expect "SATURATED"
+@magnet off
+@run 1000
+:mmc off

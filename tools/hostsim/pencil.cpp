@@ -42,6 +42,11 @@ int main(int argc, char** argv){ console.begin(&Serial); magArray.begin(); magAr
   // MAG_BIAS=i,x,y,z in the environment: a zero error at sensor i (mT, board frame) on every frame
   if (getenv("MAG_WCAP")) { magArray.setWeightCap(atof(getenv("MAG_WCAP"))); printf("weight cap %s\n", getenv("MAG_WCAP")); }
   if (getenv("MAG_FREE")) { magLocator.forgetStrength(); printf("strength free (not held)\n"); }
+  // MAG_STRENGTH=<mT*mm^3>, MAG_NOISE=x,y,z (a TMAG's per-axis noise a frame), MAG_MMC=0 (the MMC56x3 out): the bench as it is (1839, 0.012/0.012/0.006, out) against the defaults the levers were set by (4200, 0.010, in)
+  float strength = getenv("MAG_STRENGTH") ? atof(getenv("MAG_STRENGTH")) : 4200.0f;
+  Vec3 noise = {0.010f, 0.010f, 0.010f}; if (getenv("MAG_NOISE")) { if (sscanf(getenv("MAG_NOISE"), "%f,%f,%f", &noise.x, &noise.y, &noise.z)!=3) noise = {0.010f, 0.010f, 0.010f}; }
+  if (getenv("MAG_MMC") && atoi(getenv("MAG_MMC"))==0) magArray.useMmc = false;
+  printf("world: magnet %.0f, noise %.3f %.3f %.3f mT a frame, the MMC %s\n", strength, noise.x, noise.y, noise.z, magArray.useMmc ? "in" : "out");
   bool biasOn=false; int biasI=0; Vec3 bias={0,0,0}; if (getenv("MAG_BIAS")) { biasOn = sscanf(getenv("MAG_BIAS"), "%d,%f,%f,%f", &biasI, &bias.x, &bias.y, &bias.z)==4; if (biasOn) printf("bias: sensor %d %.4f %.4f %.4f mT\n", biasI, bias.x, bias.y, bias.z); }
   Vec3 p={27,22,zLow+2.5f}, v={0,0,0}, goal=p; float lean=0.3f, az=1.0f, leanGoal=0.3f, azGoal=1.0f; int dwell=0;
   std::vector<Sample> samples; double restSpeed=0, restAlpha=0, moveSpeed=0; long restN=0, moveN=0;
@@ -56,8 +61,8 @@ int main(int argc, char** argv){ console.begin(&Serial); magArray.begin(); magAr
     lean += fmaxf(-turn, fminf(turn, leanGoal-lean)); float daz=azGoal-az; while(daz>M_PI)daz-=2*M_PI; while(daz<-M_PI)daz+=2*M_PI; az += fmaxf(-turn, fminf(turn, daz));
     Vec3 shaft={sinf(lean)*cosf(az), sinf(lean)*sinf(az), cosf(lean)};
     bool moving = sqrtf(v.x*v.x+v.y*v.y+v.z*v.z) > 5.0f; bool turning = fabsf(leanGoal-lean)>0.02f || fabsf(daz)>0.02f;
-    simMicros += 10000; Vec3 m = { 4200*shaft.x, 4200*shaft.y, 4200*shaft.z };
-    for (int i=0;i<MAG_SENSOR_COUNT;i++){ float k = magArray.noiseMt[i]/MAG_WEIGHT_REFERENCE_MT; magArray.field[i]=magFitDipoleField(magArray.position[i],p,m); magArray.field[i].x+=gauss(0.010f*k); magArray.field[i].y+=gauss(0.010f*k); magArray.field[i].z+=gauss(0.010f*k); magArray.fresh[i]=true; }
+    simMicros += 10000; Vec3 m = { strength*shaft.x, strength*shaft.y, strength*shaft.z };
+    for (int i=0;i<MAG_SENSOR_COUNT;i++){ float k = magArray.noiseMt[i]/MAG_WEIGHT_REFERENCE_MT; magArray.field[i]=magFitDipoleField(magArray.position[i],p,m); magArray.field[i].x+=gauss(noise.x*k); magArray.field[i].y+=gauss(noise.y*k); magArray.field[i].z+=gauss(noise.z*k); magArray.fresh[i]=true; }
     if (biasOn) { magArray.field[biasI].x+=bias.x; magArray.field[biasI].y+=bias.y; magArray.field[biasI].z+=bias.z; }
     magArray.frameCount++; magLocator.service();
     // the cursor's truth: down the shaft to the surface plane (17.5), as the tracker defines it

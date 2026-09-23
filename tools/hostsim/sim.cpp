@@ -98,11 +98,12 @@ class WorldService : public Service {
     float strength = MAGLOC_MAGNET_STRENGTH; // the probe's, as the locator starts out holding (@strength changes it)
     float surfaceZ = MAGLOC_BOARD_Z_MM; // @surface: where the board's top really is (the locator's setting is its belief)
     float tipMm = -1.0f; // @tip: the magnet's centre this far up the shaft from the point (-1 = whatever the locator believes)
-    float noise = 0.010f; // a TMAG5273's per-axis noise a frame at the reference (0.011 mT): 0.012 on the bench (2026-09-21), the MMC's 0.0003 by its ratio
+    Vec3 noise = { 0.010f, 0.010f, 0.010f }; // a TMAG5273's noise a frame per axis at the reference (0.011 mT), the other types by their ratio; the bench measures 0.012 x/y, 0.006 z (@noise; 2026-09-21/23)
     uint64_t dropoutUntilUs = 0;
     uint64_t deadUntilUs[ MAG_SENSOR_COUNT ] = { }; // @dead: one sensor not read until then
     Vec3 bias[ MAG_SENSOR_COUNT ] = { }; // @bias: a zero error at a sensor, added to every frame
     float gain[ MAG_SENSOR_COUNT ]; // @gain: a sensor reads this much of the true field
+    Vec3 placeError[ MAG_SENSOR_COUNT ] = { }; // @place: a sensor really sits this far from where the table says (the world's truth, not the fit's)
     WorldService( ) {
         for ( int i = 0; i < MAG_SENSOR_COUNT; i++ )
             gain[ i ] = 1.0f;
@@ -124,17 +125,21 @@ class WorldService : public Service {
         bool dropout = simMicros < dropoutUntilUs;
         Vec3 moment = { strength * shaft.x, strength * shaft.y, strength * shaft.z };
         for ( int i = 0; i < MAG_SENSOR_COUNT; i++ ) {
-            Vec3 b = on ? magFitDipoleField( magArray.position[ i ], magnet, moment ) : Vec3{ 0, 0, 0 };
+            Vec3 at = { magArray.position[ i ].x + placeError[ i ].x, magArray.position[ i ].y + placeError[ i ].y, magArray.position[ i ].z + placeError[ i ].z };
+            Vec3 b = on ? magFitDipoleField( at, magnet, moment ) : Vec3{ 0, 0, 0 };
             // Each sensor's noise scaled by its type's (an MMC56x3 is 30-50x quieter than a TMAG5273).
-            float n = noise * magArray.noiseMt[ i ] / MAG_WEIGHT_REFERENCE_MT;
+            float k = magArray.noiseMt[ i ] / MAG_WEIGHT_REFERENCE_MT;
             // As the array does it: the reading into raw[], the field less the
             // baseline - so the zero's drift rules (MagArray::driftBaseline)
             // act here as on the board.
-            magArray.raw[ i ] = { gain[ i ] * b.x + bias[ i ].x + gauss( n ), gain[ i ] * b.y + bias[ i ].y + gauss( n ), gain[ i ] * b.z + bias[ i ].z + gauss( n ) };
+            magArray.raw[ i ] = { gain[ i ] * b.x + bias[ i ].x + gauss( noise.x * k ), gain[ i ] * b.y + bias[ i ].y + gauss( noise.y * k ), gain[ i ] * b.z + bias[ i ].z + gauss( noise.z * k ) };
             Vec3 zero = magArray.baselineOf( i );
             magArray.field[ i ] = { magArray.raw[ i ].x - zero.x, magArray.raw[ i ].y - zero.y, magArray.raw[ i ].z - zero.z };
-            magArray.fresh[ i ] = !dropout && simMicros >= deadUntilUs[ i ];
-            magArray.saturated[ i ] = false;
+            // As the array does it (MagArray::takeReading): a reading past MAG_SATURATED of the part's range is clipped, and a clipped sensor is out of that frame.
+            float limit = MAG_SATURATED * magArray.sensor( i ).rangeMt;
+            bool saturated = fabsf( magArray.raw[ i ].x ) > limit || fabsf( magArray.raw[ i ].y ) > limit || fabsf( magArray.raw[ i ].z ) > limit;
+            magArray.saturated[ i ] = saturated;
+            magArray.fresh[ i ] = !dropout && simMicros >= deadUntilUs[ i ] && !saturated;
         }
         magArray.frameCount++;
         return ServiceStatus::BUSY;
@@ -429,6 +434,12 @@ static bool directive( const std::vector<std::string>& w, int lineNo ) {
         world.tipMm = (float)atof( w[ 1 ].c_str( ) );
     } else if ( d == "@strength" && w.size( ) >= 2 ) {
         world.strength = (float)atof( w[ 1 ].c_str( ) ); // the magnet's |moment|, mT*mm^3 (the locator holds MAGLOC_MAGNET_STRENGTH)
+    } else if ( d == "@noise" && w.size( ) >= 4 ) {
+        world.noise = { (float)atof( w[ 1 ].c_str( ) ), (float)atof( w[ 2 ].c_str( ) ), (float)atof( w[ 3 ].c_str( ) ) };
+    } else if ( d == "@place" && w.size( ) >= 5 ) {
+        int i = atoi( w[ 1 ].c_str( ) );
+        if ( i >= 0 && i < MAG_SENSOR_COUNT )
+            world.placeError[ i ] = { (float)atof( w[ 2 ].c_str( ) ), (float)atof( w[ 3 ].c_str( ) ), (float)atof( w[ 4 ].c_str( ) ) };
     } else if ( d == "@gain" && w.size( ) >= 3 ) {
         int i = atoi( w[ 1 ].c_str( ) );
         if ( i >= 0 && i < MAG_SENSOR_COUNT )

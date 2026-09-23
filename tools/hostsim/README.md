@@ -16,6 +16,14 @@ The firmware's modules run on a PC against stubs of what the chip provides (`Ard
 | `@magnet off` | no magnet |
 | `@move <dx> <dy> <dz> <ms>` | glide the magnet by that much over that long |
 | `@dropout <ms>` | no readings for that long |
+| `@bias <i> <x> <y> <z>` | a zero error at sensor i, mT board frame, on every frame |
+| `@gain <i> <f>` | sensor i reads this much of the true field |
+| `@dead <i> <ms>` | sensor i not read for that long |
+| `@strength <n>` | the magnet's moment, mT*mm^3 (the locator's held value is its belief) |
+| `@tip <mm>`, `@surface <mm>` | where the magnet really sits up the shaft, where the board's top really is |
+| `@baselines` | print each sensor's zero and field |
+| `@noise <x> <y> <z>` | a TMAG5273's noise a frame per axis, mT (the other types by their ratio); the default 0.010 isotropic, the bench 0.012 0.012 0.006 |
+| `@place <i> <dx> <dy> <dz>` | sensor i really sits this far (mm) from where the table says |
 | `@strip on\|off` | pretend a real LED chain is wired (the display's LED-first rule) |
 | `@type "text" [n] [gap ms]` | type text n times with a gap (a run of joystick nudges) |
 | `@expect "text" [ms]` | the text must appear in what the firmware printed for the previous script line (waiting up to ms) |
