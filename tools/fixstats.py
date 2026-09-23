@@ -21,12 +21,15 @@ LOAD_RE=[
     ('max_peak_level', r'the strongest reading since the last look ([0-9.]+)'),
 ]
 TRACK_RE=r'(\d+) fixes taken, (\d+) dropped, (\d+) restarts'
+PREFIX_RE=re.compile(r'^\d+\.\d+\s+(.*)$')
 
 def parse(lines):
     """The fix rows (floats, `fix` column dropped), the :load blocks (dicts) and the track counters, in file order."""
     rows=[]; loads=[]; tracks=[]; block=None
     for line in lines:
-        line=line.rstrip('\r\n')
+        line=line.rstrip('\r\n').lstrip()
+        m=PREFIX_RE.match(line)   # tools/readport.py puts the host time in front of every line
+        if m: line=m.group(1)
         if line.startswith('fix,'):
             p=line.split(',')
             if len(p)<len(cols): continue
@@ -195,6 +198,9 @@ def selftest():
     assert f['error_over_5mm']==0.0 and f['seen_min']==5, f
     assert 0.5<f['gate_mean']<1.2, f
     assert abs(r["minutes"]-(199*50+500)/60000.0)<1e-6, r["minutes"]   # 200 rows span 199 intervals
+    # tools/readport.py writes every line with the host time in front ("   12.3 fix,..."): the same capture must parse the same
+    r2=analyze(["%7.1f %s" % (0.1*k, l) for k,l in enumerate(_synthetic())], skip_s=0)
+    assert r2['rows']==r['rows']==200 and r2['loads']==2 and r2['tracks']==2 and r2['events']==r['events'], (r2['rows'], r2['loads'], r2['tracks'])
     print("fixstats selftest ok")
 
 

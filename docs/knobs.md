@@ -230,3 +230,35 @@ Kevin: "we can't even calibrate rows because the inner readings are too shaky to
 - **The one-sensor shortcut is the MMC's** (`f.enough`'s `seenBy >= 1` clause now needs `magArray.useMmc`), and presence needs two TMAGs whether the MMC is in or out (a probe near enough to light one TMAG plainly lights its neighbour): with the MMC out, one TMAG's stale zero after a boot would otherwise have been presence and a lattice every 400 ms for the twenty seconds its absorb takes. The scene: a lone TMAG 0.045 mT off with the MMC out is "no magnet". (Built as `night_0005.elf`, not flashed: Kevin was using the probe, and the WCH-LinkE had failed three ways in an hour - the hang, "endpoint stalled", and the 0x55 protocol error - and the 23:44 program failed with the 22:42 fastprogram error, recovered by `--erase`.)
 - **The bench, 23:50, the MMC out:** "magnet strength held at 1839 (measured by 263 frames at 6 places; another magnet taken 1 times)" - the probe's magnet is 1839 mT*mm^3, 43 % of the 4232 the fit had been holding since 09-21 (Kevin's "a bit weaker"). Held at 4232, no near fix could be right; measured, a fix at row 1 reads z 15.8 ±0.5 mm at a 10 % misfit with three TMAGs seeing it plainly. With a magnet that weak the eight TMAGs alone see it plainly from fewer places (the counters: 56 cold starts in five minutes of use, 75 by the near track's two misses running out) - the near tolerances (`MAGLOC_MAX_MISSES` 2, the smoothing by the peak reading) were set for a magnet twice as strong, and are the next thing to look at with the probe in hand.
 - **Still to see on the bench:** the probe in an inner hole of row 15 while `d` streams (the "shaky" itself is unobserved - the capture at 22:10 had the probe off the board), the learned strength on `l`, and the taps taking. The inner holes sit right over the MMC, whose lumped gain (1.129 with its height fixed) is 12 % off the TMAGs' prediction close in; if the taps still wander there once the strength is right, the zero audit (`:audit`) with the probe moved about is the next tool, and magcal on a fresh recording the one after.
+
+## 8. The bench capture protocol (2026-09-23): the numbers come before the levers
+
+The at-rest fix is at the sensors' noise floor (0.12-0.16 mm rms; the frame-to-frame MAD equals the sensor floor), so what shows as jumpiness is EVENTS: cold starts, the track ending on its miss counter, presence toggling on zero drift, gate drops and restarts, far basin hops, the "nothing" state still showing the last rough position. The `d` stream prints no absent frame, so those events live in the counters on `:load` and `l`, and a capture is bracketed by both. Nothing below is tuned until its "before" number is in this section.
+
+**Tools.** `python3 tools/readport.py <port> <seconds> <file> [keys]` captures the port (it APPENDS, with the host time in front of every line, so one file takes the start and the end); `python3 tools/fixstats.py <file>` prints the old rest statistics plus: cold starts by cause per minute, presence toggles, frames missed while tracking, drops and restarts (from the `:load`/`l` pair), stream gaps over 60 ms (absent or too-few spells), the track-state histogram and transitions, rough-while-valid, the R floor (`sigma_R` = the standard deviation of the fix's second differences over sqrt 6: what `MAGTRACK_SIGMA_FLOOR_MM` should be), the bar-over-5-mm fraction, seen-by, the gate's mean, and the frame-to-frame MADs of the raw fix, the track and the cursor. `--minutes=N` times a capture with no fix rows (the absent run). `--selftest` is its check. `d` is a toggle: the end call sends it again.
+
+**The three counters added for this** (`:load`'s fit block): "presence toggled N times", "N frames missed while tracking" (each a near miss of a cold start under `MAGLOC_MAX_MISSES`), and "the strongest reading since the last look" (reset each time `:load` prints it: the absent run's presence floor, in TMAG terms).
+
+**Regimes.** Rest first: the "shaky" itself.
+
+1. **Rest**: the probe resting in row 15, hole 3, two minutes. `readport <port> 125 rest.txt $':load\rl\rm\rd\r'`, then `readport <port> 8 rest.txt $'d\r:load\rl\r:audit\r'`. The `:audit` at the end is each sensor's zero and gain against the others (TMAG 5 was 64 % off on 2026-09-21).
+2. **Hover**: about 30 mm over row 15, the hand as still as it gets, one minute, the same bracketing.
+3. **Absent**: the probe a metre away, thirty minutes, NO `d` (the ring is 4 KB): `:load`, `l`, `m`, `s` at the start and the end (the zero drift per sensor is the difference of the two `s` outputs; the strongest reading is the presence floor), then `fixstats --minutes=30`.
+4. **Reach map**: the probe resting twenty seconds in the inner hole of rows 1, 5, 10, 15, 20, 25 and 30 with `d` on, one file per row: per row the seen-by, the valid fraction, the misfit and the bar say which rows a threshold can rescue and which are geometry (with the 1839 magnet a TMAG reads 0.04 mT only within ~40 mm; the far corner of row 1 is 65 mm out).
+5. **Far hover** (`:mmc on` first): about 60 mm and 90 mm over the centre, one minute each with `d`: the far mode's cold starts and basin hops.
+6. **Absent, the MMC in**: ten minutes, counters only: its zero drift and toggles at its 0.008 mT level.
+7. **Saturate and recover** (`:mmc on`, `f` streaming): the probe touched down over the MMC (it clips), lifted to about 40 mm and held, thirty seconds. The MMC's next second of readings against the TMAGs' prediction (`tools/farfit.cpp`'s leave-one-out on the capture): agreement within its noise means the periodic SET restores it and the "flips above 3.2 mT" hypothesis is dropped; a lasting offset means a SET after every saturated frame.
+
+Also from `m`: `samplesPerFrame` (the design is 3.3; 1-2 during far fits means the V3F's single slot is losing conversions).
+
+**What counts as fixed** (the "before" column is filled from the captures above, the "after" after each change):
+
+| regime | cold starts | track ends | presence toggles | drops | rough frames | steadiness |
+|---|---|---|---|---|---|---|
+| rest 2 min | 0 | 0 | 0 | < 1 %, restarts 0 | 0 | raw rms ≤ 0.16 mm an axis (the noise floor), cursor MAD ≤ 0.05 mm, tilt sd ≤ 1.3°, gaps 0 |
+| hover 1 min | ≤ 1 | ≤ 1 | 0 | < 2 % | < 2 % | tracking + coasting ≥ 95 % of frames |
+| absent 30 min | 0 | 0 | ≤ 1 | - | 0 | the strongest reading recorded |
+| reach map | - | - | - | - | - | valid ≥ 95 % where seen by ≥ 3; the row where it drops is the reach |
+| far hover, MMC in | ≤ 1 a hover | - | 0 | - | - | no basin hop: the fix stays on the board side |
+
+**Before (2026-09-23, from the recordings on hand, not the protocol):** the 2026-09-19 night capture (probe resting at 41° in row 35 hole 3, the 4232 magnet, the MMC not yet fitted): `sigma_R` 0.16 / 0.19 / 0.16 mm, raw sd 0.16 / 0.21 / 0.17, frame-to-frame MAD 0.11 / 0.17 / 0.15, cursor MAD 0.03 / 0.05, tilt sd 1.19°, gate mean 0.22 sigma, five stream gaps in 80 s. The bench's own numbers with the 1839 magnet: to be captured.
