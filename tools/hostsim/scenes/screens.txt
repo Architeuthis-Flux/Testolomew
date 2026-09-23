@@ -46,7 +46,7 @@ e
 @run 150
 :screen:png out/s08_view_coasting.png
 @run 500
-@magnet 27 22 54 0.34 0 0.94
+@magnet 27 22 75 0.34 0 0.94
 @run 1500
 :screen:png out/s09_view_rough.png
 e

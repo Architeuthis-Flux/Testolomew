@@ -79,8 +79,9 @@ bool tmag5273Acknowledges( TwoWire* bus, uint8_t address );
 bool tmag5273Read( TwoWire* bus, const TMAG5273* dev, TMAG5273Reading* reading );
 // The same in two halves, for a sampler that reads on one core and decodes
 // on the other: the bytes of one 1-byte-mode read (7, or 9 with the
-// temperature channel), taken straight off I2C block `peripheral` (1-3;
-// false = failed, in at most a millisecond), and what they mean.
+// temperature channel), taken straight off I2C block `peripheral` (1-4;
+// false = failed, in at most a millisecond), and what they mean. The read
+// itself is MagI2c.h's bare read (no register phase in this mode).
 size_t tmag5273ReadBytes( const TMAG5273* dev );
 bool tmag5273BurstRead( int peripheral, uint8_t address, uint8_t* out, size_t count );
 // The block reset and re-initialised as a master at `hz` (a wedge cleared).

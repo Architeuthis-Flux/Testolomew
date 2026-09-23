@@ -23,7 +23,7 @@ int main(){ console.begin(&Serial); magArray.begin(); magArray.useSimulatedFrame
     shaft={sinf(lean)*cosf(az), sinf(lean)*sinf(az), cosf(lean)};
     bool dropout = (f % 1000) > 985; // 140 ms every 10 s
     simMicros += 10000; Vec3 m = { 4200*shaft.x, 4200*shaft.y, 4200*shaft.z };
-    for (int i=0;i<MAG_SENSOR_COUNT;i++){ magArray.field[i]=magFitDipoleField(magArray.position[i],p,m); magArray.field[i].x+=gauss(0.005f)+ (rand()%40==0? gauss(0.3f):0); magArray.field[i].y+=gauss(0.005f); magArray.field[i].z+=gauss(0.005f); magArray.fresh[i]=!dropout; }
+    for (int i=0;i<MAG_SENSOR_COUNT;i++){ float k = magArray.noiseMt[i]/MAG_WEIGHT_REFERENCE_MT; magArray.field[i]=magFitDipoleField(magArray.position[i],p,m); magArray.field[i].x+=gauss(0.005f*k)+ (rand()%40==0? gauss(0.3f):0); magArray.field[i].y+=gauss(0.005f*k); magArray.field[i].z+=gauss(0.005f*k); magArray.fresh[i]=!dropout; }
     magArray.frameCount++; magLocator.service(); rowCounter.service(); probeLeds.service();
     const MagTrack& t = magLocator.track; frames++;
     if (bad(t.position.x)||bad(t.cursor.x)||bad(t.sigma.x)||bad(t.shaft.x)||bad(magLocator.fix.magnet.x)) nanCount++;

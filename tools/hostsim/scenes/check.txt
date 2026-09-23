@@ -334,3 +334,117 @@ s
 @expect "row: 20 hole 2" 2000
 @magnet off
 @run 1000
+
+
+# The tip offset from taps (2026-09-21 night): the probe's magnet 6 mm up the
+# shaft from its point, the locator believing 0. The point rests in row 20
+# hole 2 at three angles, q takes each, Q solves t - and a tap at 40 degrees
+# then lights the row tapped, not the one the shaft points at.
+@tip 6
+@magnet row 20 2 0 5
+@run 2500
+q
+@expect "tip sample 1"
+@magnet row 20 2 0 35
+@run 2500
+q
+@magnet row 20 2 0 55
+@run 2500
+q
+Q
+@expect "mm from 3 angles (the points then agree to 0.0"
+@magnet row 20 2 0 40
+@run 3000
+:screen
+@expect "row: 20 hole 2" 2000
+@magnet off
+@run 1000
+@tip -1
+t0\r
+@run 500
+
+# The probe far up (2026-09-21): only the MMC56x3 reads it plainly, the
+# TMAG5273s are at noise. The strength held and the direction leaning on the
+# last good fix's pole make a fix of that: 40 mm up it tracks; 90 mm up it
+# is a rough fix (the far glow) within a few mm of the truth, and it is not
+# "row 13 at 6 mm" (the free fit's answer, which the bench showed all day).
+@magnet 24 22 40 0 0 -1
+@run 3000
+l
+@expect "z 40."
+@expect "(held)"
+@magnet 24 22 90 0 0 -1
+@run 3000
+l
+@expect "track: rough"
+@expect "z 8"
+@magnet off
+@run 4000
+l
+@expect "no magnet"
+
+# A zero error at the MMC56x3 is not a far probe (2026-09-21, evening: its
+# saved zero, put back under a newly calibrated table row, read 0.09 mT
+# with nothing there, and the far mode kept it alive as a probe 45 mm up).
+# It never fits under MAGLOC_FAR_MISFIT / MAGLOC_FAR_ERROR_MM, so nothing
+# is shown, and the absorb rule takes it into the zero in a few minutes.
+@bias 8 -0.021 -0.013 -0.092
+@run 3000
+l
+@expect "only 1 sensor"
+@expect "track: nothing"
+@run 200000
+l
+@expect "no magnet"
+@bias 8 0 0 0
+z
+@run 2000
+
+# The zero audit (2026-09-21 night): with the probe in use near the board, each
+# sensor's zero is checked against the fit of the others. A 0.003/0.003/0.005
+# mT zero error at the MMC56x3 is found and taken out within a minute of use;
+# no other sensor is touched.
+@bias 8 0.003 0.003 0.005
+@magnet row 5 2 0 20
+@run 3000
+@magnet row 6 3 0 30
+@run 3000
+@magnet row 7 4 0 40
+@run 3000
+@magnet row 8 5 0 10
+@run 3000
+@magnet row 9 1 0 20
+@run 3000
+@magnet row 10 2 0 30
+@run 3000
+@magnet row 11 3 0 40
+@run 3000
+@magnet row 12 4 0 10
+@run 3000
+@magnet row 13 5 0 20
+@run 3000
+@magnet row 14 1 0 30
+@run 3000
+@magnet row 15 2 0 40
+@run 3000
+@magnet row 16 3 0 10
+@run 3000
+@magnet row 17 4 0 20
+@run 3000
+@magnet row 18 5 0 30
+@run 3000
+@expect "sensor 8's zero was off by" 150000
+@magnet off
+@bias 8 0 0 0
+z
+@run 2000
+
+# ...and a small one (an hour's drift, 0.005 mT) is under the MMC's
+# presence level (MAGLOC_TYPE_SCALE_FLOOR) and absorbed at once.
+@bias 8 0.003 0.003 0.005
+@run 30000
+l
+@expect "no magnet"
+@bias 8 0 0 0
+z
+@run 2000

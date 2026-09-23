@@ -5,9 +5,9 @@
 
 MagSamplerShared magSampler;
 
-void magSamplerSetup( int, int ) {}
+void magSamplerSetup( int ) {}
 void magSamplerSetBusHz( uint32_t ) {}
-void magSamplerSetSensor( int, uint8_t, int, bool ) {}
+void magSamplerSetSensor( int, int, void*, uint8_t, int, int, bool ) {}
 bool magSamplerCommand( MagSamplerCommand ) { return false; }
 bool magSamplerRunning( void ) { return false; }
 bool magSamplerTake( int, uint32_t*, uint8_t*, uint32_t* ) { return false; }

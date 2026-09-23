@@ -35,6 +35,7 @@
 #define LEDSTRIP_MAX 448          // a V5 is 445 in all
 #define LEDSTRIP_SPI_HZ 3125000   // 100 MHz HCLK / 32
 #define LEDSTRIP_BYTES_PER_LED 12 // 24 bits x 4 SPI bits / 8
+#define LEDSTRIP_MOSI_CFG 0x9u    // the MOSI pad's driver: AF push-pull, the 10 MHz class (slower edges, the same 320 ns symbols)
 
 class SPIClassCH32H4;
 
@@ -63,6 +64,17 @@ struct LedStrip {
 // are taken too) and DMA1 channel `dmaChannel` (1-8). false if no
 // peripheral has that pin as MOSI.
 bool ledStripBegin( LedStrip* s, int dataPin, int sckPin, int misoPin, int count, int dmaChannel );
+
+// A DARK frame by polling: no DMA, no runtime, no heap - so that the V3F can
+// send it before it wakes the V5F (ch32h4_v3f_before_wake, below), and the
+// V5F first thing at boot. A WS2812 keeps the last frame it was given
+// through any reset of the chip, and on 2026-09-21 the chain held the lit
+// cursor frame while the rail could not lift the V5F: sixty resets in four
+// seconds, "rst=... por" each, until a hand cut the LEDs' power. Every
+// strip pin the board defines is sent LEDSTRIP_MAX LEDs of black, by the
+// same SPI timing as the live frames (the hardware's, not a counted loop:
+// a bit sent long is a lit LED).
+extern "C" void ledStripDarkAll( void );
 
 // Set one LED (0-255 per channel, as the chain shows them; GRB order is
 // handled here). Takes effect on the next show().

@@ -64,6 +64,10 @@ class Display : public Service {
     uint32_t periodUs( ) const override { return DISPLAY_PERIOD_US; }
 
     DisplayDrawFn drawFn = nullptr;
+    // Painted over every frame after drawFn (a banner that any app shows:
+    // main.cpp's sensor watch); returns true if it painted (the frame is
+    // then pushed even when drawFn had nothing new).
+    DisplayDrawFn overlayFn = nullptr;
     int slot = 0; // which screen the draws are for (its own times)
     float fps( ) const { return framesPerSecond; }
     bool ready( ) const { return canvas != nullptr; }

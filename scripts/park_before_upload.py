@@ -37,11 +37,14 @@ def park_the_other_core(source, target, env):
         if b"parked" in seen:
             print("park_before_upload: F sent on %s, the other core reports parked" % port)
         elif b"did not park" in seen:
-            print("park_before_upload: F sent on %s but the other core did NOT park: flashing anyway, hold RESET if it fails" % port)
+            print("park_before_upload: F sent on %s but the other core did NOT park: NOT flashing (2026-09-21: a flash with the V3F running half-erased the chip). Reset the board and try again" % port)
+            env.Exit(1)
         else:
-            print("park_before_upload: F sent on %s, no answer in 2 s (not running the firmware?): flashing anyway" % port)
+            print("park_before_upload: F sent on %s, no answer in 2 s: NOT flashing (2026-09-21: the upload went ahead on no answer and the V3F, still running, half-erased the chip). If the firmware is not running, flash by hand: wlink flash --chip CH32H41X --speed low <elf>, with RESET held if it fails" % port)
+            env.Exit(1)
     except Exception as e:
-        print("park_before_upload: could not send F on %s (%s): flashing anyway; hold RESET if it fails" % (port, e))
+        print("park_before_upload: could not send F on %s (%s): NOT flashing. Free the port (a monitor holds it?) and try again, or flash by hand with wlink --speed low" % (port, e))
+        env.Exit(1)
 
 
 env.AddPreAction("upload", park_the_other_core)

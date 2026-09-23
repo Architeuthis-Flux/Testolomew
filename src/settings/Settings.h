@@ -20,7 +20,11 @@
 // setting (S17, t12, u, R30...) is saved the same as a menu edit, and a
 // lever being nudged twenty times is written once. A commit erases and
 // programs a flash page, which holds the loop for a few tens of ms; that is
-// why it waits for the values to settle.
+// why it waits for the values to settle. The erase is also a burst of
+// current on the 3.3 V rail, and with the LED chain lit around a probe on
+// the board it browned the board out (2026-09-21: the menu used with the
+// probe near); so `aroundWrite` lets main.cpp put the board in the dark for
+// it (the chain cleared and its last frame waited out), and back after.
 //
 // Not saved: row mode, the V5 console stream, the chain on/off and the play
 // mode. Those are modes, and the board boots into row mode (RowCounter.h),
@@ -78,6 +82,11 @@ class SettingsService : public Service {
     void reset( Stream* out );
     // What is saved, line by line, and whether it matches what is running.
     void print( Stream* out );
+
+    // Called just before a page is erased (true) and right after it is
+    // programmed (false): main.cpp clears the LED chain for the erase and
+    // brings it back (the header comment). Nothing is called if unset.
+    void ( *aroundWrite )( bool starting ) = nullptr;
 
     uint32_t saves = 0; // pages written since boot
     uint32_t writeFailures = 0;

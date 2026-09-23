@@ -85,10 +85,21 @@ int SettingsService::record( int step, char* out, int size ) {
     // The array's zero as last taken (not the drifting live one), and the
     // last good fix - both so a reboot with the probe on the board recovers.
     if ( step < MAG_SENSOR_COUNT ) {
-        if ( !magArray.baselineReady( ) || magArray.zeroedAt == 0 || step >= magArray.sensorCount( ) ) {
+        if ( !magArray.baselineReady( ) || magArray.zeroedAt == 0 || step >= magArray.sensorCount( ) || !magArray.zeroKnown[ step ] || magArray.zeroProvisional[ step ] ) {
+            // A sensor with no zero (absent while the others zeroed) gets no
+            // line: a saved 0,0,0 would come back as a real zero. Nor does a
+            // PROVISIONAL one, taken from live frames at boot with the probe
+            // anywhere: saved, it came back at the next boot as known and
+            // was never settled (2026-09-21). It is written once the locator
+            // has settled it, or z has taken it deliberately.
             return 0;
         }
-        return snprintf( out, size, "zero=%d,%.4f,%.4f,%.4f\n", step, (double)magArray.zeroed[ step ].x, (double)magArray.zeroed[ step ].y, (double)magArray.zeroed[ step ].z );
+        // In the sensor's own frame (MagArray::zeroInSensorFrame), so that a
+        // table row calibrated after the zero was taken does not turn the
+        // zero into a phantom. (zero= lines, in the board frame, are still
+        // read; they are dropped at the next write.)
+        Vec3 z = magArray.zeroInSensorFrame( step );
+        return snprintf( out, size, "sensorzero=%d,%.4f,%.4f,%.4f\n", step, (double)z.x, (double)z.y, (double)z.z );
     }
     step -= MAG_SENSOR_COUNT;
     if ( step == 0 ) {
@@ -175,13 +186,20 @@ int SettingsService::apply( const char* text ) {
                 if ( oldTuning && console.port( ) != nullptr ) {
                     console.port( )->println( "settings: the saved tracker/smoothing values are from an older tuning: the new defaults are used (and saved)" );
                 }
-            } else if ( keyLength == 4 && strncmp( line, "zero", 4 ) == 0 ) {
+            } else if ( ( keyLength == 4 && strncmp( line, "zero", 4 ) == 0 ) || ( keyLength == 10 && strncmp( line, "sensorzero", 10 ) == 0 ) ) {
+                // zero= is in the board frame (the older record, right only
+                // under the table row it was taken with); sensorzero= is in
+                // the sensor's own frame and comes through the row compiled now.
+                bool sensorFrame = keyLength == 10;
                 char* next = nullptr;
                 int i = (int)strtol( value, &next, 10 );
                 if ( i >= 0 && i < MAG_SENSOR_COUNT ) {
                     zeros[ i ].x = strtof( next + 1, &next );
                     zeros[ i ].y = strtof( next + 1, &next );
                     zeros[ i ].z = strtof( next + 1, &next );
+                    if ( sensorFrame ) {
+                        zeros[ i ] = magArray.sensorFrameToBoard( i, zeros[ i ] );
+                    }
                     if ( !haveZero[ i ] )
                         zeroCount++;
                     haveZero[ i ] = true;
@@ -260,8 +278,19 @@ int SettingsService::apply( const char* text ) {
         }
         line = end + 1;
     }
-    if ( zeroCount == MAG_SENSOR_COUNT ) {
-        magArray.restoreBaseline( zeros, MAG_SENSOR_COUNT );
+    if ( zeroCount > 0 ) {
+        // The sensors the record covers get their saved zero back. Any it
+        // does not: the compiled-in zero if there is one for that sensor
+        // (a TMAG whose line was lost is never zeroed blind), else a zero
+        // from live frames at boot (a sensor added since the record).
+        static const Vec3 compiledZero[ MAG_ZERO_AT_BOOT_COUNT ] = MAG_ZERO_AT_BOOT;
+        for ( int i = 0; i < MAG_ZERO_AT_BOOT_COUNT && i < MAG_SENSOR_COUNT; i++ ) {
+            if ( !haveZero[ i ] ) {
+                zeros[ i ] = compiledZero[ i ];
+                haveZero[ i ] = true;
+            }
+        }
+        magArray.restoreBaseline( zeros, haveZero, MAG_SENSOR_COUNT, "the saved zero" );
     }
 #if MODULE_ROW_COUNT
     if ( anchorCount > 0 ) {
@@ -307,7 +336,16 @@ bool SettingsService::writeFlash( const char* text ) {
         EEPROM.write( 8 + i, (uint8_t)text[ i ] );
     }
     EEPROM.write( 8 + length, 0 );
-    return EEPROM.commit( );
+    // The writes above go to the RAM mirror; the commit is the erase and
+    // the programming, the tens of ms the board spends in the dark.
+    if ( aroundWrite != nullptr ) {
+        aroundWrite( true );
+    }
+    bool written = EEPROM.commit( );
+    if ( aroundWrite != nullptr ) {
+        aroundWrite( false );
+    }
+    return written;
 }
 
 int SettingsService::begin( Menu* m ) {

@@ -6,9 +6,11 @@
 // jitter at rest. The numbers to tune the smoothing levers by.
 #include "MagArray.h"
 #include "MagLocator.h"
+#include "MagTracker.h"
 #include "Console.h"
 #include <vector>
 #include <string.h>
+#include <stdlib.h>
 
 
 static float gauss(float s){ float u1=(rand()+1.0f)/((float)RAND_MAX+2.0f), u2=(rand()+1.0f)/((float)RAND_MAX+2.0f); return s*sqrtf(-2*logf(u1))*cosf(2*M_PI*u2);}
@@ -37,6 +39,10 @@ int main(int argc, char** argv){ console.begin(&Serial); magArray.begin(); magAr
   if (far) printf("far: hovering %.0f-%.0f mm up\n", zLow, zHigh);
   printf("levers: view %.2f Hz / beta %.3f, cursor %.2f / %.3f, shaft %.2f / %.2f, accel %.0f, speed jitter K %.2f\n", tr.viewMinCutoff, tr.viewBeta, tr.oneEuroMinCutoff, tr.oneEuroBeta, tr.shaftMinCutoff, tr.shaftBeta, tr.accelSigma, magLocator.speedJitterK);
   magLocator.tipOffsetMm = 0; tr.tipOffsetMm = 0; tr.cursorMode = MAGCURSOR_POINTED;
+  // MAG_BIAS=i,x,y,z in the environment: a zero error at sensor i (mT, board frame) on every frame
+  if (getenv("MAG_WCAP")) { magArray.setWeightCap(atof(getenv("MAG_WCAP"))); printf("weight cap %s\n", getenv("MAG_WCAP")); }
+  if (getenv("MAG_FREE")) { magLocator.forgetStrength(); printf("strength free (not held)\n"); }
+  bool biasOn=false; int biasI=0; Vec3 bias={0,0,0}; if (getenv("MAG_BIAS")) { biasOn = sscanf(getenv("MAG_BIAS"), "%d,%f,%f,%f", &biasI, &bias.x, &bias.y, &bias.z)==4; if (biasOn) printf("bias: sensor %d %.4f %.4f %.4f mT\n", biasI, bias.x, bias.y, bias.z); }
   Vec3 p={27,22,zLow+2.5f}, v={0,0,0}, goal=p; float lean=0.3f, az=1.0f, leanGoal=0.3f, azGoal=1.0f; int dwell=0;
   std::vector<Sample> samples; double restSpeed=0, restAlpha=0, moveSpeed=0; long restN=0, moveN=0;
   for (int f=0; f<30000; f++) { // 5 min
@@ -51,10 +57,11 @@ int main(int argc, char** argv){ console.begin(&Serial); magArray.begin(); magAr
     Vec3 shaft={sinf(lean)*cosf(az), sinf(lean)*sinf(az), cosf(lean)};
     bool moving = sqrtf(v.x*v.x+v.y*v.y+v.z*v.z) > 5.0f; bool turning = fabsf(leanGoal-lean)>0.02f || fabsf(daz)>0.02f;
     simMicros += 10000; Vec3 m = { 4200*shaft.x, 4200*shaft.y, 4200*shaft.z };
-    for (int i=0;i<MAG_SENSOR_COUNT;i++){ magArray.field[i]=magFitDipoleField(magArray.position[i],p,m); magArray.field[i].x+=gauss(0.006f); magArray.field[i].y+=gauss(0.006f); magArray.field[i].z+=gauss(0.004f); magArray.fresh[i]=true; }
+    for (int i=0;i<MAG_SENSOR_COUNT;i++){ float k = magArray.noiseMt[i]/MAG_WEIGHT_REFERENCE_MT; magArray.field[i]=magFitDipoleField(magArray.position[i],p,m); magArray.field[i].x+=gauss(0.010f*k); magArray.field[i].y+=gauss(0.010f*k); magArray.field[i].z+=gauss(0.010f*k); magArray.fresh[i]=true; }
+    if (biasOn) { magArray.field[biasI].x+=bias.x; magArray.field[biasI].y+=bias.y; magArray.field[biasI].z+=bias.z; }
     magArray.frameCount++; magLocator.service();
     // the cursor's truth: down the shaft to the surface plane (17.5), as the tracker defines it
-    Vec3 ct = p; { float drop = p.z - magLocator.boardZ; float lean2 = sqrtf(shaft.x*shaft.x+shaft.y*shaft.y); float reach = shaft.z>1e-3f? drop*lean2/shaft.z : 40; if (reach>40) reach=40; if (lean2>1e-6f){ ct.x = p.x - reach*shaft.x/lean2; ct.y = p.y - reach*shaft.y/lean2; } ct.z = magLocator.boardZ; }
+    Vec3 ct = p; { float reachT = 0; ct = magTrackPointer(magLocator.boardZ, MAGTRACK_MAX_REACH_MM, p, shaft, &reachT); } // the cursor's truth: the same geometry the tracker uses (touching = the point, else the pointer)
     Sample s = { p, shaft, tr.position, tr.viewPosition, ct, tr.cursor, tr.shaft, tr.state==MAGTRACK_TRACKING, moving, turning };
     samples.push_back(s);
     if (!moving && !turning && dwell>0) { restSpeed += magLocator.smoothSpeed; restAlpha += magLocator.smoothAlpha; restN++; } else if (moving) { moveSpeed += magLocator.smoothSpeed; moveN++; }

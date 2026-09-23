@@ -64,17 +64,14 @@ void magTrackReset( MagTrack* t ) {
 
 // ---- the cursor ------------------------------------------------------------
 
-Vec3 magTrackCursorOf( const MagTrack* t, Vec3 tip, Vec3 shaft, float* reachMm ) {
+Vec3 magTrackPointer( float surfaceZ, float maxReachMm, Vec3 tip, Vec3 shaft, float* reachMm ) {
     Vec3 cursor = tip;
     *reachMm = 0.0f;
-    float drop = tip.z - t->surfaceZ;
-    if ( drop <= 0.0f ) {
-        return cursor; // in a hole (or level with the surface): the point is the cursor
+    float drop = tip.z - surfaceZ;
+    if ( drop <= MAGTRACK_CONTACT_MM ) {
+        return cursor; // touching (in a hole, on the surface, or within a hair of it): the point is the cursor
     }
-    cursor.z = t->surfaceZ;
-    if ( t->cursorMode == MAGCURSOR_UNDER ) {
-        return cursor;
-    }
+    cursor.z = surfaceZ;
     // Down the shaft to the plane: a horizontal reach of drop * tan(tilt),
     // capped, in the direction the shaft leans away from vertical (the point
     // is DOWN the shaft from the magnet, so the cursor lies on the -shaft side).
@@ -82,14 +79,32 @@ Vec3 magTrackCursorOf( const MagTrack* t, Vec3 tip, Vec3 shaft, float* reachMm )
     if ( lean < 1e-4f ) {
         return cursor;
     }
-    float reach = shaft.z > 1e-3f ? drop * lean / shaft.z : t->maxReachMm;
-    if ( reach > t->maxReachMm ) {
-        reach = t->maxReachMm;
+    // tan(tilt), the tilt no flatter than MAGTRACK_MAX_POINT_TILT_DEG.
+    float maxTan = tanf( MAGTRACK_MAX_POINT_TILT_DEG * (float)M_PI / 180.0f );
+    float tanTilt = shaft.z > 1e-3f ? lean / shaft.z : maxTan;
+    if ( tanTilt > maxTan ) {
+        tanTilt = maxTan;
+    }
+    float reach = drop * tanTilt;
+    if ( reach > maxReachMm ) {
+        reach = maxReachMm;
     }
     cursor.x = tip.x - reach * shaft.x / lean;
     cursor.y = tip.y - reach * shaft.y / lean;
     *reachMm = reach;
     return cursor;
+}
+
+Vec3 magTrackCursorOf( const MagTrack* t, Vec3 tip, Vec3 shaft, float* reachMm ) {
+    if ( t->cursorMode == MAGCURSOR_UNDER ) {
+        *reachMm = 0.0f;
+        Vec3 cursor = tip;
+        if ( tip.z > t->surfaceZ ) {
+            cursor.z = t->surfaceZ; // straight under the tip; in a hole, the point itself
+        }
+        return cursor;
+    }
+    return magTrackPointer( t->surfaceZ, t->maxReachMm, tip, shaft, reachMm );
 }
 
 // The 1-Euro filter: low-pass with a cutoff that rises with the (filtered) speed.
@@ -199,14 +214,19 @@ static void finishFrame( MagTrack* t, float dtS, bool roughHeld ) {
     t->tiltDeg = acosf( t->shaft.z > 1.0f ? 1.0f : ( t->shaft.z < -1.0f ? -1.0f : t->shaft.z ) ) * 180.0f / (float)M_PI;
     t->tip = { t->position.x - t->tipOffsetMm * t->shaft.x, t->position.y - t->tipOffsetMm * t->shaft.y, t->position.z - t->tipOffsetMm * t->shaft.z };
     t->rawCursor = magTrackCursorOf( t, t->tip, t->shaft, &t->reachMm );
-    t->cursor.x = oneEuro( &t->euro[ 0 ], t->rawCursor.x, dtS, t->oneEuroMinCutoff, t->oneEuroBeta );
-    t->cursor.y = oneEuro( &t->euro[ 1 ], t->rawCursor.y, dtS, t->oneEuroMinCutoff, t->oneEuroBeta );
+    // A rough fix (the far probe: 8-12 mm bars, the glow) gets a calmer
+    // filter of its own, with no opening for speed: about here, smoothly.
+    bool roughNow = t->state == MAGTRACK_ROUGH;
+    float cursorCutoff = roughNow ? MAGTRACK_ROUGH_CUTOFF_HZ : t->oneEuroMinCutoff, cursorBeta = roughNow ? 0.0f : t->oneEuroBeta;
+    float viewCutoff = roughNow ? MAGTRACK_ROUGH_CUTOFF_HZ : t->viewMinCutoff, viewBeta = roughNow ? 0.0f : t->viewBeta;
+    t->cursor.x = oneEuro( &t->euro[ 0 ], t->rawCursor.x, dtS, cursorCutoff, cursorBeta );
+    t->cursor.y = oneEuro( &t->euro[ 1 ], t->rawCursor.y, dtS, cursorCutoff, cursorBeta );
     t->cursor.z = t->rawCursor.z;
     // What the scene draws: the same magnet through a filter of its own, so
     // the picture can be calmer than the track without slowing the cursor.
-    t->viewPosition.x = oneEuro( &t->viewEuro[ 0 ], t->position.x, dtS, t->viewMinCutoff, t->viewBeta );
-    t->viewPosition.y = oneEuro( &t->viewEuro[ 1 ], t->position.y, dtS, t->viewMinCutoff, t->viewBeta );
-    t->viewPosition.z = oneEuro( &t->viewEuro[ 2 ], t->position.z, dtS, t->viewMinCutoff, t->viewBeta );
+    t->viewPosition.x = oneEuro( &t->viewEuro[ 0 ], t->position.x, dtS, viewCutoff, viewBeta );
+    t->viewPosition.y = oneEuro( &t->viewEuro[ 1 ], t->position.y, dtS, viewCutoff, viewBeta );
+    t->viewPosition.z = oneEuro( &t->viewEuro[ 2 ], t->position.z, dtS, viewCutoff, viewBeta );
     t->viewTip = { t->viewPosition.x - t->tipOffsetMm * t->shaft.x, t->viewPosition.y - t->tipOffsetMm * t->shaft.y, t->viewPosition.z - t->tipOffsetMm * t->shaft.z };
     // The cursor's bar: the track's, plus what a few degrees of shaft error do
     // over the reach, plus the tip offset's share of the same.

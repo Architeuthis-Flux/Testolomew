@@ -18,6 +18,11 @@
 //   @magnet off
 //   @move <dx> <dy> <dz> <ms>  glide the magnet by this much over this long
 //   @dropout <ms>              no readings for this long
+//   @dead <i> <ms>             sensor i not read for this long (the others go on)
+//   @bias <i> <x> <y> <z>      a zero error at sensor i: this much (mT, board frame) added to every reading
+//   @gain <i> <factor>         sensor i reads this much of the true field (a gain error)
+//   @tip <mm>                  the probe's magnet sits this far up the shaft from its point (the world's truth; -1 = as the locator believes)
+//   @surface <mm>              where the board's top really is (the @magnet row form rests the point on it; the locator's S is its belief)
 //   @strip on|off              pretend a real LED chain is wired (the LED-first rule)
 //   @type "text" [n] [gap ms]  type text n times with a gap
 //   @expect "text" [ms]        the text must appear in what was printed since
@@ -91,8 +96,17 @@ class WorldService : public Service {
     Vec3 magnet = { 0, 0, 0 };
     Vec3 shaft = { 0, 0, 1 };
     float strength = 4200.0f;
-    float noise = 0.005f;
+    float surfaceZ = MAGLOC_BOARD_Z_MM; // @surface: where the board's top really is (the locator's setting is its belief)
+    float tipMm = -1.0f; // @tip: the magnet's centre this far up the shaft from the point (-1 = whatever the locator believes)
+    float noise = 0.010f; // a TMAG5273's per-axis noise a frame at the reference (0.011 mT): 0.012 on the bench (2026-09-21), the MMC's 0.0003 by its ratio
     uint64_t dropoutUntilUs = 0;
+    uint64_t deadUntilUs[ MAG_SENSOR_COUNT ] = { }; // @dead: one sensor not read until then
+    Vec3 bias[ MAG_SENSOR_COUNT ] = { }; // @bias: a zero error at a sensor, added to every frame
+    float gain[ MAG_SENSOR_COUNT ]; // @gain: a sensor reads this much of the true field
+    WorldService( ) {
+        for ( int i = 0; i < MAG_SENSOR_COUNT; i++ )
+            gain[ i ] = 1.0f;
+    }
     // A glide under way.
     bool moving = false;
     Vec3 moveFrom, moveTo;
@@ -111,8 +125,15 @@ class WorldService : public Service {
         Vec3 moment = { strength * shaft.x, strength * shaft.y, strength * shaft.z };
         for ( int i = 0; i < MAG_SENSOR_COUNT; i++ ) {
             Vec3 b = on ? magFitDipoleField( magArray.position[ i ], magnet, moment ) : Vec3{ 0, 0, 0 };
-            magArray.field[ i ] = { b.x + gauss( noise ), b.y + gauss( noise ), b.z + gauss( noise ) };
-            magArray.fresh[ i ] = !dropout;
+            // Each sensor's noise scaled by its type's (an MMC56x3 is 30-50x quieter than a TMAG5273).
+            float n = noise * magArray.noiseMt[ i ] / MAG_WEIGHT_REFERENCE_MT;
+            // As the array does it: the reading into raw[], the field less the
+            // baseline - so the zero's drift rules (MagArray::driftBaseline)
+            // act here as on the board.
+            magArray.raw[ i ] = { gain[ i ] * b.x + bias[ i ].x + gauss( n ), gain[ i ] * b.y + bias[ i ].y + gauss( n ), gain[ i ] * b.z + bias[ i ].z + gauss( n ) };
+            Vec3 zero = magArray.baselineOf( i );
+            magArray.field[ i ] = { magArray.raw[ i ].x - zero.x, magArray.raw[ i ].y - zero.y, magArray.raw[ i ].z - zero.z };
+            magArray.fresh[ i ] = !dropout && simMicros >= deadUntilUs[ i ];
             magArray.saturated[ i ] = false;
         }
         magArray.frameCount++;
@@ -369,9 +390,9 @@ static bool directive( const std::vector<std::string>& w, int lineNo ) {
             float lean = ( w.size( ) >= 6 ? atof( w[ 5 ].c_str( ) ) : 0.0f ) * (float)M_PI / 180.0f;
             RowPlace place = rowGridHolePlace( row, hole );
             Vec3 tip = rowGridToBoard( &rowCounter.grid, place.along, place.acrossMm );
-            tip.z = magLocator.boardZ + up;
+            tip.z = world.surfaceZ + up;
             world.shaft = { sinf( lean ), 0.0f, cosf( lean ) };
-            world.magnet = { tip.x + magLocator.tipOffsetMm * world.shaft.x, tip.y + magLocator.tipOffsetMm * world.shaft.y, tip.z + magLocator.tipOffsetMm * world.shaft.z };
+            { float tt = world.tipMm >= 0.0f ? world.tipMm : magLocator.tipOffsetMm; world.magnet = { tip.x + tt * world.shaft.x, tip.y + tt * world.shaft.y, tip.z + tt * world.shaft.z }; }
             world.on = true;
             world.moving = false;
         } else if ( w.size( ) >= 7 ) {
@@ -393,6 +414,27 @@ static bool directive( const std::vector<std::string>& w, int lineNo ) {
         world.moveEndUs = simMicros + (uint64_t)ms * 1000u;
         world.moving = true;
         run( ms );
+    } else if ( d == "@baselines" ) {
+        for ( int i = 0; i < magArray.sensorCount( ); i++ ) {
+            Vec3 z = magArray.baselineOf( i );
+            printf( "baseline %d: %.4f %.4f %.4f  field %.4f %.4f %.4f\n", i, z.x, z.y, z.z, magArray.field[ i ].x, magArray.field[ i ].y, magArray.field[ i ].z );
+        }
+    } else if ( d == "@dead" && w.size( ) >= 3 ) {
+        int i = atoi( w[ 1 ].c_str( ) );
+        if ( i >= 0 && i < MAG_SENSOR_COUNT )
+            world.deadUntilUs[ i ] = simMicros + (uint64_t)atol( w[ 2 ].c_str( ) ) * 1000u;
+    } else if ( d == "@surface" && w.size( ) >= 2 ) {
+        world.surfaceZ = (float)atof( w[ 1 ].c_str( ) );
+    } else if ( d == "@tip" && w.size( ) >= 2 ) {
+        world.tipMm = (float)atof( w[ 1 ].c_str( ) );
+    } else if ( d == "@gain" && w.size( ) >= 3 ) {
+        int i = atoi( w[ 1 ].c_str( ) );
+        if ( i >= 0 && i < MAG_SENSOR_COUNT )
+            world.gain[ i ] = (float)atof( w[ 2 ].c_str( ) );
+    } else if ( d == "@bias" && w.size( ) >= 5 ) {
+        int i = atoi( w[ 1 ].c_str( ) );
+        if ( i >= 0 && i < MAG_SENSOR_COUNT )
+            world.bias[ i ] = { (float)atof( w[ 2 ].c_str( ) ), (float)atof( w[ 3 ].c_str( ) ), (float)atof( w[ 4 ].c_str( ) ) };
     } else if ( d == "@dropout" && w.size( ) >= 2 ) {
         world.dropoutUntilUs = simMicros + (uint64_t)atol( w[ 1 ].c_str( ) ) * 1000u;
     } else if ( d == "@strip" && w.size( ) >= 2 ) {
@@ -488,8 +530,10 @@ int main( int argc, char** argv ) {
             std::vector<std::string> w = words( line );
             if ( w[ 0 ] != "@expect" )
                 mark = outText.size( );
-            if ( !directive( w, lineNo ) )
+            if ( !directive( w, lineNo ) ) {
+                failures++; // a script that cannot go on has failed (2026-09-21: an unknown directive ended a run green at 28 s)
                 break;
+            }
             continue;
         }
         mark = outText.size( );

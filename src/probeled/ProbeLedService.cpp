@@ -219,6 +219,12 @@ void ProbeLedService::sendFrame( bool chainFree, bool topFree, int count ) {
             stripWorstScale = k;
         }
     }
+    // The slew: no more than PROBELED_MAX_STEP_MA above the last frame sent.
+    float allowed = stripLastMa + PROBELED_MAX_STEP_MA;
+    if ( ma * k > allowed && allowed > 0.0f ) {
+        k = allowed / ma;
+        stripSlewedFrames++;
+    }
     // Scaled channels are truncated, not rounded: rounding up by half a
     // count on each of 1200 channels is 28 mA past the budget (8 % of it).
     // What is sent is what is summed for the report.

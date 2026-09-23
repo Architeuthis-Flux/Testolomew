@@ -33,7 +33,7 @@
 
 // The console is Serial = USART1 on PA9 (TX) / PA10 (RX), which the onboard
 // WCH-LinkE bridges to USB through solder bridges SB4 / SB3 (see
-// board_build.serial in platformio.ini). SWD is PB8 / PB9 through SB5 / SB6.
+// board_build.serial in platformio.ini). SWD is PB8 / PB9 through SB5 / SB6.w
 
 // ---- magnetometer array (header J5 and J9) --------------------------------
 // 4x2 TMAG5273. One I2C bus, and each sensor's VCC on its own GPIO so they can
@@ -42,6 +42,19 @@
 // pull-ups in open-drain mode.
 #define PIN_MAG_SCL PA8 // I2C3 (the silicon pairs PA8 with PC9)
 #define PIN_MAG_SDA PC9
+
+// A second sensor bus, for parts with a fixed I2C address (the two
+// MMC5633NJLs both answer at 0x30, so one of them shares the TMAG bus
+// above and the other has this bus to itself; MagArrayConfig.h says which).
+// The pairs the silicon offers that reach the headers unused: I2C4 on
+// PF12 (SCL, J10 pin 13) / PF13 (SDA, J6 pin 13) - the others are on the SD
+// socket (PB10/PB11), the nav switch and button B (PD12/PD13, which stay
+// theirs), the debug port (PB8/PB9), the first bus's own block (PA14/PA13)
+// or not on a header at all (PB6/PB7, PC0/PC1). The same 2.2k-4.7k pull-ups
+// to 3.3 V as the first bus, and the wires kept away from the LED strip's
+// data line (PD7). -1 = not wired (sensors on it are reported absent).
+#define PIN_MAG2_SCL PF12 // J10 pin 13
+#define PIN_MAG2_SDA PF13 // J6 pin 13
 
 // Sensor VCC pins, sensor 0..7. Set A is on J5, set B on J9.
 #define PIN_MAG_VCC_0 PD0

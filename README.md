@@ -2,7 +2,7 @@
 
 The test bed for Jumperless V6 ideas: a [nanoCH32H417](https://github.com/wuxx/nanoCH32H417) dev board (WCH CH32H417, the coprocessor planned for V6), PlatformIO, and firmware laid out like [JumperlOS](https://github.com/Architeuthis-Flux/JumperlOS) so that whatever works here can be carried over.
 
-First experiment: **locating a magnet in 3D with a 4×2 array of TMAG5273 Hall sensors**, as a way to track a cable-free probe, and showing it on the board's LCD.
+First experiment: **locating a magnet in 3D with a 4×2 array of TMAG5273 Hall sensors** (plus, since 2026-09-21, an MMC5633NJL AMR magnetometer at the centre of the same array - the sensor table mixes types), as a way to track a cable-free probe, and showing it on the board's LCD.
 
 ![The 3D view, rendered on the host from simulated sensor readings](docs/magview-simulated.png)
 
@@ -28,7 +28,7 @@ pio run -t compiledb      # compile_commands.json for clangd
 
 The first build downloads the CH32 platform, the RISC-V toolchain and the CH32H4 Arduino core.
 
-Three things that bite: editing `platformio.ini` changes the project checksum, and the next PlatformIO run - including the IDE extension's own background one - empties `.pio/build`, so if a flash is in progress it loses its ELF (copy the ELF elsewhere and flash that with `~/.platformio/packages/tool-wlink/wlink flash file.elf`). The WCH-LinkE can wedge so that `wlink flash` connects, erases, and then never acknowledges the first 4 KB write; a USB device reset clears it (pyusb with libusb: `dev = usb.core.find(idVendor=0x1a86, idProduct=0x8010); dev.reset()`). And `Error while fastprogram: [41, 01, 01, 05]`, after which the WCH-LinkE drops off USB for 20-40 s and comes back on its own: that one is the V3F. It has no instruction cache, fetches every instruction from the flash being programmed, and a page program with it running does not complete (the Arduino core's `ch32h4_park.c`); it hit every other flash once the sensor sampler ran on that core, and once left a half-written image that needed RESET held through the next flash. So before a flash the firmware must park the V3F: `pio run -t upload` sends the console command `F` first (`scripts/park_before_upload.py`), and flashing by hand with wlink you send `F` yourself (`python3 tools/readport.py <port> 1 /dev/null F`, then `wlink flash file.elf`; the reset after the flash brings both cores back). If a flash still fails: wait for `/dev/cu.usbmodem*` to return and flash again; if wlink answers `protocol error 0x55` to everything, hold RESET down while running the flash.
+Three things that bite: editing `platformio.ini` changes the project checksum, and the next PlatformIO run - including the IDE extension's own background one - empties `.pio/build`, so if a flash is in progress it loses its ELF (copy the ELF elsewhere and flash that with `~/.platformio/packages/tool-wlink/wlink flash file.elf`). The WCH-LinkE can wedge so that `wlink flash` connects, erases, and then never acknowledges the first 4 KB write; a USB device reset clears it (pyusb with libusb: `dev = usb.core.find(idVendor=0x1a86, idProduct=0x8010); dev.reset()`). And `Error while fastprogram: [41, 01, 01, 05]`, after which the WCH-LinkE drops off USB for 20-40 s and comes back on its own: that one is the V3F. It has no instruction cache, fetches every instruction from the flash being programmed, and a page program with it running does not complete (the Arduino core's `ch32h4_park.c`); it hit every other flash once the sensor sampler ran on that core, and once left a half-written image that needed RESET held through the next flash. So before a flash the firmware must park the V3F: `pio run -t upload` sends the console command `F` first (`scripts/park_before_upload.py`), and flashing by hand with wlink you send `F` yourself (`python3 tools/readport.py <port> 1 /dev/null F`, then `wlink flash file.elf`; the reset after the flash brings both cores back). If a flash still fails: wait for `/dev/cu.usbmodem*` to return and flash again; if wlink answers `protocol error 0x55` to everything, that is its chip auto-detection failing on a halted or erased chip: `wlink flash --chip CH32H41X file.elf` attaches (the project's `upload_command` names the chip for this reason, 2026-09-21).
 
 The board boots with its last zero: the array is zeroed once (`z`, with the probe away) and that zero is kept in flash, so a reboot with the probe lying on the board does not zero the magnet into the baseline (which made it invisible; every reflash during the first night did that). The console takes single-character commands; `?` lists them. With every module on:
 
@@ -40,7 +40,12 @@ The board boots with its last zero: the array is zeroed once (`z`, with the prob
 | `z` | re-zero the ambient baseline (probe well away). The board never zeroes blind at boot: the saved zero is put back, or the compiled-in `MAG_ZERO_AT_BOOT` when none is saved |
 | `p` | power-cycle and re-address every sensor |
 | `i` | identify: print which sensor reads strongest |
-| `b` | bus check: are there pull-ups on SCL/SDA, and what acknowledges with each sensor powered alone |
+| `b` | bus check: are there pull-ups on SCL/SDA (each bus), and what acknowledges with each sensor powered alone; whether the fixed-address parts answer |
+| `w` | weight cap: how much more the fit trusts the quieter sensor type, `w20⏎` = 2.0× a TMAG5273 (`MAG_WEIGHT_CAP`), `w0⏎` = every sensor equal |
+| `:mmc <i> [cfg <odr> <bw> <autoSR>]` | an MMC56x3's Status1 and raw data bytes three times, 50 ms apart, from the main core; reconfigured first if asked |
+| `:watch <i>[,<j>...]|all|off` | while wiring: the listed sensors are looked for every half second and a banner on the screen shows a line per sensor, red with a clock until it answers, green blinking with its product ID and read count once it does |
+| `q`, `Q` | tip calibration: the point resting in one hole, `q` at each of three or more angles, `Q` solves the magnet-to-point distance and uses it (saved as cursor/tip) |
+| `:audit` | the zero audit: each sensor's zero and gain against the fit of the others while the probe is near (`:audit reset` clears the samples) |
 | `n` | LED strip statistics and the power line: the last frame's current by the model, the budget in force (the menu's "budget mA", never above the compiled-in ceiling `PROBELED_STRIP_HARD_MAX_MA`; a frame that would draw more is dimmed whole), then a dot runs up the chain |
 | `F` | before a reflash by hand: stop the sampler and park the other core in ITCM (it would otherwise fetch the flash being written and the program would fail); nothing is read until the reset after the flash. `pio run -t upload` sends it itself |
 | `f` | stream field frames as CSV |
@@ -83,10 +88,12 @@ All in `src/board/BoardPins.h`. For the magnetometer array:
 | | Pin |
 |---|---|
 | SCL / SDA | PA8 / PC9 (I2C3), **with external pull-ups to 3.3 V**; this chip has no internal ones for I²C |
+| Second bus SCL / SDA | PF12 (J10 pin 13) / PF13 (J6 pin 13) (I2C4), the same pull-ups; the MMC5633NJL is on it (sensor 8, at the board's centre on the back) |
 | Sensor VCC 0–7 | PD0, PC10, PC11, PA14, PD6, PD2, PD3, PD4 |
 | Sensor ground, set A / set B | PA15 / PD5 |
+| MMC5633NJL (sensor 8) | VDD 3.3 V and VSA ground, no switching, on the second bus. A part with no VDD still answers (fed through the bus lines) but measures nothing and can hold both lines low |
 
-The sensors' supplies are GPIOs because a TMAG5273 forgets an assigned I²C address whenever it loses power: they have to be powered up one at a time and re-addressed at every boot. `src/magarray/MagArray.h` explains the sequence. The array's geometry (pitch, order, each sensor's rotation) is `src/magarray/MagArrayConfig.h`; the default 20 mm pitch is a placeholder to be measured.
+The TMAG5273s' supplies are GPIOs because a TMAG5273 forgets an assigned I²C address whenever it loses power: they have to be powered up one at a time and re-addressed at every boot. `src/magarray/MagArray.h` explains the sequence. The MMC5633NJL has a fixed address (0x30) and is simply looked for on its bus. The array's table - each slot's type, bus, address, place, rotation, gain and face - is `src/magarray/MagArrayConfig.h`; the MMC's row was measured with `tools/magcal` on 2026-09-21 (`tools/recordings/2026-09-21-mmc-centre-calibration.txt`). The fit weights each sensor per frame by its noise and the share of its reading no dipole explains (`magSensorFrameWeight`), so the quiet MMC carries a far probe on its own and counts as one more TMAG close in; the magnet's strength is held (`MAGLOC_MAGNET_STRENGTH`) because far out the MMC's three numbers alone cannot tell a weak magnet near from the real one far, and the last good fix's direction is a soft prior on what three numbers cannot pin. `docs/knobs.md` has the numbers.
 
 The LCD is whatever ST7789 panel is on the board's 12-pin FPC connector; `src/display/ST7789.h` has the numbers for the common ones (default 1.54" 240×240).
 
@@ -134,7 +141,7 @@ Conventions are JumperlOS's: Arduino framework, feature folders under `src/` wit
 
 ## Calibrating the array
 
-`tools/magcal.cpp` works out where each sensor really is, how it is turned, and its gain, from a recording of a magnet being waved over the array: stream frames with `f`, save them to a file, measure one real distance (sensor 4 to sensor 7) for scale, and
+`tools/magcal.cpp` works out where each sensor really is, how it is turned, and its gain, from a recording of a magnet being waved over the array (8 or 10 sensors: it reads the column count, and knows which slots are MMC56x3s with their z-up convention). To add a sensor to the calibrated array - the MMC - record the PROBE's small magnet waved 15-40 mm over the whole board (the calibration magnet clips an MMC 44 mm out) and run `./magcal rec.txt 53.4 1e9 seen=3 only=8`: the listed sensors are refined against poses from the trusted ones, both faces tried; put the rotation and gain it prints (and `underside` if it says z down) into the table and set that row's `calibrated` to true. For the whole array: stream frames with `f`, save them to a file, measure one real distance (sensor 4 to sensor 7) for scale, and
 
 ```sh
 cd tools
@@ -142,7 +149,7 @@ c++ -std=c++11 -O2 -I../src/magfit -I../src/common magcal.cpp ../src/magfit/MagF
 ./magcal recordings/my-recording.txt 53.4 100     # 53.4 = mm from sensor 4 to 7; frames after 100 s are held back as a test
 ```
 
-Copy the table it prints into `src/magarray/MagArrayConfig.h` (and into `magcal.cpp`'s own copy, which must match the firmware the recording was made with). `tools/recordings/` has the recording the current table came from and the ruler test that checked it. Before calibrating, `i` (sensor order) and `o` (rotation, side, row order) get the table close enough for the solver to converge.
+Copy the table it prints into `src/magarray/MagArrayConfig.h` (and into `magcal.cpp`'s own copy). A recording is decoded through the rows the firmware streamed it with: put a `# streamed-with <i> <x> <y> <z> <rotation> <gain> <zUp>` line at its top for any row that differs from the table now (the MMC recording has one), or the stream is undone through the wrong row. `tools/recordings/` has the recording the current table came from and the ruler test that checked it. Before calibrating, `i` (sensor order) and `o` (rotation, side, row order) get the table close enough for the solver to converge.
 
 The row grid the firmware boots with (`ROWCOUNT_GRID_AT_BOOT`) came from `tools/gridfit.cpp`: a file of `row hole x y z sigmaMm` lines (one per known hole, from a stepping run like `tools/recordings/2026-09-17-row-stepping-anchors.txt`), built with `c++ -std=c++11 -O2 -I../src/rowcount -I../src/common gridfit.cpp ../src/rowcount/RowGrid.cpp -o gridfit`, prints the fit, the define to paste, and every anchor's miss. `tools/readport.py <port> <seconds> <outfile> [keys]` captures the console with a timestamp per line and sends the keys first (only one program may have the port open, so close the monitor). `tools/fixstats.py <capture>...` gives a `d` stream's rest statistics (robust and plain jitter of the raw fix, the track and the cursor, axis wander, misfit, fit time); `tools/recordings/2026-09-1[89]-night-*.txt` are the night of 2026-09-18's before and after, and `docs/morning-report-2026-09-19.md` reads them. `docs/knobs.md` is the reference card: every menu item and console command, what it does and its default, and every compile-time knob touched in the night and morning of 2026-09-18/19 with its reason. `tools/hostsim/` runs the whole firmware on a PC (its README has the build lines).
 

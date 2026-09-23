@@ -96,7 +96,13 @@ Vec3 magFitDipoleField( Vec3 sensor, Vec3 magnet, Vec3 moment );
 
 // Fit a dipole to `count` readings. sensors[i] is where sensor i sits (mm),
 // fields[i] its reading (mT, board frame, ambient already subtracted), and
-// use[i] (may be null = all) leaves dead sensors out.
+// use[i] (may be null = all) leaves dead sensors out. weights[i] (may be
+// null = all 1) is how much each sensor's three readings count: a weighted
+// least squares, each sensor's rows scaled by its weight - the reference
+// noise over that sensor's noise when the array mixes sensor types
+// (MagArray::weight). The residual, signal and misfit come out in the
+// weighted units (a weight-1 sensor's mT); sigma is the weighted
+// covariance's, which is what it should be.
 //
 // If result->valid is true on entry its position is the starting guess (warm
 // start - the normal case while tracking, a few iterations). Otherwise the
@@ -106,8 +112,15 @@ Vec3 magFitDipoleField( Vec3 sensor, Vec3 magnet, Vec3 moment );
 // Returns result->valid. maxMisfit is the residual/signal ratio above which
 // the fit is called invalid (0.25 is a reasonable start: a real magnet near
 // the array fits to a few percent, and junk does not fit at all).
+// strengthHint > 0 is the magnet's strength if it is known: the cold start's
+// lattice then prefers points whose fitted moment is that size. It matters
+// when one sensor reads most of the signal - a quiet MMC56x3 under a probe
+// far up, the TMAG5273s at noise - because then ANY position fits that
+// sensor's three numbers with some moment, and without the hint the lattice
+// settles on a weak magnet a few mm up (2026-09-21: the bench showed "row
+// 13, z 6, strength 103" for the probe hovering an inch over the board).
 bool magFitSolve( const Vec3* sensors, const Vec3* fields, const bool* use, int count,
-                  float maxMisfit, MagFitResult* result );
+                  float maxMisfit, MagFitResult* result, const float* weights = nullptr, float strengthHint = 0.0f );
 
 // The same, one slice at a time: a warm start is one call (and a failed
 // one is just that: the caller starts cold on a later call); a cold start
@@ -124,7 +137,7 @@ bool magFitSolve( const Vec3* sensors, const Vec3* fields, const bool* use, int 
 // is a steady load on the supply instead of bursts (MagLocator's "fit
 // load: steady"). 0 = the natural caps.
 bool magFitSolveStep( const Vec3* sensors, const Vec3* fields, const bool* use, int count,
-                      float maxMisfit, MagFitResult* result, int budget = 0 );
+                      float maxMisfit, MagFitResult* result, int budget = 0, const float* weights = nullptr, float strengthHint = 0.0f );
 
 // The same, for a magnet whose strength |moment| is already known - which a
 // probe's is: it carries one magnet. With the strength free, a magnet a little
@@ -138,8 +151,32 @@ bool magFitSolveStep( const Vec3* sensors, const Vec3* fields, const bool* use, 
 // strength held near `strength` - held softly, as one extra equation, so a
 // magnet that is a few percent off (temperature, a different sample) still
 // fits. result->strength comes back as what the fit settled on.
+//
+// axisPrior (may be null) is a unit vector the moment's direction is held
+// near, softly: three more rows, axisPriorWeight * (v - prior), in the
+// readings' own (weighted) mT - about a sensor's noise, 0.02, so a swing of
+// the whole direction costs what one noisy reading does. Near the array,
+// where a degree of direction is a percent of the field, the readings
+// outvote it a hundred to one and it changes nothing; far out it is what
+// makes a fix at all: one quiet sensor reading the magnet and the rest
+// reading noise is three numbers for five unknowns, and the last known
+// direction of the probe fills in the two the data cannot (with the error
+// bar counting that as knowledge, so read a far fix's tilt as "assumed").
 bool magFitSolveKnownStrength( const Vec3* sensors, const Vec3* fields, const bool* use, int count,
-                               float maxMisfit, float strength, MagFitResult* result );
+                               float maxMisfit, float strength, MagFitResult* result, const float* weights = nullptr,
+                               const Vec3* axisPrior = nullptr, float axisPriorWeight = 0.0f );
+// The second half of that on its own: `result` holds a free fit's answer
+// (position and moment, coldStage 0), and it is refined with the strength
+// held (and the direction near the prior). MagLocator runs the free fit in
+// slices (magFitSolveStep, with the strength as its hint) and then this,
+// so a cold start stays sliced and the steady load stays steady. Returns
+// result->valid as magFitSolveKnownStrength does.
+// maxIterations caps the refinement (0 = the natural cap of 30): from a
+// free fit's answer it converges in a few, and the locator gives it 8 so
+// no frame's fit runs long (the V5F's heaviest work shows on the supply).
+bool magFitRefineKnownStrength( const Vec3* sensors, const Vec3* fields, const bool* use, int count,
+                                float maxMisfit, float strength, MagFitResult* result, const float* weights = nullptr,
+                                const Vec3* axisPrior = nullptr, float axisPriorWeight = 0.0f, int maxIterations = 0 );
 
 // Roughly where is the magnet, without iterating: the point of a coarse
 // lattice (MAGFIT_COARSE_*) that explains the readings best, with the moment
@@ -148,7 +185,7 @@ bool magFitSolveKnownStrength( const Vec3* sensors, const Vec3* fields, const bo
 // a weak field, or seen by too few sensors - and its sigma says how rough the
 // answer is. It is also the first thing every cold start does. Fills in the
 // same fields as magFitSolve; result->valid only says there were readings.
-bool magFitCoarse( const Vec3* sensors, const Vec3* fields, const bool* use, int count, MagFitResult* result );
+bool magFitCoarse( const Vec3* sensors, const Vec3* fields, const bool* use, int count, MagFitResult* result, const float* weights = nullptr );
 
 // Solve the n x n system a x = b in place, n <= MAGFIT_MAX_PARAMS (Gaussian
 // elimination, partial pivoting; the answer is left in b). false if singular.

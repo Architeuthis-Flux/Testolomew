@@ -15,6 +15,7 @@
 // as in arduino-pico); everything here runs on the 400 MHz V5F for now.
 // ---------------------------------------------------------------------------
 #include <Arduino.h>
+#include <stddef.h>
 #include <stdlib.h>
 #include <string.h>
 
@@ -26,6 +27,8 @@
 
 #if MODULE_MAG_ARRAY
 #include "MagArray.h"
+#include "MagSampler.h"
+#include "FastDraw.h"
 #endif
 #if MODULE_MAG_LOCATOR
 #include "MagLocator.h"
@@ -38,6 +41,7 @@
 #include "RowCounter.h"
 #endif
 #if MODULE_PROBE_LEDS
+#include "LedStrip.h"
 #include "ProbeLedService.h"
 #endif
 #if MODULE_UI
@@ -97,6 +101,178 @@ class HeartbeatService : public Service {
 };
 
 static HeartbeatService heartbeat;
+
+#if MODULE_SETTINGS && MODULE_PROBE_LEDS
+// The board in the dark for a settings write (Settings.h: aroundWrite).
+// The page erase behind a save is a few tens of ms of extra current, and
+// with the probe near the board - the chain lit around its cursor, up to
+// the budget - it browned the board out (2026-09-21: using the menu with
+// the probe on the board rebooted it; two saves with the probe off in a
+// corner did not). So the chain is cleared first and the cleared frame
+// waited out on the wire: a WS2812 keeps what it was last given, so the
+// LEDs are not off until that frame has landed (12 ms for 400 of them).
+// The chain comes back right after: the next tick sends the live frame. A
+// save shows as one blink of the LEDs. Nothing else needs holding: the
+// loop itself stalls on the erase (the fit and the display run in it),
+// and the sampler on the other core draws next to nothing.
+static bool quietStripWas = false;
+static bool flashWriting = false;    // a settings page erase/program is under way (the flight recorder)
+static uint32_t ledRestoreMs = 0;    // when the chain was last re-lit after one (0 = never)
+static void quietForFlash( bool starting ) {
+    flashWriting = starting;
+    if ( starting ) {
+        quietStripWas = probeLeds.strip;
+        if ( quietStripWas ) {
+            probeLeds.setStrip( false, nullptr ); // waits for the frame in flight, then starts the cleared one
+            ledStripWait( &probeLeds.chain, 50 );
+            if ( probeLeds.topStrip ) {
+                ledStripWait( &probeLeds.top, 50 );
+            }
+            delayMicroseconds( 300 ); // the chain's latch: the frame shows once the wire has been low this long
+        }
+    } else if ( quietStripWas ) {
+        probeLeds.setStrip( true, nullptr );
+        ledRestoreMs = millis( ) == 0 ? 1 : millis( );
+    }
+}
+#endif
+
+// The flight recorder: what the board was doing when it last reset. The
+// brown-outs (2026-09-21: the menu used with the probe on the board; the
+// core's "rst=... por" line at boot says the rail went down, not what
+// pulled it) leave nothing in RAM that the firmware can read - except this
+// region, .xcore, which the linker does not load or clear and a reset does
+// not touch (the core keeps its own fault log there). Every tick the state
+// that draws from the rail is written here; at boot, if the record checks
+// out, it is printed under the core's rst= line. A power-cycle leaves
+// noise in it: the magic word (with the record's size in it, so an older
+// build's bytes are not read through this layout), a sum over the fields
+// and a range check tell noise from a record.
+#ifndef CH32H4_XCORE
+#define CH32H4_XCORE // the host build: ordinary RAM
+#endif
+#define FLIGHT_LABEL 24
+struct FlightRecord {
+    uint32_t magic;
+    uint32_t uptimeMs;
+    float stripMa, stripStepMa, budgetMa; // the chain's last frame, the biggest step in the report window, the budget
+    uint32_t ledRestoreAgoMs;             // since the chain was re-lit after a settings write (0xFFFFFFFF = not since boot)
+    uint32_t coldStarts;
+    float peakMt;
+    uint8_t fitValid, fitRough, present, settingsWriting;
+    int8_t pane;    // PaneKind on top of the screen (-1 = no UI)
+    uint8_t depth;  // overlays open
+    uint16_t fps;
+    char label[ FLIGHT_LABEL ]; // the menu item under the cursor, when a menu page is open
+    uint32_t check;
+};
+#define FLIGHT_MAGIC ( 0x464C5400u ^ (uint32_t)sizeof( FlightRecord ) )
+static FlightRecord CH32H4_XCORE flight;
+
+static uint32_t flightSum( const FlightRecord* r ) {
+    const uint8_t* p = (const uint8_t*)r;
+    uint32_t s = 0x2468;
+    for ( size_t i = 0; i < offsetof( FlightRecord, check ); i++ ) {
+        s = ( ( s << 5 ) | ( s >> 27 ) ) ^ p[ i ];
+    }
+    return s;
+}
+
+class FlightRecorderService : public Service {
+  public:
+    ServiceStatus service( ) override {
+        FlightRecord r = { };
+        r.magic = FLIGHT_MAGIC;
+        uint32_t now = millis( );
+        r.uptimeMs = now;
+#if MODULE_PROBE_LEDS
+        r.stripMa = probeLeds.strip ? probeLeds.stripLastMa : 0.0f;
+        r.stripStepMa = probeLeds.stripMaxStepMa;
+        r.budgetMa = probeLeds.stripBudgetMa( );
+#if MODULE_SETTINGS
+        r.ledRestoreAgoMs = ledRestoreMs == 0 ? 0xFFFFFFFFu : now - ledRestoreMs;
+        r.settingsWriting = flashWriting ? 1 : 0;
+#else
+        r.ledRestoreAgoMs = 0xFFFFFFFFu;
+#endif
+#else
+        r.ledRestoreAgoMs = 0xFFFFFFFFu;
+#endif
+#if MODULE_MAG_LOCATOR
+        r.coldStarts = magLocator.coldStarts;
+        r.peakMt = magLocator.fix.peakMt;
+        r.fitValid = magLocator.fix.valid ? 1 : 0;
+        r.fitRough = magLocator.fix.rough ? 1 : 0;
+        r.present = magLocator.fix.present ? 1 : 0;
+#endif
+        r.pane = -1;
+#if MODULE_UI
+        r.depth = (uint8_t)ui.shell.depth;
+        r.pane = (int8_t)( ui.shell.depth > 0 ? ui.shell.stack[ ui.shell.depth - 1 ] : PANE_APP );
+        if ( r.pane == PANE_MENU ) {
+            const Menu& m = ui.shell.menu;
+            int n = menuVisibleItem( &m, m.cursor );
+            if ( n >= 0 && n < m.count && m.items[ n ].label != nullptr ) {
+                strncpy( r.label, m.items[ n ].label, FLIGHT_LABEL - 1 );
+            }
+        }
+#endif
+#if MODULE_MAG_VIEW
+        r.fps = (uint16_t)( display.fps( ) + 0.5f );
+#endif
+        r.check = flightSum( &r );
+        flight = r;
+        return ServiceStatus::IDLE;
+    }
+    const char* getName( ) const override { return "Flight"; }
+    ServicePriority getPriority( ) const override { return ServicePriority::LOW; }
+    uint32_t periodUs( ) const override { return 10000; }
+};
+
+static FlightRecorderService flightRecorder;
+
+static const char* paneName( int pane ) {
+    switch ( pane ) {
+    case PANE_APP:
+        return "the app";
+    case PANE_HOME:
+        return "Home";
+    case PANE_MENU:
+        return "a menu page";
+    case PANE_CONFIRM:
+        return "a confirm pane";
+    case PANE_RESULT:
+        return "a result pane";
+    default:
+        return "no UI";
+    }
+}
+
+// At boot: the record of the run that ended in the reset, if there is one.
+static void flightReport( Stream& out ) {
+    FlightRecord r = flight;
+    bool valid = r.magic == FLIGHT_MAGIC && r.check == flightSum( &r ) && r.uptimeMs < 7u * 24u * 3600000u && r.stripMa >= 0.0f && r.stripMa < 5000.0f &&
+                 r.budgetMa >= 0.0f && r.budgetMa < 5000.0f && r.depth < 8 && r.fps < 1000;
+    if ( !valid ) {
+        out.println( "flight recorder: no record of a run before this one (a power-up, or the first boot of this build)" );
+    } else {
+        r.label[ FLIGHT_LABEL - 1 ] = '\0';
+        char line[ 320 ];
+        char relit[ 40 ];
+        if ( r.ledRestoreAgoMs == 0xFFFFFFFFu )
+            snprintf( relit, sizeof( relit ), "not re-lit since boot" );
+        else
+            snprintf( relit, sizeof( relit ), "re-lit %lu ms before", (unsigned long)r.ledRestoreAgoMs );
+        snprintf( line, sizeof( line ),
+                  "flight recorder: the last run ended after %lu.%lu s (the rst= line above says how). Then: strip %.0f mA (budget %.0f, biggest step %.0f, %s); fit %s, %lu cold starts, strongest %.3f mT; "
+                  "screen %s%s%s, %u fps; settings write %s",
+                  (unsigned long)( r.uptimeMs / 1000 ), (unsigned long)( r.uptimeMs % 1000 / 100 ), r.stripMa, r.budgetMa, r.stripStepMa, relit,
+                  r.fitValid ? ( r.fitRough ? "rough" : "tracking" ) : ( r.present ? "present, no fix" : "nothing" ), (unsigned long)r.coldStarts, r.peakMt, paneName( r.pane ),
+                  r.pane == PANE_MENU && r.label[ 0 ] != '\0' ? " at " : "", r.pane == PANE_MENU ? r.label : "", (unsigned)r.fps, r.settingsWriting ? "IN PROGRESS" : "no" );
+        out.println( line );
+    }
+    flight.magic = 0; // read once; the recorder rewrites it from the first tick
+}
 
 // :load - what draws from the 3.3 V rail and changes, and switches to take
 // each away for a bisect (the LCD's backlight hangs straight off that rail
@@ -249,6 +425,11 @@ static void onLoadVerb( int argc, char** argv, Stream* out ) {
               magLocator.fitHeld ? "HELD" : "running", magLocator.steadyFit ? "steady (fit iters a frame)" : "burst (slices every 25 ms)", (unsigned long)magLocator.fix.fitUs,
               (unsigned long)magLocator.coldStarts, (unsigned long)magLocator.coldStartUs, (unsigned long)magLocator.coldSliceMaxUs );
     out->println( line );
+    snprintf( line, sizeof( line ), "  the track ended before them: %lu times nothing present, %lu too few noticing, %lu the misses run out; %lu far cold starts rejected (%lu of them disowned by the TMAGs); found again from where it was %lu times (%lu frames tried); frames a sensor was not read in: 0:%lu 1:%lu 2:%lu 3:%lu 4:%lu 5:%lu 6:%lu 7:%lu 8:%lu",
+              (unsigned long)magLocator.coldWhyAbsent, (unsigned long)magLocator.coldWhyFew, (unsigned long)magLocator.coldWhyMisses, (unsigned long)magLocator.coldWhyRejected, (unsigned long)magLocator.coldWhyPhantom, (unsigned long)magLocator.reacquired, (unsigned long)magLocator.reacquireTries, (unsigned long)magLocator.staleFrames[ 0 ],
+              (unsigned long)magLocator.staleFrames[ 1 ], (unsigned long)magLocator.staleFrames[ 2 ], (unsigned long)magLocator.staleFrames[ 3 ], (unsigned long)magLocator.staleFrames[ 4 ], (unsigned long)magLocator.staleFrames[ 5 ],
+              (unsigned long)magLocator.staleFrames[ 6 ], (unsigned long)magLocator.staleFrames[ 7 ], (unsigned long)magLocator.staleFrames[ 8 ] );
+    out->println( line );
 #endif
     snprintf( line, sizeof( line ), "heartbeat: %s (green LED, 1 k to VDDIO, ~2 mA at 1 Hz)", heartbeat.enabled ? "on" : "off" );
     out->println( line );
@@ -256,7 +437,42 @@ static void onLoadVerb( int argc, char** argv, Stream* out ) {
     out->println( "}" );
 }
 
+#if MODULE_MAG_ARRAY && MODULE_MAG_VIEW
+// The sensor watch banner (:watch <i>): painted over any app while a
+// sensor is being wired. Red with a running clock while it does not
+// answer; green, blinking, with what it said once it does.
+static bool sensorWatchOverlay( GFXcanvas16* canvas, uint32_t nowMs ) {
+    uint32_t mask = magArray.watchMask;
+    if ( mask == 0 ) {
+        return false;
+    }
+    char line[ 32 ];
+    int y = 0;
+    for ( int i = 0; i < MAG_SENSOR_COUNT && y + 20 <= 240; i++ ) {
+        if ( !( mask & ( 1u << i ) ) ) {
+            continue;
+        }
+        const MagSensorState& s = magArray.sensor( i );
+        bool seen = s.ok;
+        uint16_t box = seen ? ( ( nowMs / 400 ) & 1 ? 0x07E0 : 0x0320 ) : 0xF800; // green / dark green blinking, red
+        uint16_t text = seen ? 0x0000 : 0xFFFF;
+        fastFillRect( canvas, 0, y, 240, 20, box );
+        if ( seen ) {
+            snprintf( line, sizeof( line ), "S%d b%d SEEN id%02X r%lu", i, s.bus, s.type == MAG_MMC56X3 ? s.mmc.productId : s.dev.version, (unsigned long)magSampler.reads[ i ] );
+        } else {
+            snprintf( line, sizeof( line ), "S%d b%d 0x%02X NO %lus", i, s.bus, magSensorPlaces[ i ].address, (unsigned long)( ( nowMs - magArray.watchSinceMs ) / 1000 ) );
+        }
+        fastText( canvas, 4, y + 2, 2, text, line );
+        y += 20;
+    }
+    return true;
+}
+#endif
+
 void setup( ) {
+#if MODULE_PROBE_LEDS
+    ledStripDarkAll( ); // before anything else draws: the chain may hold a lit frame from before the reset (LedStrip.h)
+#endif
     Serial.begin( CONSOLE_BAUD );
     boardLedsInit( );
     boardLed( PIN_LED_BLUE, true ); // blue while setup runs
@@ -281,10 +497,15 @@ void setup( ) {
     // the UI on that is the DMA-driven stream, and a plain Serial.print
     // beside it would interleave with what the modules print.
     Stream& boot = *console.port( );
+    flightReport( boot );
+    jOS.registerService( &flightRecorder );
 
 #if MODULE_MAG_ARRAY
     int found = magArray.begin( );
     jOS.registerService( &magArray );
+#if MODULE_MAG_VIEW
+    display.overlayFn = sensorWatchOverlay;
+#endif
     magArray.printStatus( &boot );
     if ( found < magArray.sensorCount( ) ) {
         boot.println( "some sensors did not answer: check that sensor's VCC pin in src/board/BoardPins.h, and the pull-ups on SDA/SCL" );
@@ -330,6 +551,9 @@ void setup( ) {
     // After the menu exists and every module has begun: the saved values go
     // in through the items (an accessor item's module follows), and what
     // the items read before that is the default.
+#if MODULE_PROBE_LEDS
+    settings.aroundWrite = quietForFlash; // the LEDs off for the erase (above)
+#endif
     int loaded = settings.begin( &ui.shell.menu );
     settingsMenuAddNewCommands( ); // s and Z into the menu's commands page
     jOS.registerService( &settings );
@@ -342,8 +566,8 @@ void setup( ) {
     if ( !magArray.baselineRestored ) {
         // Nothing saved: the compiled-in zero rather than the blind one under
         // way (the probe may be lying on the board; see MAG_ZERO_AT_BOOT).
-        static const Vec3 compiledZero[ MAG_SENSOR_COUNT ] = MAG_ZERO_AT_BOOT;
-        magArray.restoreBaseline( compiledZero, MAG_SENSOR_COUNT, "no zero saved - the compiled-in one" );
+        static const Vec3 compiledZero[ MAG_ZERO_AT_BOOT_COUNT ] = MAG_ZERO_AT_BOOT;
+        magArray.restoreBaseline( compiledZero, MAG_ZERO_AT_BOOT_COUNT, "no zero saved - the compiled-in one" );
     }
 #endif
     if ( loaded >= 0 ) {

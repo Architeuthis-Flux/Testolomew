@@ -61,6 +61,7 @@
 #define MAGTRACK_COAST_MS 400             // how long a track outlives its last fix
 #define MAGTRACK_ROUGH_HOLD_S 2.5f        // ...and how long a ROUGH one (the far glow) outlives its last rough fix (menu: far hold)
 #define MAGTRACK_ROUGH_SPREAD_MM_S 8.0f   // while it is held its bar widens this fast (the glow spreads and dims, honestly)
+#define MAGTRACK_ROUGH_CUTOFF_HZ 0.5f     // the far glow's own filter: a rough fix is "about here", and about here should not jitter (2026-09-21 night: the MMC as the far sensor, smoothly)
 #define MAGTRACK_COAST_TAU_S 0.15f        // velocity dies away with this time constant while coasting
 #define MAGTRACK_SHAFT_MIN_CUTOFF 1.0f    // Hz: the shaft direction's 1-Euro filter at rest (menu: shaft Hz)
 #define MAGTRACK_SHAFT_BETA 10.0f         // per unit/s of a component's change: how fast the cutoff opens as the pencil turns (menu: shaft beta)
@@ -68,6 +69,21 @@
 #define MAGTRACK_VIEW_BETA 0.5f           // per mm/s (0.05 lagged 40 ms at writing speed; this 20, jitter at rest 0.025 mm - pencil.cpp)
 #define MAGTRACK_SHAFT_FLIP_DEG 45.0f     // a shaft swing bigger than this in one frame waits for confirmation
 #define MAGTRACK_MAX_REACH_MM 40.0f       // the pointer never reaches further from the tip than this
+// ...and never as if the probe were flatter than this: the reach is drop x
+// tan(tilt), and past 70 degrees the tangent runs away - at 84 degrees a
+// millimetre of drop and the shaft's 0.8 degree of jitter at rest put the
+// cursor 1.5 mm from where it was a frame ago (the bench, 2026-09-21, the
+// probe laid flat on the board). A probe flatter than this points as if it
+// were at 70 degrees: the same direction, a bounded reach, and the jitter of
+// the tilt no longer in it.
+#define MAGTRACK_MAX_POINT_TILT_DEG 70.0f
+// A point this close to the surface (or under it: in a hole) is TOUCHING,
+// and a touching point is where the user means, whatever the tilt: the
+// cursor is the point itself, not a projection. Above it the probe hovers
+// and points. (2026-09-21: with the surface 1 mm under a resting magnet the
+// projection turned 0.8 deg of tilt jitter into 1.5 mm of cursor, and a tap
+// at an angle lit the row the shaft pointed at, not the one tapped.)
+#define MAGTRACK_CONTACT_MM 1.5f
 #define MAGTRACK_ONE_EURO_MIN_CUTOFF 1.0f // Hz: how much the cursor may jitter at rest
 #define MAGTRACK_ONE_EURO_BETA 0.5f       // per mm/s: how fast the cutoff opens with speed (pencil.cpp: 20 ms behind at writing speed, 0.02 mm jitter at rest)
 #define MAGTRACK_ONE_EURO_D_CUTOFF 1.0f   // Hz: smoothing of the speed estimate itself
@@ -168,5 +184,11 @@ void magTrackUpdate( MagTrack* t, float dtS, const MagTrackInput* in );
 // The cursor for a given tip and shaft, in the track's mode, plus how far it
 // reached. Exposed for the display.
 Vec3 magTrackCursorOf( const MagTrack* t, Vec3 tip, Vec3 shaft, float* reachMm );
+// The pointer alone: where the shaft, carried on from the tip, meets the
+// plane at surfaceZ - never further from the tip than maxReachMm, the tilt
+// taken no flatter than MAGTRACK_MAX_POINT_TILT_DEG, the tip itself when it
+// is at or under the plane, or within MAGTRACK_CONTACT_MM of it. Pure geometry; the cursor in POINTED mode and
+// the locator's fix.pointer are both this.
+Vec3 magTrackPointer( float surfaceZ, float maxReachMm, Vec3 tip, Vec3 shaft, float* reachMm );
 
 #endif // MAGTRACKER_H

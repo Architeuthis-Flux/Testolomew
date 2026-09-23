@@ -18,7 +18,7 @@ CXXFLAGS ?= -std=c++11 -O1 -g -w -DARDUINO=10808 -MMD -MP
 INC = -I . -I $(S) -I $(S)/common -I $(S)/jos -I $(S)/console -I $(S)/magarray -I $(S)/magfit -I $(S)/rowcount -I $(S)/display -I $(S)/probeled -I $(S)/ui -I $(S)/play -I $(S)/settings -I $(S)/apps -I $(S)/board -I "$(G)" -I "$(B)"
 
 # Every firmware source but the ones the stubs replace.
-DEVICE_ONLY = $(S)/board/BoardPins.cpp $(S)/display/ST7789.cpp $(S)/console/SerialDma.cpp $(S)/magarray/MagSampler.cpp $(S)/probeled/LedStrip.cpp
+DEVICE_ONLY = $(S)/board/BoardPins.cpp $(S)/display/ST7789.cpp $(S)/console/SerialDma.cpp $(S)/magarray/MagSampler.cpp $(S)/probeled/LedStrip.cpp $(S)/probeled/LedStripDark.cpp
 FW_SRC = $(filter-out $(DEVICE_ONLY), $(wildcard $(S)/*.cpp $(S)/*/*.cpp))
 STUB_SRC = SimGlobals.cpp LedStripStub.cpp MagSamplerStub.cpp St7789Stub.cpp
 O = build

@@ -54,8 +54,11 @@
 // model under the paint mode on 2026-09-19 (hence the ceiling and the
 // model's revision).
 #define PROBELED_MA_PER_CHANNEL 12.0f
-#define PROBELED_STRIP_MAX_MA 1000.0f      // the menu's "budget mA" to start with (2026-09-19: 300 was far too dim with a breadboard on top of the LEDs)
-#define PROBELED_STRIP_HARD_MAX_MA 2000.0f // the ceiling the menu cannot pass
+#define PROBELED_STRIP_MAX_MA 600.0f      // the menu's "budget mA" to start with (2026-09-19: 300 was far too dim with a breadboard on top of the LEDs; 1000 was set after, and the board browned out under it - see the ceiling)
+#define PROBELED_STRIP_HARD_MAX_MA 800.0f // the ceiling the menu cannot pass: the 2026-09-19 brown-out was ~900 by this model, and the 2026-09-21 boot loop under a lit cursor with the budget at 1000-1100; the LEDs share the board's supply
+// ...and a frame's current may rise by at most this much over the last frame's (20 ms): a step is what a supply cannot follow - 0 to 600 mA in one frame
+// is the dip that resets the chip - so a cursor lighting up ramps over a few frames (a fall is not limited: less current is never the problem).
+#define PROBELED_MAX_STEP_MA 150.0f
 #define PROBELED_CHASE_PIXELS_PER_S 80 // the `n` dot's speed: the whole 400-LED chain in five seconds
 #define PROBELED_CHASE_MS 5500
 #define PROBELED_CHAIN_DMA 8 // DMA1 channels (LedStrip.h)
@@ -102,6 +105,7 @@ class ProbeLedService : public Service {
     // went out (a WS2812 keeps its last frame, so the current changes only
     // when a frame does).
     float stripLeastMa = 0.0f, stripMostMa = 0.0f, stripMaxStepMa = 0.0f;
+    uint32_t stripSlewedFrames = 0; // frames held back by PROBELED_MAX_STEP_MA
     uint32_t stripFramesSent = 0;
     void resetStripWindow( ) {
         stripLeastMa = stripMostMa = stripLastMa;

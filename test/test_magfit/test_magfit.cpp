@@ -326,6 +326,155 @@ void test_weak_magnet_seen_plainly_by_two_sensors( void ) {
     TEST_ASSERT_TRUE( inRow >= cases * 9 / 10 );
 }
 
+void test_weights_favour_the_quiet_sensors( void ) {
+    // A mixed array: eight noisy sensors and two quiet ones (the MMC56x3s
+    // among the TMAG5273s), the quiet ones weighted as MagArray weights
+    // them. Weighted, the fit should be closer to the magnet than
+    // unweighted over many frames; and with every weight 1 it must be the
+    // unweighted fit to the bit.
+    srand( 7 );
+    const int count = 10;
+    Vec3 mixed[ count ];
+    for ( int i = 0; i < SENSOR_COUNT; i++ ) {
+        mixed[ i ] = sensors[ i ];
+    }
+    mixed[ 8 ] = { 30.0f, 20.0f, 0.0f };
+    mixed[ 9 ] = { 30.0f, 0.0f, 0.0f };
+    float weights[ count ];
+    float ones[ count ];
+    for ( int i = 0; i < count; i++ ) {
+        weights[ i ] = i < SENSOR_COUNT ? 1.0f : 2.0f; // MAG_WEIGHT_CAP
+        ones[ i ] = 1.0f;
+    }
+    float weightedSq = 0.0f, plainSq = 0.0f;
+    int frames = 0;
+    for ( float x = 5.0f; x <= 55.0f; x += 10.0f ) {
+        for ( int repeat = 0; repeat < 6; repeat++ ) {
+            Vec3 magnet = { x, 10.0f, 18.0f };
+            Vec3 moment = tiltedMoment( 4200.0f, 15.0f, 40.0f );
+            Vec3 fields[ count ];
+            for ( int i = 0; i < count; i++ ) {
+                fields[ i ] = magFitDipoleField( mixed[ i ], magnet, moment );
+                float sigma = i < SENSOR_COUNT ? 0.011f : 0.0003f;
+                fields[ i ].x += gaussian( sigma );
+                fields[ i ].y += gaussian( sigma );
+                fields[ i ].z += gaussian( sigma );
+            }
+            MagFitResult weighted = { };
+            MagFitResult plain = { };
+            MagFitResult onesResult = { };
+            TEST_ASSERT_TRUE( magFitSolve( mixed, fields, nullptr, count, 0.4f, &weighted, weights ) );
+            TEST_ASSERT_TRUE( magFitSolve( mixed, fields, nullptr, count, 0.4f, &plain ) );
+            TEST_ASSERT_TRUE( magFitSolve( mixed, fields, nullptr, count, 0.4f, &onesResult, ones ) );
+            TEST_ASSERT_EQUAL_FLOAT( plain.position.x, onesResult.position.x );
+            TEST_ASSERT_EQUAL_FLOAT( plain.position.z, onesResult.position.z );
+            TEST_ASSERT_EQUAL_FLOAT( plain.residual, onesResult.residual );
+            float ew = distance( weighted.position, magnet );
+            float ep = distance( plain.position, magnet );
+            weightedSq += ew * ew;
+            plainSq += ep * ep;
+            frames++;
+        }
+    }
+    float weightedRms = sqrtf( weightedSq / frames ), plainRms = sqrtf( plainSq / frames );
+    printf( "  8 noisy + 2 quiet sensors: rms position error weighted %.3f mm, unweighted %.3f mm\n", weightedRms, plainRms );
+    TEST_ASSERT_LESS_THAN_FLOAT( plainRms, weightedRms );
+}
+
+void test_far_probe_needs_the_held_strength_and_the_quiet_sensor( void ) {
+    // The probe far up (90 mm): the eight TMAG5273s read noise, the one
+    // MMC56x3 under the middle reads the magnet plainly. Its three numbers
+    // are fitted exactly by a weak magnet just over it as well as by the
+    // real one, so the free fit is anyone's guess; with the strength held,
+    // the direction leaning on a prior and the sensors weighted by their
+    // noise (a TMAG 1, the MMC 37), the position comes back within a few
+    // millimetres per axis of noise, and the error bar says so.
+    srand( 11 );
+    const int count = 9;
+    Vec3 mixed[ count ];
+    for ( int i = 0; i < SENSOR_COUNT; i++ ) {
+        mixed[ i ] = sensors[ i ];
+    }
+    mixed[ 8 ] = { 30.0f, 10.0f, -2.0f };
+    float weights[ count ];
+    for ( int i = 0; i < count; i++ ) {
+        weights[ i ] = i < SENSOR_COUNT ? 1.0f : 37.0f;
+    }
+    Vec3 magnet = { 25.0f, 15.0f, 90.0f };
+    Vec3 axis = { 0.17f, -0.1f, -0.98f }; // nearly straight down
+    float axisLength = sqrtf( axis.x * axis.x + axis.y * axis.y + axis.z * axis.z );
+    axis = { axis.x / axisLength, axis.y / axisLength, axis.z / axisLength };
+    Vec3 prior = { 0.0f, 0.0f, -1.0f }; // what the last good fix would have said, roughly
+    Vec3 moment = { 4232.0f * axis.x, 4232.0f * axis.y, 4232.0f * axis.z };
+    float heldSq = 0.0f, freeSq = 0.0f, worstBar = 0.0f;
+    int frames = 0, heldFits = 0;
+    for ( int repeat = 0; repeat < 12; repeat++ ) {
+        Vec3 fields[ count ];
+        for ( int i = 0; i < count; i++ ) {
+            fields[ i ] = magFitDipoleField( mixed[ i ], magnet, moment );
+            float sigma = i < SENSOR_COUNT ? 0.005f : 0.00015f; // a smoothed frame's noise
+            fields[ i ].x += gaussian( sigma );
+            fields[ i ].y += gaussian( sigma );
+            fields[ i ].z += gaussian( sigma );
+        }
+        MagFitResult held = { };
+        MagFitResult free = { };
+        if ( magFitSolveKnownStrength( mixed, fields, nullptr, count, 0.4f, 4232.0f, &held, weights, &prior, 0.02f ) ) {
+            heldFits++;
+        }
+        magFitSolve( mixed, fields, nullptr, count, 0.4f, &free, weights );
+        float eh = distance( held.position, magnet ), ef = distance( free.position, magnet );
+        heldSq += eh * eh;
+        freeSq += ef * ef;
+        float bar = sqrtf( held.sigma.x * held.sigma.x + held.sigma.y * held.sigma.y + held.sigma.z * held.sigma.z );
+        if ( bar > worstBar )
+            worstBar = bar;
+        frames++;
+    }
+    float heldRms = sqrtf( heldSq / frames ), freeRms = sqrtf( freeSq / frames );
+    printf( "  probe 90 mm up, seen by the MMC alone: rms position error with the strength held and a direction prior %.1f mm (%d/%d fits, widest bar %.1f mm), free %.1f mm\n",
+            heldRms, heldFits, frames, worstBar, freeRms );
+    TEST_ASSERT_EQUAL_INT( frames, heldFits );
+    TEST_ASSERT_LESS_THAN_FLOAT( 12.0f, heldRms );
+    TEST_ASSERT_LESS_THAN_FLOAT( 60.0f, worstBar );
+}
+
+void test_strength_hint_keeps_the_lattice_off_the_weak_magnet_near( void ) {
+    // The same far probe, no noise: the free lattice search has a weak
+    // magnet a few mm over the MMC that fits its readings exactly; told
+    // the strength, it must not settle there.
+    const int count = 9;
+    Vec3 mixed[ count ];
+    for ( int i = 0; i < SENSOR_COUNT; i++ ) {
+        mixed[ i ] = sensors[ i ];
+    }
+    mixed[ 8 ] = { 30.0f, 10.0f, -2.0f };
+    float weights[ count ];
+    for ( int i = 0; i < count; i++ ) {
+        weights[ i ] = i < SENSOR_COUNT ? 1.0f : 37.0f;
+    }
+    Vec3 magnet = { 25.0f, 15.0f, 90.0f };
+    Vec3 moment = { 0.0f, 0.0f, -4232.0f };
+    Vec3 fields[ count ];
+    for ( int i = 0; i < count; i++ ) {
+        fields[ i ] = magFitDipoleField( mixed[ i ], magnet, moment );
+    }
+    MagFitResult hinted = { };
+    magFitCoarse( mixed, fields, nullptr, count, &hinted, weights ); // the plain lattice, for the record
+    MagFitResult coarseFree = hinted;
+    hinted = { };
+    magFitSolve( mixed, fields, nullptr, count, 0.4f, &hinted, weights, 4232.0f );
+    MagFitResult whole = { };
+    Vec3 prior = { 0.0f, 0.0f, -1.0f };
+    bool ok = magFitSolveKnownStrength( mixed, fields, nullptr, count, 0.4f, 4232.0f, &whole, weights, &prior, 0.02f );
+    printf( "  no noise: the free lattice put the magnet at z %.0f (strength %.0f); the free fit with the strength as its hint at z %.1f; held and refined z %.2f\n",
+            coarseFree.position.z, coarseFree.strength, hinted.position.z, whole.position.z );
+    TEST_ASSERT_TRUE( hinted.valid );
+    TEST_ASSERT_FLOAT_WITHIN( 15.0f, 90.0f, hinted.position.z ); // the hint keeps it off the weak magnet a few mm up; the refinement below lands it
+    TEST_ASSERT_TRUE( ok );
+    TEST_ASSERT_FLOAT_WITHIN( 1.0f, 90.0f, whole.position.z );
+}
+
 int main( void ) {
     UNITY_BEGIN( );
     RUN_TEST( test_forward_model_on_axis );
@@ -338,5 +487,8 @@ int main( void ) {
     RUN_TEST( test_error_bar_is_honest );
     RUN_TEST( test_noise_alone_is_not_a_magnet );
     RUN_TEST( test_weak_magnet_seen_plainly_by_two_sensors );
+    RUN_TEST( test_weights_favour_the_quiet_sensors );
+    RUN_TEST( test_far_probe_needs_the_held_strength_and_the_quiet_sensor );
+    RUN_TEST( test_strength_hint_keeps_the_lattice_off_the_weak_magnet_near );
     return UNITY_END( );
 }

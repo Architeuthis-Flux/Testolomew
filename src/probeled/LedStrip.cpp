@@ -11,7 +11,6 @@
 // GPIO CFGxR nibble for the data pin: CNF 10 = alternate-function push-pull,
 // MODE 01 = the 10 MHz output class (CH32H4_CFG_AF_PP_50 is 0xB, the 50 MHz
 // one, which is what the SPI library sets).
-#define LEDSTRIP_MOSI_CFG 0x9u
 #define DEV( s ) ( (SPI_TypeDef*)( s )->dev )
 #define DMA( s ) ( (DMA_Channel_TypeDef*)( s )->dma )
 

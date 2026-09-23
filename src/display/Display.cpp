@@ -187,7 +187,11 @@ bool Display::tryDraw( ) {
     }
 #endif
     lastDrawStartUs = t0;
-    if ( drawFn == nullptr || !drawFn( canvas, millis( ) ) ) {
+    bool drew = drawFn != nullptr && drawFn( canvas, millis( ) );
+    if ( overlayFn != nullptr && canvas != nullptr ) {
+        drew |= overlayFn( canvas, millis( ) );
+    }
+    if ( !drew ) {
         return false;
     }
     s = slot < 0 ? 0 : ( slot >= DISPLAY_SLOTS ? DISPLAY_SLOTS - 1 : slot ); // the draw may have picked its slot

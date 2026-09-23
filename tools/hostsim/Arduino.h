@@ -17,7 +17,7 @@ enum BitOrder { LSBFIRST = 0, MSBFIRST = 1 };
 #define SPI_MODE3 3
 typedef int pin_size_t;
 typedef bool boolean;
-enum { PA8 = 1, PA13, PA14, PA15, PC6, PC7, PC8, PC10, PD6, PD7, PB12, PB13, PB15, PC2, PC3, PC9, PC11, PC12, PD0, PD1, PD2, PD3, PD4, PD5, PD8, PD9, PD13, PD10, PE15, PD15, PF2, PE14, PD12, PA3, PA4, PD14, PA5, PA6, PB3, PB4 };
+enum { PA8 = 1, PA13, PA14, PA15, PC6, PC7, PC8, PC10, PD6, PD7, PB12, PB13, PB15, PC2, PC3, PC9, PC11, PC12, PD0, PD1, PD2, PD3, PD4, PD5, PD8, PD9, PD13, PD10, PE15, PD15, PF2, PE14, PD12, PA3, PA4, PD14, PA5, PA6, PB3, PB4, PF12, PF13 };
 extern uint64_t simMicros; // the clock: whoever runs the loop advances it
 inline uint32_t millis() { return (uint32_t)(simMicros / 1000u); }
 inline uint32_t micros() { return (uint32_t)simMicros; }

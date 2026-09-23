@@ -15,16 +15,51 @@
 #define LM_DONE_MM 0.005f      // converged when a step is shorter than this
 #define JACOBIAN_STEP_MM 0.05f
 
+// The known-strength refinement (magFitRefineKnownStrength): the unknowns,
+// the rows (three per sensor, the strength row, and the three of the
+// direction prior), and how hard the strength row pulls.
+#define KNOWN_PARAMS 6 // x, y, z and the moment as strength * (vx, vy, vz)
+#define KNOWN_ROWS ( 3 * MAGFIT_MAX_SENSORS + 4 )
+#define KNOWN_STRENGTH_WEIGHT 5.0f // a 1 % strength error costs as much as a 5 % field misfit
+
 struct FitProblem {
     const Vec3* sensors;
     const Vec3* fields;
     const bool* use;
+    const float* weights; // nullptr = every sensor 1
     int count;
     float xMin, xMax, yMin, yMax;
+    float strengthHint; // > 0: the free fit's cost has a row that holds the fitted moment's size near this (see evaluate)
+    float fieldNorm;    // sqrt of the weighted sum of squares of the readings: what that row is weighed against
 };
+// The free fit's rows: three per sensor, and the strength row when there is a hint.
+static int freeRows( const FitProblem* fp ) {
+    return 3 * fp->count + ( fp->strengthHint > 0.0f ? 1 : 0 );
+}
 
 static bool sensorUsed( const FitProblem* fp, int i ) {
     return fp->use == nullptr || fp->use[ i ];
+}
+
+static void dipoleKernel( Vec3 sensor, Vec3 magnet, float g[ 3 ][ 3 ] );
+
+static float sensorWeight( const FitProblem* fp, int i ) {
+    return fp->weights == nullptr ? 1.0f : fp->weights[ i ];
+}
+
+// The kernel of sensor i at magnet position p and its reading, both scaled
+// by the sensor's weight: the rows of a weighted least squares.
+static void weightedRow( const FitProblem* fp, int i, Vec3 p, float g[ 3 ][ 3 ], float b[ 3 ] ) {
+    dipoleKernel( fp->sensors[ i ], p, g );
+    float w = sensorWeight( fp, i );
+    for ( int a = 0; a < 3; a++ ) {
+        for ( int c = 0; c < 3; c++ ) {
+            g[ a ][ c ] *= w;
+        }
+    }
+    b[ 0 ] = w * fp->fields[ i ].x;
+    b[ 1 ] = w * fp->fields[ i ].y;
+    b[ 2 ] = w * fp->fields[ i ].z;
 }
 
 // The symmetric 3x3 kernel G with B = G m, times KERNEL_SCALE.
@@ -83,8 +118,8 @@ static float evaluate( const FitProblem* fp, Vec3 p, Vec3* momentOut, float* res
         if ( !sensorUsed( fp, i ) ) {
             continue;
         }
-        dipoleKernel( fp->sensors[ i ], p, g );
-        float b[ 3 ] = { fp->fields[ i ].x, fp->fields[ i ].y, fp->fields[ i ].z };
+        float b[ 3 ];
+        weightedRow( fp, i, p, g, b );
         for ( int a = 0; a < 3; a++ ) {
             for ( int c = 0; c < 3; c++ ) {
                 // G is symmetric, so G^T G = G G.
@@ -103,8 +138,8 @@ static float evaluate( const FitProblem* fp, Vec3 p, Vec3* momentOut, float* res
     for ( int i = 0; i < fp->count; i++ ) {
         float e[ 3 ] = { 0, 0, 0 };
         if ( sensorUsed( fp, i ) ) {
-            dipoleKernel( fp->sensors[ i ], p, g );
-            float b[ 3 ] = { fp->fields[ i ].x, fp->fields[ i ].y, fp->fields[ i ].z };
+            float b[ 3 ];
+            weightedRow( fp, i, p, g, b );
             for ( int a = 0; a < 3; a++ ) {
                 e[ a ] = b[ a ] - ( g[ a ][ 0 ] * m[ 0 ] + g[ a ][ 1 ] * m[ 1 ] + g[ a ][ 2 ] * m[ 2 ] );
                 cost += e[ a ] * e[ a ];
@@ -117,6 +152,21 @@ static float evaluate( const FitProblem* fp, Vec3 p, Vec3* momentOut, float* res
         }
     }
 
+    if ( fp->strengthHint > 0.0f ) {
+        // With the strength known, a position whose best moment is the
+        // wrong size is the wrong position however well the fields fit:
+        // when one quiet sensor reads most of the signal (a probe far up,
+        // seen by the MMC56x3 alone), ANY position fits its three numbers
+        // exactly with some moment, and without this row the free fit
+        // cannot tell a weak magnet near from the real one far. The same
+        // row, at the same weight, as the known-strength refinement's.
+        float size = KERNEL_SCALE * sqrtf( m[ 0 ] * m[ 0 ] + m[ 1 ] * m[ 1 ] + m[ 2 ] * m[ 2 ] );
+        float row = KNOWN_STRENGTH_WEIGHT * fp->fieldNorm * ( size / fp->strengthHint - 1.0f );
+        cost += row * row;
+        if ( residuals != nullptr ) {
+            residuals[ 3 * fp->count ] = row;
+        }
+    }
     if ( momentOut != nullptr ) {
         momentOut->x = m[ 0 ] * KERNEL_SCALE;
         momentOut->y = m[ 1 ] * KERNEL_SCALE;
@@ -129,7 +179,7 @@ static float evaluate( const FitProblem* fp, Vec3 p, Vec3* momentOut, float* res
 // squares the misfit is |b|^2 - (G^T b) . m, so the second pass over the
 // sensors is not needed. Half the work of evaluate(); used by the lattice
 // search, where the cost is all that is compared. sumSquares is |b|^2 over
-// the used sensors.
+// the used sensors (weighted, like everything else).
 static float costAt( const FitProblem* fp, Vec3 p, float sumSquares ) {
     float gtg[ 3 ][ 3 ] = { { 0 } };
     float gtb[ 3 ] = { 0 };
@@ -138,8 +188,8 @@ static float costAt( const FitProblem* fp, Vec3 p, float sumSquares ) {
         if ( !sensorUsed( fp, i ) ) {
             continue;
         }
-        dipoleKernel( fp->sensors[ i ], p, g );
-        float b[ 3 ] = { fp->fields[ i ].x, fp->fields[ i ].y, fp->fields[ i ].z };
+        float b[ 3 ];
+        weightedRow( fp, i, p, g, b );
         for ( int a = 0; a < 3; a++ ) {
             for ( int c = 0; c < 3; c++ ) {
                 gtg[ a ][ c ] += g[ a ][ 0 ] * g[ 0 ][ c ] + g[ a ][ 1 ] * g[ 1 ][ c ] + g[ a ][ 2 ] * g[ 2 ][ c ];
@@ -152,7 +202,21 @@ static float costAt( const FitProblem* fp, Vec3 p, float sumSquares ) {
         return 1e30f;
     }
     float cost = sumSquares - ( gtb[ 0 ] * m[ 0 ] + gtb[ 1 ] * m[ 1 ] + gtb[ 2 ] * m[ 2 ] );
-    return cost < 0.0f ? 0.0f : cost;
+    if ( cost < 0.0f ) {
+        cost = 0.0f;
+    }
+    if ( fp->strengthHint > 0.0f ) {
+        // With the strength known, a point whose best moment is the wrong
+        // size is the wrong point, however well it fits: when one quiet
+        // sensor reads most of the signal (a probe far up, seen by the
+        // MMC56x3 alone), ANY position fits its three numbers exactly with
+        // some moment, and the free cost cannot tell a weak magnet near
+        // from the real one far. The same row the refinement uses.
+        float size = KERNEL_SCALE * sqrtf( m[ 0 ] * m[ 0 ] + m[ 1 ] * m[ 1 ] + m[ 2 ] * m[ 2 ] );
+        float row = KNOWN_STRENGTH_WEIGHT * fp->fieldNorm * ( size / fp->strengthHint - 1.0f );
+        cost += row * row;
+    }
+    return cost;
 }
 
 static float clampf( float v, float lo, float hi ) {
@@ -172,11 +236,11 @@ static Vec3 clampToBox( const FitProblem* fp, Vec3 p ) {
 // steady load) at least minIterations even once converged; *convergedOut
 // (may be null) says it stopped on its own.
 static float refine( const FitProblem* fp, Vec3 start, Vec3* pOut, int* iterationsOut, int maxIterations = LM_MAX_ITERATIONS, int minIterations = 0, bool* convergedOut = nullptr ) {
-    static float e0[ 3 * MAGFIT_MAX_SENSORS ];
-    static float e1[ 3 * MAGFIT_MAX_SENSORS ];
-    static float jac[ 3 * MAGFIT_MAX_SENSORS ][ 3 ];
+    static float e0[ 3 * MAGFIT_MAX_SENSORS + 1 ];
+    static float e1[ 3 * MAGFIT_MAX_SENSORS + 1 ];
+    static float jac[ 3 * MAGFIT_MAX_SENSORS + 1 ][ 3 ];
 
-    int rows = 3 * fp->count;
+    int rows = freeRows( fp );
     Vec3 p = clampToBox( fp, start );
     float cost = evaluate( fp, p, nullptr, e0 );
     float lambda = 1e-2f;
@@ -273,11 +337,11 @@ static float refine( const FitProblem* fp, Vec3 start, Vec3* pOut, int* iteratio
 // the moment's freedom already taken out of it, which is exactly what makes
 // the 3x3 below the position block of the full six-parameter covariance.
 static Vec3 positionSigma( const FitProblem* fp, Vec3 p, float cost, int used ) {
-    static float e0[ 3 * MAGFIT_MAX_SENSORS ];
-    static float e1[ 3 * MAGFIT_MAX_SENSORS ];
+    static float e0[ 3 * MAGFIT_MAX_SENSORS + 1 ];
+    static float e1[ 3 * MAGFIT_MAX_SENSORS + 1 ];
     float jtj[ 3 ][ 3 ] = { { 0 } };
-    static float jac[ 3 * MAGFIT_MAX_SENSORS ][ 3 ];
-    int rows = 3 * fp->count;
+    static float jac[ 3 * MAGFIT_MAX_SENSORS + 1 ][ 3 ];
+    int rows = freeRows( fp );
 
     evaluate( fp, p, nullptr, e0 );
     for ( int k = 0; k < 3; k++ ) {
@@ -301,7 +365,7 @@ static Vec3 positionSigma( const FitProblem* fp, Vec3 p, float cost, int used ) 
         }
     }
 
-    int freedom = 3 * used - 6; // readings less unknowns
+    int freedom = 3 * used - ( fp->strengthHint > 0.0f ? 5 : 6 ); // readings less unknowns (the strength known is one fewer)
     float variance = cost / ( freedom > 0 ? freedom : 1 );
     if ( variance < MAGFIT_NOISE_FLOOR_MT * MAGFIT_NOISE_FLOOR_MT ) {
         variance = MAGFIT_NOISE_FLOOR_MT * MAGFIT_NOISE_FLOOR_MT;
@@ -341,7 +405,8 @@ static int describeProblem( FitProblem* fp, const Vec3* sensors, const Vec3* fie
             fp->yMin = sensors[ i ].y;
         if ( sensors[ i ].y > fp->yMax )
             fp->yMax = sensors[ i ].y;
-        *sumSquares += fields[ i ].x * fields[ i ].x + fields[ i ].y * fields[ i ].y + fields[ i ].z * fields[ i ].z;
+        float w2 = sensorWeight( fp, i ) * sensorWeight( fp, i );
+        *sumSquares += w2 * ( fields[ i ].x * fields[ i ].x + fields[ i ].y * fields[ i ].y + fields[ i ].z * fields[ i ].z );
     }
     fp->xMin -= margin;
     fp->xMax += margin;
@@ -367,6 +432,7 @@ static float latticeSearch( const FitProblem* fp, float sumSquares, Vec3* best )
         if ( !sensorUsed( fp, i ) )
             continue;
         float w = fp->fields[ i ].x * fp->fields[ i ].x + fp->fields[ i ].y * fp->fields[ i ].y + fp->fields[ i ].z * fp->fields[ i ].z;
+        w *= sensorWeight( fp, i ) * sensorWeight( fp, i );
         cx += w * fp->sensors[ i ].x;
         cy += w * fp->sensors[ i ].y;
         cw += w;
@@ -417,16 +483,17 @@ static float latticeSearch( const FitProblem* fp, float sumSquares, Vec3* best )
     return bestCost;
 }
 
-bool magFitCoarse( const Vec3* sensors, const Vec3* fields, const bool* use, int count, MagFitResult* result ) {
+bool magFitCoarse( const Vec3* sensors, const Vec3* fields, const bool* use, int count, MagFitResult* result, const float* weights ) {
     result->valid = false;
     result->iterations = 0;
     result->sigma = { 999.0f, 999.0f, 999.0f };
     if ( count > MAGFIT_MAX_SENSORS ) {
         count = MAGFIT_MAX_SENSORS;
     }
-    FitProblem fp = { sensors, fields, use, count, 0, 0, 0, 0 };
+    FitProblem fp = { sensors, fields, use, weights, count, 0, 0, 0, 0, 0.0f, 0.0f };
     float sumSquares;
     int used = describeProblem( &fp, sensors, fields, MAGFIT_XY_MARGIN, &sumSquares );
+    fp.fieldNorm = sqrtf( sumSquares );
     if ( used < 3 || sumSquares <= 0.0f ) {
         return false;
     }
@@ -460,21 +527,21 @@ static const float coldSeeds[][ 3 ] = {
 #define COLD_SEED_COUNT ( (int)( sizeof( coldSeeds ) / sizeof( coldSeeds[ 0 ] ) ) )
 
 bool magFitSolve( const Vec3* sensors, const Vec3* fields, const bool* use, int count,
-                  float maxMisfit, MagFitResult* result ) {
+                  float maxMisfit, MagFitResult* result, const float* weights, float strengthHint ) {
     result->coldStage = 0; // a whole solve never continues an earlier cold start (nor trusts an uninitialised result)
     bool warm = result->valid;
-    bool ok = magFitSolveStep( sensors, fields, use, count, maxMisfit, result );
+    bool ok = magFitSolveStep( sensors, fields, use, count, maxMisfit, result, 0, weights, strengthHint );
     if ( !ok && warm && result->coldStage == 0 ) {
-        ok = magFitSolveStep( sensors, fields, use, count, maxMisfit, result ); // the warm start failed: a cold one, whole
+        ok = magFitSolveStep( sensors, fields, use, count, maxMisfit, result, 0, weights, strengthHint ); // the warm start failed: a cold one, whole
     }
     while ( result->coldStage > 0 ) {
-        ok = magFitSolveStep( sensors, fields, use, count, maxMisfit, result );
+        ok = magFitSolveStep( sensors, fields, use, count, maxMisfit, result, 0, weights, strengthHint );
     }
     return ok;
 }
 
 bool magFitSolveStep( const Vec3* sensors, const Vec3* fields, const bool* use, int count,
-                      float maxMisfit, MagFitResult* result, int budget ) {
+                      float maxMisfit, MagFitResult* result, int budget, const float* weights, float strengthHint ) {
     int maxIt = budget > 0 ? budget : LM_MAX_ITERATIONS;
     int seedIt = budget > 0 ? budget : LM_SEED_ITERATIONS;
     int minIt = budget > 0 ? budget : 0;
@@ -492,7 +559,7 @@ bool magFitSolveStep( const Vec3* sensors, const Vec3* fields, const bool* use, 
         count = MAGFIT_MAX_SENSORS;
     }
 
-    FitProblem fp = { sensors, fields, use, count, 1e9f, -1e9f, 1e9f, -1e9f };
+    FitProblem fp = { sensors, fields, use, weights, count, 1e9f, -1e9f, 1e9f, -1e9f, strengthHint > 0.0f ? strengthHint : 0.0f, 0.0f };
 
     // The search box, the signal level, and a |B|^2-weighted centroid of the
     // sensors as the cold-start guess for x and y.
@@ -513,6 +580,7 @@ bool magFitSolveStep( const Vec3* sensors, const Vec3* fields, const bool* use, 
         if ( sensors[ i ].y > fp.yMax )
             fp.yMax = sensors[ i ].y;
         float w = fields[ i ].x * fields[ i ].x + fields[ i ].y * fields[ i ].y + fields[ i ].z * fields[ i ].z;
+        w *= sensorWeight( &fp, i ) * sensorWeight( &fp, i );
         sumSquares += w;
         cx += w * sensors[ i ].x;
         cy += w * sensors[ i ].y;
@@ -527,6 +595,7 @@ bool magFitSolveStep( const Vec3* sensors, const Vec3* fields, const bool* use, 
     fp.yMax += MAGFIT_XY_MARGIN;
 
     result->signal = sqrtf( sumSquares / ( 3.0f * used ) );
+    fp.fieldNorm = sqrtf( sumSquares );
 
     Vec3 best = { 0, 0, 0 };
     float bestCost = 1e30f;
@@ -637,10 +706,6 @@ bool magFitSolveStep( const Vec3* sensors, const Vec3* fields, const bool* use, 
 
 // ---- known strength ----------------------------------------------------------
 
-#define KNOWN_PARAMS 6 // x, y, z and the moment as strength * (vx, vy, vz)
-#define KNOWN_ROWS ( 3 * MAGFIT_MAX_SENSORS + 1 )
-#define KNOWN_STRENGTH_WEIGHT 5.0f // a 1 % strength error costs as much as a 5 % field misfit
-
 // Solve the n x n system a x = b in place (Gaussian elimination, partial
 // pivoting). false if singular.
 bool magFitSolveLinear( float a[ MAGFIT_MAX_PARAMS ][ MAGFIT_MAX_PARAMS ], float b[ MAGFIT_MAX_PARAMS ], int n ) {
@@ -677,10 +742,11 @@ bool magFitSolveLinear( float a[ MAGFIT_MAX_PARAMS ][ MAGFIT_MAX_PARAMS ], float
 }
 
 // Residuals for q = { x, y, z, vx, vy, vz }: the field rows, then one row that
-// holds |v| at 1 (the moment is strength * v). Returns the FIELD rows' sum of
-// squares; *total includes the strength row.
+// holds |v| at 1 (the moment is strength * v), then, if there is a prior on
+// the direction, three that hold v near it. Returns the FIELD rows' sum of
+// squares; *total includes the other rows.
 static float knownResiduals( const FitProblem* fp, const float q[ KNOWN_PARAMS ], float strength, float strengthRowWeight,
-                             float* rows, float* total ) {
+                             const Vec3* axisPrior, float priorRowWeight, float* rows, float* total ) {
     Vec3 p = { q[ 0 ], q[ 1 ], q[ 2 ] };
     float m[ 3 ] = { strength * q[ 3 ] / KERNEL_SCALE, strength * q[ 4 ] / KERNEL_SCALE, strength * q[ 5 ] / KERNEL_SCALE };
     float g[ 3 ][ 3 ];
@@ -688,8 +754,8 @@ static float knownResiduals( const FitProblem* fp, const float q[ KNOWN_PARAMS ]
     for ( int i = 0; i < fp->count; i++ ) {
         float e[ 3 ] = { 0, 0, 0 };
         if ( sensorUsed( fp, i ) ) {
-            dipoleKernel( fp->sensors[ i ], p, g );
-            float b[ 3 ] = { fp->fields[ i ].x, fp->fields[ i ].y, fp->fields[ i ].z };
+            float b[ 3 ];
+            weightedRow( fp, i, p, g, b );
             for ( int a = 0; a < 3; a++ ) {
                 e[ a ] = b[ a ] - ( g[ a ][ 0 ] * m[ 0 ] + g[ a ][ 1 ] * m[ 1 ] + g[ a ][ 2 ] * m[ 2 ] );
                 cost += e[ a ] * e[ a ];
@@ -703,21 +769,43 @@ static float knownResiduals( const FitProblem* fp, const float q[ KNOWN_PARAMS ]
     float strengthRow = strengthRowWeight * ( length - 1.0f );
     rows[ 3 * fp->count ] = strengthRow;
     *total = cost + strengthRow * strengthRow;
+    if ( axisPrior != nullptr ) {
+        float px = priorRowWeight * ( q[ 3 ] - axisPrior->x ), py = priorRowWeight * ( q[ 4 ] - axisPrior->y ), pz = priorRowWeight * ( q[ 5 ] - axisPrior->z );
+        rows[ 3 * fp->count + 1 ] = px;
+        rows[ 3 * fp->count + 2 ] = py;
+        rows[ 3 * fp->count + 3 ] = pz;
+        *total += px * px + py * py + pz * pz;
+    }
     return cost;
 }
 
 bool magFitSolveKnownStrength( const Vec3* sensors, const Vec3* fields, const bool* use, int count,
-                               float maxMisfit, float strength, MagFitResult* result ) {
-    // The free fit first. If it cannot explain the readings, nothing below will.
-    bool freeOk = magFitSolve( sensors, fields, use, count, maxMisfit, result );
+                               float maxMisfit, float strength, MagFitResult* result, const float* weights,
+                               const Vec3* axisPrior, float axisPriorWeight ) {
+    // The free fit first (its lattice told the strength, so it does not
+    // settle on a weak magnet near for a real one far). If it cannot
+    // explain the readings, nothing below will.
+    bool freeOk = magFitSolve( sensors, fields, use, count, maxMisfit, result, weights, strength );
     if ( strength <= 0.0f || result->strength <= 0.0f || result->signal <= 0.0f ) {
         return freeOk;
+    }
+    return magFitRefineKnownStrength( sensors, fields, use, count, maxMisfit, strength, result, weights, axisPrior, axisPriorWeight );
+}
+
+bool magFitRefineKnownStrength( const Vec3* sensors, const Vec3* fields, const bool* use, int count,
+                                float maxMisfit, float strength, MagFitResult* result, const float* weights,
+                                const Vec3* axisPrior, float axisPriorWeight, int maxIterations ) {
+    if ( strength <= 0.0f || result->strength <= 0.0f || result->signal <= 0.0f ) {
+        return result->valid;
+    }
+    if ( maxIterations <= 0 || maxIterations > LM_MAX_ITERATIONS ) {
+        maxIterations = LM_MAX_ITERATIONS;
     }
     if ( count > MAGFIT_MAX_SENSORS ) {
         count = MAGFIT_MAX_SENSORS;
     }
 
-    FitProblem fp = { sensors, fields, use, count, 1e9f, -1e9f, 1e9f, -1e9f };
+    FitProblem fp = { sensors, fields, use, weights, count, 1e9f, -1e9f, 1e9f, -1e9f, 0.0f, 0.0f };
     int used = 0;
     for ( int i = 0; i < count; i++ ) {
         if ( !sensorUsed( &fp, i ) )
@@ -741,27 +829,40 @@ bool magFitSolveKnownStrength( const Vec3* sensors, const Vec3* fields, const bo
     // toward the known strength is the same for a strong reading and a weak one.
     float fieldNorm = result->signal * sqrtf( 3.0f * used );
     float rowWeight = KNOWN_STRENGTH_WEIGHT * fieldNorm;
+    // The direction prior is NOT weighed against the field: it is a fixed
+    // pull in the readings' own units, about a sensor's noise, so that far
+    // out - where the readings have nothing to say about two of the
+    // direction's components - it decides them, and anywhere the readings
+    // do have a say (a degree of direction is a percent of the field) they
+    // outvote it a hundred to one. (Weighed against the field it dragged a
+    // probe near the array 37 degrees toward a stale prior: 2026-09-21.)
+    if ( axisPrior == nullptr || axisPriorWeight <= 0.0f ) {
+        axisPrior = nullptr;
+    }
+    float priorWeight = axisPriorWeight;
 
     static float e0[ KNOWN_ROWS ], e1[ KNOWN_ROWS ];
     static float jac[ KNOWN_ROWS ][ KNOWN_PARAMS ];
     static const float step[ KNOWN_PARAMS ] = { JACOBIAN_STEP_MM, JACOBIAN_STEP_MM, JACOBIAN_STEP_MM, 0.002f, 0.002f, 0.002f };
-    int rows = 3 * count + 1;
+    int rows = 3 * count + 1 + ( axisPrior != nullptr ? 3 : 0 );
 
     float inv = 1.0f / result->strength;
     float q[ KNOWN_PARAMS ] = { result->position.x, result->position.y, result->position.z,
                                 result->moment.x * inv, result->moment.y * inv, result->moment.z * inv };
+    // (The direction is never turned round to suit the prior: the field is
+    // linear in the moment, so for any position the readings know its sign.)
     float total;
-    float fieldCost = knownResiduals( &fp, q, strength, rowWeight, e0, &total );
+    float fieldCost = knownResiduals( &fp, q, strength, rowWeight, axisPrior, priorWeight, e0, &total );
     float lambda = 1e-2f;
 
-    for ( int iter = 0; iter < LM_MAX_ITERATIONS; iter++ ) {
+    for ( int iter = 0; iter < maxIterations; iter++ ) {
         for ( int k = 0; k < KNOWN_PARAMS; k++ ) {
             float nudged[ KNOWN_PARAMS ];
             for ( int j = 0; j < KNOWN_PARAMS; j++ )
                 nudged[ j ] = q[ j ];
             nudged[ k ] += step[ k ];
             float unused;
-            knownResiduals( &fp, nudged, strength, rowWeight, e1, &unused );
+            knownResiduals( &fp, nudged, strength, rowWeight, axisPrior, priorWeight, e1, &unused );
             for ( int r = 0; r < rows; r++ )
                 jac[ r ][ k ] = ( e1[ r ] - e0[ r ] ) / step[ k ];
         }
@@ -804,7 +905,7 @@ bool magFitSolveKnownStrength( const Vec3* sensors, const Vec3* fields, const bo
             trial[ 1 ] = boxed.y;
             trial[ 2 ] = boxed.z;
             float trialTotal;
-            float trialFieldCost = knownResiduals( &fp, trial, strength, rowWeight, e1, &trialTotal );
+            float trialFieldCost = knownResiduals( &fp, trial, strength, rowWeight, axisPrior, priorWeight, e1, &trialTotal );
             if ( trialTotal < total ) {
                 for ( int i = 0; i < KNOWN_PARAMS; i++ )
                     q[ i ] = trial[ i ];
@@ -833,7 +934,7 @@ bool magFitSolveKnownStrength( const Vec3* sensors, const Vec3* fields, const bo
                 nudged[ j ] = q[ j ];
             nudged[ k ] += step[ k ];
             float unused;
-            knownResiduals( &fp, nudged, strength, rowWeight, e1, &unused );
+            knownResiduals( &fp, nudged, strength, rowWeight, axisPrior, priorWeight, e1, &unused );
             for ( int r = 0; r < rows; r++ )
                 jac[ r ][ k ] = ( e1[ r ] - e0[ r ] ) / step[ k ];
         }
