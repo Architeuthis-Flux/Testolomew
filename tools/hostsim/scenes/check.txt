@@ -416,6 +416,7 @@ z
 # mT zero error at the MMC56x3 is found and taken out within a minute of use;
 # no other sensor is touched.
 @bias 8 0.003 0.003 0.005
+:audit reset
 @magnet row 5 2 0 20
 @run 3000
 @magnet row 6 3 0 30
@@ -454,6 +455,55 @@ z
 @seen "sensor 8's zero was off by"
 @magnet off
 @bias 8 0 0 0
+z
+@run 2000
+
+# A sensor reading 36 % low on every axis (a table gain a third off: the
+# datasheet's sensitivity is +-5 % typical, +-20 % at most per axis, and
+# the 09-21 leave-one-out found TMAG 5 64 % off the others' prediction) is
+# found by the same audit and its gain CORRECTED, per axis, once the taps
+# have given its samples the spread (Phase 3 step 8, 2026-09-23: until then
+# the gain was reported and the sensor left out of the audit's fits). The
+# next fixes land in their hole.
+@gain 5 0.64
+:audit reset
+@magnet row 5 2 0 20
+@run 3000
+@magnet row 6 3 0 30
+@run 3000
+@magnet row 7 4 0 40
+@run 3000
+@magnet row 8 5 0 10
+@run 3000
+@magnet row 9 1 0 20
+@run 3000
+@magnet row 10 2 0 30
+@run 3000
+@magnet row 11 3 0 40
+@run 3000
+@magnet row 12 4 0 10
+@run 3000
+@magnet row 13 5 0 20
+@run 3000
+@magnet row 14 1 0 30
+@run 3000
+@magnet row 15 2 0 40
+@run 3000
+@magnet row 16 3 0 10
+@run 3000
+@magnet row 17 4 0 20
+@run 3000
+@magnet row 18 5 0 30
+@run 3000
+@run 20000
+@seen "sensor 5's gain was off"
+@magnet row 15 3
+@run 3000
+:screen
+@expect "row: 15 hole 3"
+@magnet off
+@gain 5 1.0
+:audit reset
 z
 @run 2000
 

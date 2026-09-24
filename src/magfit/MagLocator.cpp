@@ -398,71 +398,6 @@ void MagLocator::begin( ) {
     consoleAddCommand( 'Q', "tip calibration: solve the magnet-to-point distance from the q samples (3 or more angles) and use it", onTipSolve );
 }
 
-// The surface from where the point bottoms out (MAGLOC_FLOOR_* in the header).
-void MagLocator::learnFloor( uint32_t nowMs ) {
-    if ( fix.valid && fix.misfit < MAGLOC_FLOOR_MISFIT && fix.seenBy >= 4 && fix.tip.z < floorWindowMinZ ) {
-        floorWindowMinZ = fix.tip.z;
-    }
-    if ( floorWindowStartMs == 0 ) {
-        floorWindowStartMs = nowMs == 0 ? 1 : nowMs;
-        return;
-    }
-    if ( nowMs - floorWindowStartMs < MAGLOC_FLOOR_WINDOW_MS ) {
-        return;
-    }
-    floorWindowStartMs = nowMs == 0 ? 1 : nowMs;
-    if ( floorWindowMinZ > 1e8f ) {
-        floorMinCount = 0; // a second without a fix: start over
-        return;
-    }
-    if ( floorMinCount < MAGLOC_FLOOR_WINDOWS ) {
-        floorMins[ floorMinCount++ ] = floorWindowMinZ;
-    } else {
-        for ( int i = 1; i < MAGLOC_FLOOR_WINDOWS; i++ )
-            floorMins[ i - 1 ] = floorMins[ i ];
-        floorMins[ MAGLOC_FLOOR_WINDOWS - 1 ] = floorWindowMinZ;
-    }
-    floorWindowMinZ = 1e9f;
-    if ( floorMinCount < MAGLOC_FLOOR_WINDOWS ) {
-        return;
-    }
-    float lowest = floorMins[ 0 ], highest = floorMins[ 0 ], sum = 0.0f;
-    for ( int i = 0; i < MAGLOC_FLOOR_WINDOWS; i++ ) {
-        if ( floorMins[ i ] < lowest )
-            lowest = floorMins[ i ];
-        if ( floorMins[ i ] > highest )
-            highest = floorMins[ i ];
-        sum += floorMins[ i ];
-    }
-    float floor = sum / MAGLOC_FLOOR_WINDOWS;
-    if ( highest - lowest <= MAGLOC_FLOOR_AGREE_MM ) {
-        // Where the point bottoms out is REPORTED, not taken as the surface:
-        // it is a hole's bottom, or a lying magnet's radius, and with the
-        // tip offset wrong it is wherever the magnet is (2026-09-21: the
-        // rule that brought the surface down to it put the surface 4 mm
-        // under a resting probe; the rule that brought it up to it raised
-        // the surface 6 mm under a probe whose magnet sat 6 mm up the
-        // shaft, in the sim). S and the menu set the surface; q/Q find the
-        // tip offset; this line says whether they agree.
-        bool changed = floorZ == 0.0f || fabsf( floor - floorZ ) > 1.0f;
-        floorZ = floor;
-        floorMinCount = 0;
-        if ( changed ) {
-            surfaceLearned++;
-            Stream* out = console.port( );
-            if ( out != nullptr ) {
-                char line[ 160 ];
-                snprintf( line, sizeof( line ), "the point bottoms out at %.1f mm; the surface is set at %.1f (%.1f %s it) - S sets the surface, q/Q the tip offset", floorZ, boardZ, fabsf( floorZ - boardZ ),
-                          floorZ < boardZ ? "below" : "above" );
-                out->println( line );
-            }
-        }
-    }
-}
-
-// The shaft carried on from the point down to the board's surface. A point
-// already at or below the surface, or a shaft too near level to meet it
-// anywhere sensible, stays where it is.
 Vec3 MagLocator::pointerOf( Vec3 tip, Vec3 shaft ) const {
     float reach = 0.0f;
     return magTrackPointer( boardZ, MAGTRACK_MAX_REACH_MM, tip, shaft, &reach ); // the one geometry, the tracker's cursor included
@@ -590,7 +525,6 @@ ServiceStatus MagLocator::service( ) {
     } else {
         lastStatus = sim.on ? simFrame( &in ) : fitFrame( &in );
     }
-    learnFloor( millis( ) );
     keepStrengthRecord( millis( ) );
     track.surfaceZ = boardZ;
     track.tipOffsetMm = tipOffsetMm;
@@ -1262,76 +1196,175 @@ void MagLocator::auditZeros( const FrameScratch& f ) {
     // again, because the others' samples were taken against fits that
     // carried that error (the sim: the MMC's 0.1 mT, uncorrected, made
     // 10-35 uT "zero errors" at three TMAGs).
-    int best = -1;
-    float bestRatio = 1.0f;
-    bool newlyExcluded = false;
+    // Every window with its samples must also have the spread before any
+    // correction is applied: a sensor whose gain is far off pulls the fits of
+    // the others, and the first window to solve was a TRUE sensor's, given a
+    // false 6.6 % z gain from fits the bad one was still in (2026-09-23, the
+    // sim); solved together, the largest correction goes first and the
+    // windows start again without that error.
+    for ( int k = 0; k < count; k++ ) {
+        ZeroAuditSensor& a = audit.sensor( k );
+        if ( a.n >= MAGLOC_AUDIT_MIN_SAMPLES && !( a.excluded && !a.correctable ) && !audit.solve( k, MAGLOC_AUDIT_MIN_SAMPLES, MAGLOC_AUDIT_MIN_SPREAD ) ) {
+            return; // too little spread yet on one of them: the samples keep accumulating (a window that never gets it starts again at MAGLOC_AUDIT_MAX_SAMPLES)
+        }
+    }
+    // Zeros first, then gains: a zero error biases the far sensors most (the
+    // MMC's 0.005 mT is half of what it reads 90 mm out) and, through their
+    // weight, the fits of the others - the first audit scene's world has no
+    // gain error, and the solve showed z gains of 1.06 on three TMAGs and
+    // 0.91 on a fourth, all the MMC's zero error in the fits (2026-09-23).
+    // Only with no zero left to correct is a gain judged.
+    int best = -1, bestGain = -1, bestCorrectable = -1;
+    float bestRatio = 1.0f, bestGainRatio = 1.0f;
+    bool newlyExcluded = false; // a sensor the model does not describe was found in the fits: this round's other solves are not to be trusted
     for ( int k = 0; k < count; k++ ) {
         ZeroAuditSensor& a = audit.sensor( k );
         if ( a.n < MAGLOC_AUDIT_MIN_SAMPLES ) {
             continue;
         }
         if ( !audit.solve( k, MAGLOC_AUDIT_MIN_SAMPLES, MAGLOC_AUDIT_MIN_SPREAD ) ) {
-            continue; // too little spread yet: its samples keep accumulating
+            continue;
         }
-        float meanPred = sqrtf( ( a.pp[ 0 ] + a.pp[ 1 ] + a.pp[ 2 ] ) / a.n );
-        // Unexplained: more than a share of its field AND more than its own
-        // noise can make (a faint-reading TMAG's residual is its noise, not
-        // a fault - at the bench's 0.012 mT a frame every round was thrown
-        // away for one, in the sim).
+        float meanPred = sqrtf( ( a.spp[ 0 ] + a.spp[ 1 ] + a.spp[ 2 ] ) / a.n );
         float unexplainedLimit = MAGLOC_AUDIT_MAX_UNEXPLAINED * meanPred;
         float noiseFloor = 3.0f * magArray.noiseMt[ k ];
         if ( unexplainedLimit < noiseFloor )
             unexplainedLimit = noiseFloor;
-        bool bad = fabsf( a.gain - 1.0f ) > MAGLOC_AUDIT_MAX_GAIN_ERROR || ( meanPred > 0.0f && a.rmsAfter > unexplainedLimit );
-        if ( bad && !a.excluded ) {
+        float gainAxis[ 3 ] = { a.gain.x, a.gain.y, a.gain.z };
+        bool wild = false;
+        for ( int ax = 0; ax < 3; ax++ )
+            wild = wild || gainAxis[ ax ] > MAGLOC_AUDIT_MAX_GAIN_TRIM || gainAxis[ ax ] < 1.0f / MAGLOC_AUDIT_MAX_GAIN_TRIM;
+        bool bad = wild || ( meanPred > 0.0f && a.rmsAfter > unexplainedLimit );
+        bool offGain = false;
+        for ( int ax = 0; ax < 3; ax++ )
+            offGain = offGain || fabsf( gainAxis[ ax ] - 1.0f ) > MAGLOC_AUDIT_MAX_GAIN_ERROR;
+        if ( bad && !( a.excluded && !a.correctable ) ) {
             a.excluded = true;
+            a.correctable = false;
             newlyExcluded = true;
             Stream* out = console.port( );
             if ( out != nullptr ) {
                 char line[ 200 ];
-                snprintf( line, sizeof( line ), "zero audit: sensor %d does not fit the model (gain %.3f, %.4f mT unexplained of %.3f): left out of the audit's fits; its row wants a look (magcal)", k, a.gain,
-                          a.rmsAfter, meanPred );
+                snprintf( line, sizeof( line ), "zero audit: sensor %d does not fit the model (gain x %.3f y %.3f z %.3f, %.4f mT unexplained of %.3f): left out of the audit's fits; its row wants a look (magcal)", k,
+                          a.gain.x, a.gain.y, a.gain.z, a.rmsAfter, meanPred );
                 out->println( line );
             }
+        } else if ( offGain && !a.excluded ) {
+            // A gain this far off pulls the fits of the others (2026-09-23,
+            // the sim: a sensor 36 % low put a false 6.6 % z gain on a true
+            // one). Its own samples come from fits WITHOUT it (the audit is
+            // leave-one-out), so its own solve is clean: it is corrected
+            // this round, zero and gain together, and until then it is out
+            // of the others' fits.
+            a.excluded = true;
+            a.correctable = true;
         }
-        if ( a.excluded ) {
+        if ( a.excluded && !a.correctable ) {
             continue;
         }
-        float size = sqrtf( a.zero.x * a.zero.x + a.zero.y * a.zero.y + a.zero.z * a.zero.z );
-        float threshold = MAGLOC_AUDIT_APPLY_NOISE * magArray.noiseMt[ k ];
-        if ( threshold < MAGLOC_AUDIT_APPLY_MT )
-            threshold = MAGLOC_AUDIT_APPLY_MT;
-        // ...and never less than three times the estimate's own uncertainty
-        // (the residual's rms over root n, over the three axes): a zero
-        // found to be off by less than that is the samples' noise.
-        float sigma = 1.73f * a.rmsAfter / sqrtf( (float)a.n ) * 3.0f;
-        if ( threshold < sigma )
-            threshold = sigma;
-        float ratio = size / threshold;
-        if ( size < MAGLOC_AUDIT_MAX_MT && ratio > bestRatio ) {
+        // Per axis: a zero past the larger of the apply floor (the axis's own
+        // noise: Z is quieter) and three of the solve's sigma; a gain past
+        // MAGLOC_AUDIT_APPLY_GAIN and three of its sigma. The sensor with the
+        // clearest correction goes first; the rest come round after the
+        // windows start again without that error in the fits.
+        float zeroAxis[ 3 ] = { a.zero.x, a.zero.y, a.zero.z };
+        float zeroSig[ 3 ] = { a.zeroSigma.x, a.zeroSigma.y, a.zeroSigma.z }, gainSig[ 3 ] = { a.gainSigma.x, a.gainSigma.y, a.gainSigma.z };
+        float ratio = 0.0f, gainRatio = 0.0f;
+        for ( int ax = 0; ax < 3; ax++ ) {
+            float noise = magArray.noiseMt[ k ] * ( ax == 2 && magSensorPlaces[ k ].type != MAG_MMC56X3 ? MAG_NOISE_Z_MT / MAG_WEIGHT_REFERENCE_MT : 1.0f );
+            float threshold = MAGLOC_AUDIT_APPLY_NOISE * noise;
+            if ( threshold < MAGLOC_AUDIT_APPLY_MT )
+                threshold = MAGLOC_AUDIT_APPLY_MT;
+            if ( threshold < 3.0f * zeroSig[ ax ] )
+                threshold = 3.0f * zeroSig[ ax ];
+            float r = fabsf( zeroAxis[ ax ] ) < MAGLOC_AUDIT_MAX_MT ? fabsf( zeroAxis[ ax ] ) / threshold : 0.0f;
+            if ( r > ratio )
+                ratio = r;
+            float gThreshold = MAGLOC_AUDIT_APPLY_GAIN;
+            if ( gThreshold < 3.0f * gainSig[ ax ] )
+                gThreshold = 3.0f * gainSig[ ax ];
+            float rg = fabsf( gainAxis[ ax ] - 1.0f ) / gThreshold;
+            if ( rg > gainRatio )
+                gainRatio = rg;
+        }
+        if ( a.excluded && a.correctable && gainRatio > 1.0f && ( bestCorrectable < 0 || gainRatio > bestGainRatio ) ) {
+            bestCorrectable = k; // corrected before anything else: its samples are the clean ones, the others' were taken with its error in their fits
+        }
+        if ( ratio > bestRatio ) {
             bestRatio = ratio;
             best = k;
         }
+        if ( gainRatio > bestGainRatio ) {
+            bestGainRatio = gainRatio;
+            bestGain = k;
+        }
+    }
+    bool gainRound = false;
+    if ( bestCorrectable >= 0 ) {
+        best = bestCorrectable; // zero and gain together
+        gainRound = true;
+    } else if ( best < 0 && bestGain >= 0 ) {
+        best = bestGain; // no zero left to correct: the gains' turn
+        gainRound = true;
     }
     if ( newlyExcluded ) {
         best = -1; // this round was taken with that sensor in the fits: again without it
     }
     if ( best >= 0 ) {
         ZeroAuditSensor& a = audit.sensor( best );
-        // The reading carries z that the model does not: it is in the zero,
-        // and comes out (shiftBaseline subtracts `by` from the baseline, so
-        // the field gains it: pass -z). The smoothed field follows at once.
-        Vec3 by = { -a.zero.x, -a.zero.y, -a.zero.z };
+        // Every axis over its own threshold is corrected, zero and gain alike:
+        // the reading was zero + gain * field, so the field is (reading - zero) / gain.
+        float zeroAxis[ 3 ] = { a.zero.x, a.zero.y, a.zero.z }, gainAxis[ 3 ] = { a.gain.x, a.gain.y, a.gain.z };
+        float zeroSig[ 3 ] = { a.zeroSigma.x, a.zeroSigma.y, a.zeroSigma.z }, gainSig[ 3 ] = { a.gainSigma.x, a.gainSigma.y, a.gainSigma.z };
+        float zApply[ 3 ] = { 0, 0, 0 }, gApply[ 3 ] = { 1, 1, 1 };
+        bool anyZero = false, anyGain = false;
+        for ( int ax = 0; ax < 3; ax++ ) {
+            float noise = magArray.noiseMt[ best ] * ( ax == 2 && magSensorPlaces[ best ].type != MAG_MMC56X3 ? MAG_NOISE_Z_MT / MAG_WEIGHT_REFERENCE_MT : 1.0f );
+            float threshold = MAGLOC_AUDIT_APPLY_NOISE * noise;
+            if ( threshold < MAGLOC_AUDIT_APPLY_MT )
+                threshold = MAGLOC_AUDIT_APPLY_MT;
+            if ( threshold < 3.0f * zeroSig[ ax ] )
+                threshold = 3.0f * zeroSig[ ax ];
+            if ( fabsf( zeroAxis[ ax ] ) > threshold && fabsf( zeroAxis[ ax ] ) < MAGLOC_AUDIT_MAX_MT ) {
+                zApply[ ax ] = zeroAxis[ ax ];
+                anyZero = true;
+            }
+            float gThreshold = MAGLOC_AUDIT_APPLY_GAIN;
+            if ( gThreshold < 3.0f * gainSig[ ax ] )
+                gThreshold = 3.0f * gainSig[ ax ];
+            if ( gainRound && fabsf( gainAxis[ ax ] - 1.0f ) > gThreshold ) {
+                gApply[ ax ] = gainAxis[ ax ];
+                anyGain = true;
+            }
+        }
+        Vec3 by = { -zApply[ 0 ], -zApply[ 1 ], -zApply[ 2 ] };
         magArray.shiftBaseline( best, by );
-        smooth[ best ] = { smooth[ best ].x - a.zero.x, smooth[ best ].y - a.zero.y, smooth[ best ].z - a.zero.z };
+        smooth[ best ] = { smooth[ best ].x - zApply[ 0 ], smooth[ best ].y - zApply[ 1 ], smooth[ best ].z - zApply[ 2 ] };
+        if ( anyGain ) {
+            Vec3 g = { gApply[ 0 ], gApply[ 1 ], gApply[ 2 ] };
+            magArray.applyGainTrim( best, g );
+            smooth[ best ] = { smooth[ best ].x / g.x, smooth[ best ].y / g.y, smooth[ best ].z / g.z };
+            a.lastGainApplied = g;
+        }
         a.applied++;
-        a.lastApplied = a.zero;
+        a.lastApplied = { zApply[ 0 ], zApply[ 1 ], zApply[ 2 ] };
+        if ( a.excluded && a.correctable ) {
+            a.excluded = false; // corrected: back into the others' fits
+            a.correctable = false;
+        }
         Stream* out = console.port( );
         if ( out != nullptr ) {
-            char line[ 200 ];
-            snprintf( line, sizeof( line ), "zero audit: sensor %d's zero was off by %.4f %.4f %.4f mT (gain %.3f, %d samples, spread %.2f): taken out, the settings keep it", best, a.zero.x, a.zero.y,
-                      a.zero.z, a.gain, a.n, a.spread );
-            out->println( line );
+            char line[ 220 ];
+            if ( anyZero ) {
+                snprintf( line, sizeof( line ), "zero audit: sensor %d's zero was off by %.4f %.4f %.4f mT (%d samples, spread %.2f): taken out, the settings keep it", best, zApply[ 0 ], zApply[ 1 ], zApply[ 2 ], a.n,
+                          a.spread );
+                out->println( line );
+            }
+            if ( anyGain ) {
+                snprintf( line, sizeof( line ), "zero audit: sensor %d's gain was off - x %.3f y %.3f z %.3f of what the others predict (%d samples, spread %.2f): corrected, the settings keep it", best, gApply[ 0 ],
+                          gApply[ 1 ], gApply[ 2 ], a.n, a.spread );
+                out->println( line );
+            }
         }
         for ( int k = 0; k < count; k++ ) {
             audit.reset( k ); // every window again, against fits without that error
@@ -1354,7 +1387,7 @@ void MagLocator::auditZeros( const FrameScratch& f ) {
 
 void MagLocator::printAudit( Stream* out ) const {
     char line[ 220 ];
-    snprintf( line, sizeof( line ), "zero audit: each sensor against the fit of the others while the probe is near (a sample a second; z applied past %.3f mT with %d samples over spread %.1f)", MAGLOC_AUDIT_APPLY_MT,
+    snprintf( line, sizeof( line ), "zero audit: each sensor against the fit of the others while the probe is near (a sample a second; a zero applied past %.3f mT and a gain past 1 %%, each past three of its own sigma, with %d samples over spread %.1f; the gain per axis)", MAGLOC_AUDIT_APPLY_MT,
               MAGLOC_AUDIT_MIN_SAMPLES, MAGLOC_AUDIT_MIN_SPREAD );
     out->println( line );
     int applied = 0;
@@ -1362,7 +1395,7 @@ void MagLocator::printAudit( Stream* out ) const {
         applied += audit.sensor( i ).applied;
     snprintf( line, sizeof( line ), "zero audit: corrections applied since boot: %d", applied );
     out->println( line );
-    out->println( " #  samples  spread     z_x     z_y     z_z (mT)   gain   rms before/after (mT)  applied  last z applied   (x = left out of the audit's fits: the model does not describe it)" );
+    out->println( " #  samples  spread     z_x     z_y     z_z (mT)   gain x y z          rms before/after (mT)  applied  last z applied   (x = left out of the audit's fits: the model does not describe it)" );
     for ( int i = 0; i < magArray.sensorCount( ); i++ ) {
         ZeroAuditSensor a = audit.sensor( i );
         if ( a.n >= 2 ) {
@@ -1375,8 +1408,8 @@ void MagLocator::printAudit( Stream* out ) const {
             snprintf( line, sizeof( line ), "%2d  %7d  %6.2f  (too little spread of position yet to tell a zero from a gain)   %.4f (reading - prediction, rms)   %3d    %+.4f %+.4f %+.4f %s", i, a.n,
                       a.spread, a.rmsBefore, a.applied, a.lastApplied.x, a.lastApplied.y, a.lastApplied.z, a.excluded ? "x" : "" );
         } else {
-            snprintf( line, sizeof( line ), "%2d  %7d  %6.2f  %+.4f %+.4f %+.4f   %6.3f   %.4f / %.4f            %3d    %+.4f %+.4f %+.4f %s", i, a.n, a.spread, a.zero.x, a.zero.y, a.zero.z, a.gain,
-                      a.rmsBefore, a.rmsAfter, a.applied, a.lastApplied.x, a.lastApplied.y, a.lastApplied.z, a.excluded ? "x" : "" );
+            snprintf( line, sizeof( line ), "%2d  %7d  %6.2f  %+.4f %+.4f %+.4f   %.3f %.3f %.3f   %.4f / %.4f            %3d    %+.4f %+.4f %+.4f %s", i, a.n, a.spread, a.zero.x, a.zero.y, a.zero.z,
+                      a.gain.x, a.gain.y, a.gain.z, a.rmsBefore, a.rmsAfter, a.applied, a.lastApplied.x, a.lastApplied.y, a.lastApplied.z, a.excluded ? "x" : "" );
         }
         out->println( line );
     }

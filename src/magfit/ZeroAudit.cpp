@@ -10,7 +10,9 @@ void ZeroAudit::reset( int i ) {
     s[ i ] = ZeroAuditSensor( );
     s[ i ].applied = keep.applied;
     s[ i ].lastApplied = keep.lastApplied;
+    s[ i ].lastGainApplied = keep.lastGainApplied;
     s[ i ].excluded = keep.excluded;
+    s[ i ].correctable = keep.correctable;
 }
 
 void ZeroAudit::resetAll( ) {
@@ -22,19 +24,31 @@ void ZeroAudit::addSample( int i, Vec3 prediction, Vec3 reading, uint32_t nowMs 
     if ( i < 0 || i >= ZERO_AUDIT_MAX )
         return;
     ZeroAuditSensor& a = s[ i ];
-    if ( a.n == 0 )
+    if ( a.n == 0 ) {
         a.firstMs = nowMs;
+        a.firstPred = prediction;
+        a.firstRead = reading;
+    }
     float pv[ 3 ] = { prediction.x, prediction.y, prediction.z }, rv[ 3 ] = { reading.x, reading.y, reading.z };
+    float p0[ 3 ] = { a.firstPred.x, a.firstPred.y, a.firstPred.z }, r0[ 3 ] = { a.firstRead.x, a.firstRead.y, a.firstRead.z };
     for ( int k = 0; k < 3; k++ ) {
-        a.r[ k ] += rv[ k ];
-        a.p[ k ] += pv[ k ];
-        a.pp[ k ] += (double)pv[ k ] * pv[ k ];
-        a.pr[ k ] += (double)pv[ k ] * rv[ k ];
-        a.rr[ k ] += (double)rv[ k ] * rv[ k ];
+        float u = pv[ k ] - p0[ k ], v = rv[ k ] - r0[ k ];
+        a.su[ k ] += u;
+        a.sv[ k ] += v;
+        a.suu[ k ] += u * u;
+        a.suv[ k ] += u * v;
+        a.svv[ k ] += v * v;
+        a.spp[ k ] += pv[ k ] * pv[ k ];
     }
     a.n++;
 }
 
+// Per axis, the line reading = zero + gain * prediction through the samples
+// (centred on the first sample: the sums are small and do not cancel in
+// float). An axis whose predictions hardly vary (spreadAxis under
+// minSpread) cannot tell its gain from its zero: it keeps gain 1 and the
+// offset takes the mean difference. The solve's own 1-sigma per axis comes
+// with it: the locator applies a correction only past three of them.
 bool ZeroAudit::solve( int i, int minSamples, float minSpread ) {
     if ( i < 0 || i >= ZERO_AUDIT_MAX )
         return false;
@@ -42,32 +56,39 @@ bool ZeroAudit::solve( int i, int minSamples, float minSpread ) {
     a.solved = false;
     if ( a.n < 2 )
         return false;
-    double n = a.n;
-    double num = 0, den = 0, meanSq = 0;
+    float n = (float)a.n;
+    float p0[ 3 ] = { a.firstPred.x, a.firstPred.y, a.firstPred.z }, r0[ 3 ] = { a.firstRead.x, a.firstRead.y, a.firstRead.z };
+    float g[ 3 ], z[ 3 ], gs[ 3 ], zs[ 3 ];
+    float meanSq = 0.0f, denAll = 0.0f, before = 0.0f, after = 0.0f;
     for ( int k = 0; k < 3; k++ ) {
-        num += a.pr[ k ] - a.r[ k ] * a.p[ k ] / n;
-        den += a.pp[ k ] - a.p[ k ] * a.p[ k ] / n;
-        meanSq += ( a.p[ k ] / n ) * ( a.p[ k ] / n );
+        float mu = a.su[ k ] / n, mv = a.sv[ k ] / n;
+        float sxx = a.suu[ k ] - a.su[ k ] * a.su[ k ] / n;
+        float sxy = a.suv[ k ] - a.su[ k ] * a.sv[ k ] / n;
+        float syy = a.svv[ k ] - a.sv[ k ] * a.sv[ k ] / n;
+        float meanP = p0[ k ] + mu;
+        a.spreadAxis[ k ] = sxx > 0.0f && meanP != 0.0f ? sqrtf( ( sxx / n ) / ( meanP * meanP ) ) : 0.0f;
+        meanSq += meanP * meanP;
+        denAll += sxx > 0.0f ? sxx : 0.0f;
+        bool axisOk = sxx > 0.0f && a.spreadAxis[ k ] >= minSpread;
+        g[ k ] = axisOk ? sxy / sxx : 1.0f;
+        z[ k ] = r0[ k ] - g[ k ] * p0[ k ] + ( mv - g[ k ] * mu );
+        float residual = axisOk ? syy - g[ k ] * sxy : syy - 2.0f * sxy + sxx; // the sum of squares left, about the line
+        if ( residual < 0.0f )
+            residual = 0.0f;
+        after += residual;
+        float d0 = r0[ k ] - p0[ k ];
+        before += n * d0 * d0 + 2.0f * d0 * ( a.sv[ k ] - a.su[ k ] ) + ( a.svv[ k ] - 2.0f * a.suv[ k ] + a.suu[ k ] );
+        float var = residual / ( n > 2.0f ? n - 2.0f : 1.0f );
+        gs[ k ] = axisOk ? sqrtf( var / sxx ) : 1e9f;
+        zs[ k ] = sqrtf( var / n );
     }
-    // The spread of the prediction over the samples, against its mean size.
-    a.spread = meanSq > 0 ? (float)sqrt( ( den / n ) / meanSq ) : 0.0f;
-    if ( den <= 0 )
-        return false;
-    double g = num / den;
-    double z[ 3 ];
-    for ( int k = 0; k < 3; k++ )
-        z[ k ] = ( a.r[ k ] - g * a.p[ k ] ) / n;
-    // The residual's rms before (reading - pred) and after (reading - z - g pred).
-    double before = 0, after = 0;
-    for ( int k = 0; k < 3; k++ ) {
-        before += a.rr[ k ] - 2 * a.pr[ k ] + a.pp[ k ];
-        // sum (r - z - g p)^2 = rr - 2 z r - 2 g pr + n z^2 + 2 z g p + g^2 pp
-        after += a.rr[ k ] - 2 * z[ k ] * a.r[ k ] - 2 * g * a.pr[ k ] + n * z[ k ] * z[ k ] + 2 * z[ k ] * g * a.p[ k ] + g * g * a.pp[ k ];
-    }
-    a.rmsBefore = (float)sqrt( before > 0 ? before / n : 0 );
-    a.rmsAfter = (float)sqrt( after > 0 ? after / n : 0 );
-    a.gain = (float)g;
-    a.zero = { (float)z[ 0 ], (float)z[ 1 ], (float)z[ 2 ] };
+    a.spread = meanSq > 0.0f ? sqrtf( ( denAll / n ) / meanSq ) : 0.0f;
+    a.rmsBefore = sqrtf( before > 0.0f ? before / n : 0.0f );
+    a.rmsAfter = sqrtf( after > 0.0f ? after / n : 0.0f );
+    a.gain = { g[ 0 ], g[ 1 ], g[ 2 ] };
+    a.zero = { z[ 0 ], z[ 1 ], z[ 2 ] };
+    a.gainSigma = { gs[ 0 ], gs[ 1 ], gs[ 2 ] };
+    a.zeroSigma = { zs[ 0 ], zs[ 1 ], zs[ 2 ] };
     a.solved = a.n >= minSamples && a.spread >= minSpread;
     return a.solved;
 }

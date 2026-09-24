@@ -133,6 +133,8 @@ class WorldService : public Service {
             // baseline - so the zero's drift rules (MagLocator::keepZeros)
             // act here as on the board.
             magArray.raw[ i ] = { gain[ i ] * b.x + bias[ i ].x + gauss( noise.x * k ), gain[ i ] * b.y + bias[ i ].y + gauss( noise.y * k ), gain[ i ] * b.z + bias[ i ].z + gauss( noise.z * k ) };
+            const Vec3& t = magArray.gainTrim[ i ]; // as the array does it: the audit's gain trim on the reading
+            magArray.raw[ i ] = { magArray.raw[ i ].x * t.x, magArray.raw[ i ].y * t.y, magArray.raw[ i ].z * t.z };
             Vec3 zero = magArray.baselineOf( i );
             magArray.field[ i ] = { magArray.raw[ i ].x - zero.x, magArray.raw[ i ].y - zero.y, magArray.raw[ i ].z - zero.z };
             // As the array does it (MagArray::takeReading): a reading past MAG_SATURATED of the part's range is clipped, and a clipped sensor is out of that frame.

@@ -122,6 +122,17 @@ class MagArray : public Service {
 
     Vec3 position[ MAG_SENSOR_COUNT ];              // where each sensor sits, mm
     Vec3 field[ MAG_SENSOR_COUNT ];                 // latest reading minus baseline, mT, board frame
+    // Each sensor's gain as the zero audit has corrected it, per BOARD axis
+    // (the TMAG5273's sensitivity is per axis, and the audit sees the board
+    // frame), applied to the reading after the table's gain and rotation:
+    // 1 until the audit finds otherwise; the settings keep it (sensorgain=).
+    // A part rotated by a multiple of 90 degrees maps a board axis to a
+    // sensor axis, so the trim is that sensor axis's; the MMC56x3's 260.6
+    // degrees does not, and its trim is what the audit found, re-found
+    // within minutes of use. (Phase 4's calibration blob keeps gains in the
+    // sensor's frame.)
+    Vec3 gainTrim[ MAG_SENSOR_COUNT ];
+    void applyGainTrim( int i, Vec3 divideBy ); // the audit: the reading was this much too big per axis; the baseline and the saved zero follow (they are readings of nothing)
     Vec3 raw[ MAG_SENSOR_COUNT ];                   // latest reading as measured, mT, board frame
     bool fresh[ MAG_SENSOR_COUNT ];                 // this sensor was read in the latest frame, and was not saturated
     // ...and whether the fit should use it: fresh, calibrated (the table)
@@ -253,7 +264,10 @@ class MagArray : public Service {
     bool simulatedFrames = false;
 
   private:
-    MagArray( ) = default;
+    MagArray( ) {
+        for ( int i = 0; i < MAG_SENSOR_COUNT; i++ )
+            gainTrim[ i ] = { 1, 1, 1 };
+    }
 
     MagSensorState sensors[ MAG_SENSOR_COUNT ];
     bool disabled[ MAG_SENSOR_COUNT ] = { false }; // left unpowered (or unread) on purpose (powerOffFrom)

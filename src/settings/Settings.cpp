@@ -82,6 +82,19 @@ int SettingsService::record( int step, char* out, int size ) {
         return snprintf( out, size, "%s=%s\n", key, value );
     }
     step -= items;
+    // Each sensor's gain as the zero audit corrected it (per board axis; 1 = the
+    // table's), before the zeros: a saved zero comes through the trim.
+    if ( step < MAG_SENSOR_COUNT ) {
+        if ( step >= magArray.sensorCount( ) ) {
+            return 0;
+        }
+        const Vec3& t = magArray.gainTrim[ step ];
+        if ( t.x == 1.0f && t.y == 1.0f && t.z == 1.0f ) {
+            return 0;
+        }
+        return snprintf( out, size, "sensorgain=%d,%.4f,%.4f,%.4f\n", step, (double)t.x, (double)t.y, (double)t.z );
+    }
+    step -= MAG_SENSOR_COUNT;
     // The array's zero as last taken (not the drifting live one), and the
     // last good fix - both so a reboot with the probe on the board recovers.
     if ( step < MAG_SENSOR_COUNT ) {
@@ -193,6 +206,19 @@ int SettingsService::apply( const char* text ) {
                 oldTuning = strtol( value, nullptr, 10 ) < SETTINGS_TUNING_VERSION;
                 if ( oldTuning && console.port( ) != nullptr ) {
                     console.port( )->println( "settings: the saved tracker/smoothing values are from an older tuning: the new defaults are used (and saved)" );
+                }
+            } else if ( keyLength == 10 && strncmp( line, "sensorgain", 10 ) == 0 ) {
+                char* next = nullptr;
+                int i = (int)strtol( value, &next, 10 );
+                if ( i >= 0 && i < MAG_SENSOR_COUNT ) {
+                    Vec3 t;
+                    t.x = strtof( next + 1, &next );
+                    t.y = strtof( next + 1, &next );
+                    t.z = strtof( next + 1, &next );
+                    if ( t.x > 0.3f && t.x < 3.0f && t.y > 0.3f && t.y < 3.0f && t.z > 0.3f && t.z < 3.0f ) {
+                        magArray.gainTrim[ i ] = t;
+                        applied++;
+                    }
                 }
             } else if ( ( keyLength == 4 && strncmp( line, "zero", 4 ) == 0 ) || ( keyLength == 10 && strncmp( line, "sensorzero", 10 ) == 0 ) ) {
                 // zero= is in the board frame (the older record, right only

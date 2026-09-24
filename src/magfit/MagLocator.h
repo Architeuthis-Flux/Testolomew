@@ -269,21 +269,6 @@
 // bench the breadboard sits 17.5 mm over the sensors; on V6 the surface is
 // 7.1 mm above the base PCB (plus wherever the sensors sit below that).
 #define MAGLOC_BOARD_Z_MM 17.5f
-// Where the point bottoms out is also WATCHED: each second the lowest point
-// of the tracked fixes is noted, and when the last MAGLOC_FLOOR_WINDOWS of
-// them agree within MAGLOC_FLOOR_AGREE_MM that is the floor (floorZ), which
-// is reported against the surface as set. It is NOT taken as the surface
-// any more: the point bottoms out in a hole, a lying magnet at its radius,
-// and with the tip offset wrong the "point" is wherever the magnet is
-// (2026-09-19 the rule brought the surface 6.7 mm down under a probe whose
-// magnet was that far up the shaft; 2026-09-21 it put the surface 4 mm
-// under a resting probe and the pointed cursor projected the difference).
-// S and the menu set the surface; q/Q measure the tip offset.
-#define MAGLOC_FLOOR_WINDOW_MS 1000
-#define MAGLOC_FLOOR_WINDOWS 3
-#define MAGLOC_FLOOR_AGREE_MM 0.7f
-#define MAGLOC_FLOOR_STEP_MM 0.5f
-#define MAGLOC_FLOOR_MISFIT 0.10f // a fix worse than this says nothing about the floor
 
 // A fit is offered to the tracker as a ROUGH fix ("somewhere about here",
 // the wide glow on the LEDs, no row counted) rather than a proper one when
@@ -334,6 +319,8 @@
 #define MAGLOC_AUDIT_MIN_SPREAD 0.3f
 #define MAGLOC_AUDIT_APPLY_MT 0.004f         // ...or 0.6 of the sensor's own noise, whichever is more (a TMAG: 0.008)
 #define MAGLOC_AUDIT_APPLY_NOISE 0.6f
+#define MAGLOC_AUDIT_APPLY_GAIN 0.01f        // a gain is corrected past this (1 %), and past three of the solve's own sigma
+#define MAGLOC_AUDIT_MAX_GAIN_TRIM 2.0f      // ...but a gain further from 1 than this (either way) is a row that wants magcal, not a trim
 #define MAGLOC_AUDIT_MAX_GAIN_ERROR 0.15f    // a sensor whose gain solves further from 1 than this...
 #define MAGLOC_AUDIT_MAX_UNEXPLAINED 0.15f   // ...or whose residual after the solve is more than this of its field, is left out of the audit's fits
 #define MAGLOC_AUDIT_MAX_MT 0.3f
@@ -469,14 +456,8 @@ class MagLocator : public Service {
     // the magnet's angle to the shaft.
     float tipOffsetMm = MAGLOC_TIP_OFFSET_MM;
     float magnetAngleDeg = MAGLOC_MAGNET_ANGLE_DEG;
-    float boardZ = MAGLOC_BOARD_Z_MM; // the breadboard's surface, mm above the sensors (the menu's "surface", saved; learned too, see MAGLOC_FLOOR_*)
-    float floorZ = 0.0f;              // where the point bottoms out, as learned (0 = not yet); the surface only ever comes UP to it
-    float floorWindowMinZ = 1e9f;     // the lowest point this second
-    uint32_t floorWindowStartMs = 0;
-    float floorMins[ MAGLOC_FLOOR_WINDOWS ]; // the last seconds' lowest points
-    int floorMinCount = 0;
+    float boardZ = MAGLOC_BOARD_Z_MM; // the breadboard's surface, mm above the sensors (the menu's "surface", saved; the row calibration sets it)
     uint32_t surfaceLearned = 0; // times the surface came down to the floor
-    void learnFloor( uint32_t nowMs );
     float presentMt = MAGLOC_PRESENT_MT; // the strongest smoothed reading that counts as a magnet (menu: presence)
     float fitMaxChi = MAGLOC_FIT_MAX_CHI; // the fit's acceptance: residuals over each sensor's own expected error (menu: fit chi - loosened at the bench when its errors are not the simulator's)
     float levelScale( ) const;           // the seen level's scale for the held strength (MAGLOC_THRESHOLDS_TUNED_AT)

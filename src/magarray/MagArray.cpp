@@ -800,19 +800,35 @@ Vec3 magBoardToSensor( Vec3 field, float rotationDeg, bool underside, bool zInto
 
 Vec3 MagArray::sensorFrameField( int i ) const {
     float k = 1.0f / magSensorPlaces[ i ].gain;
-    Vec3 ungained = { field[ i ].x * k, field[ i ].y * k, field[ i ].z * k };
+    const Vec3& t = gainTrim[ i ];
+    Vec3 ungained = { field[ i ].x * k / t.x, field[ i ].y * k / t.y, field[ i ].z * k / t.z };
     return magBoardToSensor( ungained, magSensorPlaces[ i ].rotationDeg, magSensorPlaces[ i ].underside, magSensorTypeZIntoTop( sensors[ i ].type ) );
 }
 
 Vec3 MagArray::zeroInSensorFrame( int i ) const {
     float k = 1.0f / magSensorPlaces[ i ].gain;
-    Vec3 ungained = { zeroed[ i ].x * k, zeroed[ i ].y * k, zeroed[ i ].z * k };
+    const Vec3& t = gainTrim[ i ];
+    Vec3 ungained = { zeroed[ i ].x * k / t.x, zeroed[ i ].y * k / t.y, zeroed[ i ].z * k / t.z };
     return magBoardToSensor( ungained, magSensorPlaces[ i ].rotationDeg, magSensorPlaces[ i ].underside, magSensorTypeZIntoTop( magSensorPlaces[ i ].type ) );
 }
 
 Vec3 MagArray::sensorFrameToBoard( int i, Vec3 s ) const {
     float g = magSensorPlaces[ i ].gain;
-    return magSensorToBoard( { s.x * g, s.y * g, s.z * g }, magSensorPlaces[ i ].rotationDeg, magSensorPlaces[ i ].underside, magSensorTypeZIntoTop( magSensorPlaces[ i ].type ) );
+    Vec3 b = magSensorToBoard( { s.x * g, s.y * g, s.z * g }, magSensorPlaces[ i ].rotationDeg, magSensorPlaces[ i ].underside, magSensorTypeZIntoTop( magSensorPlaces[ i ].type ) );
+    const Vec3& t = gainTrim[ i ];
+    return { b.x * t.x, b.y * t.y, b.z * t.z };
+}
+
+void MagArray::applyGainTrim( int i, Vec3 divideBy ) {
+    if ( i < 0 || i >= MAG_SENSOR_COUNT || divideBy.x <= 0.0f || divideBy.y <= 0.0f || divideBy.z <= 0.0f ) {
+        return;
+    }
+    gainTrim[ i ] = { gainTrim[ i ].x / divideBy.x, gainTrim[ i ].y / divideBy.y, gainTrim[ i ].z / divideBy.z };
+    baseline[ i ] = { baseline[ i ].x / divideBy.x, baseline[ i ].y / divideBy.y, baseline[ i ].z / divideBy.z };
+    zeroed[ i ] = { zeroed[ i ].x / divideBy.x, zeroed[ i ].y / divideBy.y, zeroed[ i ].z / divideBy.z };
+    raw[ i ] = { raw[ i ].x / divideBy.x, raw[ i ].y / divideBy.y, raw[ i ].z / divideBy.z };
+    field[ i ] = { raw[ i ].x - baseline[ i ].x, raw[ i ].y - baseline[ i ].y, raw[ i ].z - baseline[ i ].z };
+    zeroedAt++; // the settings keep the trim with the zero
 }
 
 void MagArray::startBaseline( ) {
@@ -1197,8 +1213,9 @@ void MagArray::publishFrame( ) {
         fresh[ i ] = sampleCount[ i ] > 0 && !saturated[ i ];
         if ( sampleCount[ i ] > 0 ) {
             float k = magSensorPlaces[ i ].gain / sampleCount[ i ];
-            raw[ i ] = magSensorToBoard( { sampleSum[ i ].x * k, sampleSum[ i ].y * k, sampleSum[ i ].z * k }, magSensorPlaces[ i ].rotationDeg,
-                                         magSensorPlaces[ i ].underside, magSensorTypeZIntoTop( sensors[ i ].type ) );
+            Vec3 b = magSensorToBoard( { sampleSum[ i ].x * k, sampleSum[ i ].y * k, sampleSum[ i ].z * k }, magSensorPlaces[ i ].rotationDeg,
+                                       magSensorPlaces[ i ].underside, magSensorTypeZIntoTop( sensors[ i ].type ) );
+            raw[ i ] = { b.x * gainTrim[ i ].x, b.y * gainTrim[ i ].y, b.z * gainTrim[ i ].z };
             if ( baselineLeft > 0 && zeroing[ i ] ) {
                 baselineSum[ i ].x += raw[ i ].x;
                 baselineSum[ i ].y += raw[ i ].y;

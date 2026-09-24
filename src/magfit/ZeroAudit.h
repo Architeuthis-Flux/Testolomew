@@ -49,21 +49,26 @@
 
 struct ZeroAuditSensor {
     int n = 0;
-    double r[ 3 ] = { 0, 0, 0 };  // sum of the readings, per axis
-    double p[ 3 ] = { 0, 0, 0 };  // sum of the predictions
-    double pp[ 3 ] = { 0, 0, 0 }; // sum of prediction^2
-    double pr[ 3 ] = { 0, 0, 0 }; // sum of prediction * reading
-    double rr[ 3 ] = { 0, 0, 0 }; // sum of reading^2 (for the rms before)
+    Vec3 firstPred = { 0, 0, 0 }, firstRead = { 0, 0, 0 }; // the first sample: the sums are of deviations from it (float sums that do not cancel)
+    float su[ 3 ] = { 0, 0, 0 };  // sum of (prediction - first), per axis
+    float sv[ 3 ] = { 0, 0, 0 };  // sum of (reading - first)
+    float suu[ 3 ] = { 0, 0, 0 }; // sum of its square
+    float suv[ 3 ] = { 0, 0, 0 }; // sum of the product
+    float svv[ 3 ] = { 0, 0, 0 }; // sum of the reading deviation's square
+    float spp[ 3 ] = { 0, 0, 0 }; // sum of prediction^2 (the mean size of what was predicted)
     uint32_t firstMs = 0;
-    // The last solve.
     bool solved = false;
     Vec3 zero = { 0, 0, 0 };
-    float gain = 1.0f;
-    float spread = 0.0f;   // rms spread of |pred| over its mean
+    Vec3 gain = { 1, 1, 1 };       // per axis (the TMAG5273's sensitivity is per axis: X-Y mismatch 0.5 %, Z up to 15 % with its drift); 1 on an axis without spread
+    float spread = 0.0f;           // rms spread of |pred| over its mean, all axes
+    float spreadAxis[ 3 ] = { 0, 0, 0 }; // ...per axis: an axis under the minimum keeps gain 1 (its gain and zero cannot be told apart)
+    Vec3 zeroSigma = { 0, 0, 0 }, gainSigma = { 0, 0, 0 }; // the solve's own 1-sigma per axis (a gain that could not be solved: 1e9)
     float rmsBefore = 0.0f, rmsAfter = 0.0f; // of the residual, mT
-    int applied = 0;       // times this sensor's zero was corrected
-    bool excluded = false; // the model does not describe this sensor (a gain far from 1, or a residual it cannot explain): left out of the audit's fits of the others
+    int applied = 0;       // times this sensor's zero or gain was corrected
+    bool excluded = false; // left out of the audit's fits of the others: its gain is off by more than the others' fits can carry (correctable: its own audit goes on, from fits without it, and it comes back in once corrected), or the model does not describe it at all (a residual it cannot explain, a gain wildly off: never corrected)
+    bool correctable = false;
     Vec3 lastApplied = { 0, 0, 0 };
+    Vec3 lastGainApplied = { 1, 1, 1 };
 };
 
 class ZeroAudit {
