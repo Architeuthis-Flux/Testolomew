@@ -239,6 +239,10 @@ static inline float magSensorTypeNoiseMt( MagSensorType type ) {
 #define MAG_ZERO_DOUBT_FLOOR_TMAG_MT 0.001f
 #define MAG_ZERO_DOUBT_FLOOR_MMC_MT 0.0005f
 #define MAG_ZERO_DRIFT_MT_PER_S 0.0001f
+// ...and never past this by drift: doubted more, a stale-zero pattern the
+// size of a far probe's passes the fit as a phantom (a probe parked for an
+// hour, then lifted: the zeros it left are not a magnet).
+#define MAG_ZERO_DOUBT_MAX_MT 0.005f
 static inline float magSensorTypeZeroMt( MagSensorType type ) {
     return type == MAG_MMC56X3 ? MAG_ZERO_UNCERTAINTY_MMC_MT : MAG_ZERO_UNCERTAINTY_TMAG_MT;
 }
@@ -271,7 +275,13 @@ static inline float magSensorTypeZeroFloorMt( MagSensorType type ) {
 // than this, either way (MagArray::applyGainTrim): a row that wants magcal.
 #define MAG_GAIN_TRIM_MAX 2.0f
 #define MAG_OFFSET_FOLLOW_S 20.0f
-#define MAG_OFFSET_HOLD_S 120.0f
+#define MAG_OFFSET_HOLD_S 30.0f // (120 until 2026-09-24: Kevin's bench read 0.05 mT with the probe away and waited on it; a pattern few sensors see plainly that no dipole explains is drift after half a minute - what the fit refuses only by the footprint, or three TMAGs read plainly, or was a fix within the far hold, is held the far hold instead)
+// A fix that ONE sensor makes (the MMC's far regime, three numbers for five
+// unknowns) is real or the tail of a zero error at that sensor, and at the
+// array's reach the others cannot say (their share of a probe 90 mm up is
+// at their noise): its zero is held this long, then follows. A fix two or
+// more sensors make holds for as long as it lasts.
+#define MAG_OFFSET_FAR_HOLD_S 120.0f
 #define MAG_OFFSET_HOLDOFF_S 10.0f
 static inline float magSensorFrameWeight( MagSensorType type, float fieldMt, float cap ) {
     if ( cap <= 0.0f ) {

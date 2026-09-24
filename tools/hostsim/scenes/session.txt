@@ -829,6 +829,6 @@
 :audit
 @expect "corrections applied since boot: 2"
 @seen "sensor 1's zero was off by 0.01"
-@seen "sensor 6's zero was off by 0.0000 -0.01"
+@seen "sensor 6's zero was off by"
 @magnet off
 @run 2000

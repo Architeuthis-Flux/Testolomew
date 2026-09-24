@@ -4,13 +4,17 @@
 # z 22); with Z weighed by its quietness that basin misfits at 49 % and is
 # REJECTED (at 26 % it was accepted as a rough fix); since Phase 3 step 4
 # (2026-09-23) a rejected fit is nothing - no rough offer, no far glow - and
-# at the second place, 6 mm further out, one TMAG reads 0.038 mT: still
-# "present" (once present the array stays so down to three quarters of the
-# bar, 2026-09-24) but only two sensors notice and nothing is offered. The
-# lattice's memoryless offer is gone with the rough class.
+# at the second place, 6 mm further out, one TMAG reads 0.033 mT, right at
+# the presence hysteresis's lower bar (three quarters of 0.04): present or
+# not is a coin flip there and not asserted; nothing is offered either way.
+# The lattice's memoryless offer is gone with the rough class.
 :mmc off
 @strength 1839
 @seed 3
+# (a second for the boot's zero to be judged before anything appears: a
+# probe arriving inside the first 64 frames is what the adoption would take
+# for the zero, 2026-09-24)
+@run 1000
 @magnet -22 22 22 0 0 1
 @run 3000
 l
@@ -18,7 +22,6 @@ l
 @magnet -28 22 22 0 0 1
 @run 3000
 l
-@expect "only 2 sensors notice"
 @expect "track: nothing"
 @magnet off
 @run 2000
@@ -27,19 +30,16 @@ l
 # post-boot range, knobs.md (7)-(8)) and nothing present: NOT a magnet.
 # With the seen level scaled for the weak magnet (0.022), two sensors above
 # it are not enough to say a probe is there - the corroboration takes two
-# TMAGs reading PLAINLY (0.04). The 0.045 zero plus the 0.03 one's noise put
-# two sensors over 0.04 once: presence goes on, stays on while one still
-# reads over three quarters of the bar (the hysteresis, 2026-09-24: without
-# it a zero followed out flickered presence on its way down), and goes off
-# once the filters have followed them out after the hold-off - two toggles
-# in the half minute on top of the probe's two above (the clocks: twelve at
-# the scaled bar, 2026-09-23).
+# TMAGs reading PLAINLY (0.04). With no fix lately the offset filters follow
+# the stale zeros out from the first frame (the drift), and presence never
+# turns on in the half minute: the count stays at the probe's two toggles
+# above (the clocks: two here, twelve at the scaled bar, 2026-09-23).
 @bias 2 0.045 0 0
 @bias 3 0.03 0 0
 :load
 @run 30000
 :load
-@expect "presence toggled 4 times"
+@expect "presence toggled 2 times"
 l
 @expect "no magnet"
 @bias 2 0 0 0
@@ -63,4 +63,37 @@ l
 @expect "row: 15 hole 3"
 @magnet off
 @gain 5 1.0
+@run 2000
+
+# One TMAG5273's zero gone 0.3 mT wrong under a resting probe (a corrupt
+# read that sticks - the bus has no CRC - or a magnet left beside the
+# sensor): the chi refuses the fit (6 against 2.0 with the zeros doubted at
+# the floor, misfit 48 %) on eight plain sensors. A reading three or more TMAGs read plainly is not drift
+# (drift is one sensor's): the zeros are held the far hold (2026-09-24;
+# followed at the half-minute hold, MAG_OFFSET_HOLD_S, they carried the
+# probe's field a minute later and the array was blind to it - observed with
+# the rule off), and the fix is back the moment the sensor reads right.
+# Held two minutes, then followed: a sensor wrong longer than that under a
+# resting probe takes the zeros with it, and the tracker page's "fit chi"
+# is the bench's way out. (Two minutes of nothing first: the stale zeros of
+# the block above, half followed when its probe arrived, go out, and no fix
+# is within the far hold - a reading that was a fix lately keeps the far
+# hold anyway; the wrong zero and the probe arrive together.)
+@run 125000
+@bias 5 0.3 0.3 0.3
+@magnet row 15 3
+@run 60000
+l
+@expect "no usable fix"
+@expect "chi 6."
+@baselines
+@seen "baselines over 0.02 mT: none"
+@bias 5 0 0 0
+# (a cold start: after four rejected in a row the next waits two seconds)
+@run 3000
+l
+@expect "magnet at"
+:screen
+@expect "row: 15 hole 3"
+@magnet off
 @run 2000

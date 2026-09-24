@@ -64,6 +64,7 @@ check: sim
 	./sim scenes/edge.txt -q
 	./sim scenes/hover.txt -q
 	./sim scenes/boot.txt -q
+	./sim scenes/bootprobe.txt -q
 	./sim scenes/session.txt -q
 
 screens: sim

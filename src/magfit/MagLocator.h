@@ -316,7 +316,7 @@
 #define MAGLOC_AUDIT_MIN_SAMPLES 40
 #define MAGLOC_AUDIT_MAX_SAMPLES 400 // a window that never crosses the threshold starts again after this many (an hour's drift is not a week's)
 #define MAGLOC_AUDIT_MIN_SPREAD 0.3f
-#define MAGLOC_AUDIT_APPLY_MT 0.004f         // ...or 0.6 of the sensor's own noise, whichever is more (a TMAG: 0.008)
+#define MAGLOC_AUDIT_APPLY_MT 0.002f         // ...or 0.6 of the sensor's own noise, whichever is more (a TMAG: 0.007; the MMC this floor - 0.004 until 2026-09-24, thirteen times its noise, left a 0.0035 mT error the follow had not finished with; two windows agreeing guard against noise now)
 #define MAGLOC_AUDIT_APPLY_NOISE 0.6f
 // A gain is corrected past this (the datasheet's typical spread: under it a
 // 40-sample solve is noise - in a clean world the solve scatters +-3 % and
@@ -547,6 +547,18 @@ class MagLocator : public Service {
 
     uint32_t lastTrackUs = 0;
     uint32_t checkedBaseline = 0;          // magArray.baselineCount last checked
+    // The zero put back at boot is checked against the live readings once
+    // MAG_BASELINE_FRAMES of them are in: their difference, if no dipole
+    // explains it, is drift since the zero was saved and the readings are
+    // adopted as the zero; if a dipole does, a magnet was near at boot and
+    // the saved zero is kept (Kevin's bench, 2026-09-24: 0.05 mT read with
+    // the probe nowhere near, from a zero saved days before).
+    bool bootAdopting = false;
+    int bootAdoptFrames = 0;
+    Vec3 bootSum[ MAGFIT_MAX_SENSORS ] = { };
+    int bootFrames[ MAGFIT_MAX_SENSORS ] = { 0 };
+    void adoptBootZero( );
+    bool magnetExplains( const Vec3* fields, const bool* use, int count, MagFitResult* out ) const; // the pollution test: the fields less their mean fit a dipole of a magnet's strength over the board
     Vec3 speedRing[ MAGLOC_SPEED_WINDOW ]; // the track's position, the last MAGLOC_SPEED_WINDOW frames
     int speedRingCount = 0;
     int baselineRetakes = 0;
@@ -566,6 +578,7 @@ class MagLocator : public Service {
         bool good = false;                   // the fit's verdict
         bool outside = false;                // the fit's answer is beyond the array's footprint (MAGLOC_OUTSIDE_MM)
         bool explained = false;              // an accepted fix that two or more sensors make (or a rough offer a dipole explains): the offsets hold this frame
+        bool farOnlyFix = false;             // an accepted fix that ONE sensor makes: real or a zero error's tail, held MAG_OFFSET_FAR_HOLD_S then followed
         bool quiet[ MAGFIT_MAX_SENSORS ];    // this sensor reads under MAGLOC_QUIET_FRACTION of its faint level: nothing there for it, whatever the array says
     };
     bool filterFrame( FrameScratch& f );

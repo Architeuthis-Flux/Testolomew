@@ -437,42 +437,94 @@ void MagLocator::unpolluteBaseline( Stream* out ) {
     out->println( line );
 }
 
+bool MagLocator::magnetExplains( const Vec3* fields, const bool* use, int count, MagFitResult* out ) const {
+    Vec3 mean = { 0, 0, 0 };
+    int used = 0;
+    for ( int i = 0; i < count; i++ ) {
+        if ( !use[ i ] )
+            continue;
+        mean = { mean.x + fields[ i ].x, mean.y + fields[ i ].y, mean.z + fields[ i ].z };
+        used++;
+    }
+    if ( used < 4 ) {
+        *out = MagFitResult( );
+        return false;
+    }
+    mean = { mean.x / used, mean.y / used, mean.z / used }; // the same at every sensor (the earth's field, a common drift) is not a dipole's
+    Vec3 residue[ MAGFIT_MAX_SENSORS ];
+    for ( int i = 0; i < count && i < MAGFIT_MAX_SENSORS; i++ ) {
+        residue[ i ] = { fields[ i ].x - mean.x, fields[ i ].y - mean.y, fields[ i ].z - mean.z };
+    }
+    MagFitResult r = { };
+    magFitSolve( magArray.position, residue, use, count, 1e6f, &r );
+    *out = r;
+    float misfit = r.signal > 0.0f ? r.residual / r.signal : 1.0f;
+    return misfit < MAGLOC_BASELINE_MAGNET_MISFIT && r.strength > MAGLOC_BASELINE_MAGNET_STRENGTH && r.position.z > 0.0f;
+}
+
+// The zero put back at boot, against the live readings (see the header).
+void MagLocator::adoptBootZero( ) {
+    int count = magArray.sensorCount( );
+    Vec3 mean[ MAGFIT_MAX_SENSORS ], diff[ MAGFIT_MAX_SENSORS ];
+    bool use[ MAGFIT_MAX_SENSORS ];
+    float largest = 0.0f;
+    int largestAt = -1;
+    for ( int i = 0; i < count && i < MAGFIT_MAX_SENSORS; i++ ) {
+        use[ i ] = bootFrames[ i ] >= MAG_BASELINE_FRAMES / 2 && magArray.sensor( i ).ok && !magArray.ignored( i );
+        mean[ i ] = bootFrames[ i ] > 0 ? Vec3 { bootSum[ i ].x / bootFrames[ i ], bootSum[ i ].y / bootFrames[ i ], bootSum[ i ].z / bootFrames[ i ] } : Vec3 { 0, 0, 0 };
+        Vec3 b = magArray.baselineOf( i );
+        diff[ i ] = { mean[ i ].x - b.x, mean[ i ].y - b.y, mean[ i ].z - b.z };
+        float size = sqrtf( diff[ i ].x * diff[ i ].x + diff[ i ].y * diff[ i ].y + diff[ i ].z * diff[ i ].z );
+        if ( use[ i ] && size > largest ) {
+            largest = size;
+            largestAt = i;
+        }
+    }
+    MagFitResult r;
+    bool magnet = magnetExplains( diff, use, count, &r );
+    Stream* out = console.port( );
+    char line[ 220 ];
+    if ( magnet ) {
+        snprintf( line, sizeof( line ), "zero: a magnet was near at boot (about %.0f mT*mm^3 at x %.0f y %.0f z %.0f): the saved zero is kept, and doubted by %.3f mT until the probe is away",
+                  r.strength, r.position.x, r.position.y, r.position.z, MAG_ZERO_UNCERTAINTY_TMAG_MT );
+    } else {
+        for ( int i = 0; i < count && i < MAGFIT_MAX_SENSORS; i++ ) {
+            if ( use[ i ] )
+                magArray.setBaseline( i, mean[ i ] ); // the live baseline; the saved zero is still z's and the audit's
+        }
+        snprintf( line, sizeof( line ), "zero: the live readings adopted as the zero at boot - the saved zero was off by up to %.3f mT (sensor %d); no dipole in the difference", largest, largestAt );
+    }
+    if ( out != nullptr )
+        out->println( line );
+}
+
 void MagLocator::checkBaseline( ) {
     checkedBaseline = magArray.baselineCount;
     baselineCorrected = false; // a zero just taken: Y may be applied to it once
     if ( magArray.baselineRestored ) {
-        baselinePolluted = false; // a saved zero, checked when it was taken; never retaken behind the user's back
+        baselinePolluted = false; // a saved zero, checked when it was taken; never retaken behind the user's back...
         baselineRetakes = 0;
         retakeBaselineAtMs = 0;
+        // ...but checked against the live readings once they are in (adoptBootZero).
+        bootAdopting = true;
+        bootAdoptFrames = 0;
+        for ( int i = 0; i < MAGFIT_MAX_SENSORS; i++ ) {
+            bootSum[ i ] = { 0, 0, 0 };
+            bootFrames[ i ] = 0;
+        }
         return;
     }
     int count = magArray.sensorCount( );
-    Vec3 mean = { 0, 0, 0 };
-    int used = 0;
-    for ( int i = 0; i < count; i++ ) {
-        if ( !magArray.sensor( i ).ok )
-            continue;
-        Vec3 b = magArray.baselineOf( i );
-        mean = { mean.x + b.x, mean.y + b.y, mean.z + b.z };
-        used++;
-    }
-    if ( used < 4 ) {
-        baselinePolluted = false;
-        return;
-    }
-    mean = { mean.x / used, mean.y / used, mean.z / used };
-    Vec3 residue[ MAGFIT_MAX_SENSORS ];
+    Vec3 baseline[ MAGFIT_MAX_SENSORS ];
     bool use[ MAGFIT_MAX_SENSORS ];
-    for ( int i = 0; i < count; i++ ) {
-        Vec3 b = magArray.baselineOf( i );
-        residue[ i ] = { b.x - mean.x, b.y - mean.y, b.z - mean.z };
+    for ( int i = 0; i < count && i < MAGFIT_MAX_SENSORS; i++ ) {
+        baseline[ i ] = magArray.baselineOf( i );
         use[ i ] = magArray.sensor( i ).ok;
     }
-    MagFitResult r = { };
-    magFitSolve( magArray.position, residue, use, count, 1e6f, &r );
+    MagFitResult r;
+    baselinePolluted = magnetExplains( baseline, use, count, &r );
     baselineMagnetMisfit = r.signal > 0.0f ? r.residual / r.signal : 1.0f;
     baselineMagnetStrength = r.strength;
-    baselinePolluted = baselineMagnetMisfit < MAGLOC_BASELINE_MAGNET_MISFIT && r.strength > MAGLOC_BASELINE_MAGNET_STRENGTH && r.position.z > 0.0f;
 
     Stream* out = console.port( );
     if ( baselinePolluted ) {
@@ -506,6 +558,24 @@ ServiceStatus MagLocator::service( ) {
         return lastStatus;
     }
     lastFrame = magArray.frameCount;
+    if ( bootAdopting ) {
+        int done = 0, wanted = 0;
+        for ( int i = 0; i < magArray.sensorCount( ) && i < MAGFIT_MAX_SENSORS; i++ ) {
+            if ( magArray.fresh[ i ] && bootFrames[ i ] < MAG_BASELINE_FRAMES ) {
+                bootSum[ i ] = { bootSum[ i ].x + magArray.raw[ i ].x, bootSum[ i ].y + magArray.raw[ i ].y, bootSum[ i ].z + magArray.raw[ i ].z };
+                bootFrames[ i ]++;
+            }
+            if ( magArray.sensor( i ).ok && !magArray.ignored( i ) ) {
+                wanted++;
+                done += bootFrames[ i ] >= MAG_BASELINE_FRAMES ? 1 : 0;
+            }
+        }
+        bootAdoptFrames++;
+        if ( done == wanted || bootAdoptFrames > 2 * MAG_BASELINE_FRAMES ) { // every sensor has its frames, or some never will (absent): judge what there is
+            bootAdopting = false;
+            adoptBootZero( );
+        }
+    }
 
     // One frame: the fit (or not), then the tracker, which is told about every
     // frame - the ones with no fix are what it coasts through.
@@ -517,7 +587,10 @@ ServiceStatus MagLocator::service( ) {
     if ( sim.on && sim.untilMs != 0 && (int32_t)( millis( ) - sim.untilMs ) >= 0 ) {
         simProbeOff( );
     }
-    if ( fitHeld ) {
+    if ( fitHeld || bootAdopting ) {
+        // Held (:load fit off), or the first MAG_BASELINE_FRAMES after boot
+        // while the zero put back is judged against the readings (adoptBootZero):
+        // nothing is present and nothing is fitted until the zero is settled.
         fix.valid = false;
         fix.present = false;
         result.valid = false;
@@ -862,6 +935,12 @@ void MagLocator::keepZeros( const FrameScratch& f ) {
         } else if ( magArray.ignored( i ) || explained ) {
             follow = false; // a magnet, not drift (a switched-out sensor: read and shown, its zero follows the drift with nothing there and holds otherwise)
             unexplainedSinceMs[ i ] = 0;
+        } else if ( fix.present && f.farOnlyFix ) {
+            // A fix one sensor makes: held the far hold on this sensor's clock
+            // (the zero error's tail IS a far probe to three numbers), then followed.
+            if ( unexplainedSinceMs[ i ] == 0 )
+                unexplainedSinceMs[ i ] = now == 0 ? 1 : now;
+            follow = now - unexplainedSinceMs[ i ] > (uint32_t)( MAG_OFFSET_FAR_HOLD_S * 1000.0f );
         } else {
             // Not quiet, with no fix explaining it (or in the hold-off after
             // presence, wavering at the edge): held on its own clock, then
@@ -874,7 +953,25 @@ void MagLocator::keepZeros( const FrameScratch& f ) {
             // frames absorbed a real far hover's share, 2026-09-23.)
             if ( unexplainedSinceMs[ i ] == 0 )
                 unexplainedSinceMs[ i ] = now == 0 ? 1 : now;
-            float holdS = f.enough ? MAG_OFFSET_HOLD_S : MAG_OFFSET_HOLDOFF_S;
+            // ...and a reading that was an accepted fix within the far hold
+            // keeps the far hold: a far fix flickering about the chi's limit
+            // is not drift on its refused frames (the MMC's 90 mm hover was
+            // followed to 96 mm in ninety seconds under the half-minute hold).
+            bool fixLately = lastFixMs != 0 && now - lastFixMs < (uint32_t)( MAG_OFFSET_FAR_HOLD_S * 1000.0f );
+            // ...and so does a reading refused only by the footprint rule (a
+            // dipole of the held strength the array cannot pin: a probe off
+            // the end of the board, one sensor plain - the same as a fix one
+            // sensor makes), or one that MAGLOC_OUTSIDE_MIN_SEEN TMAGs read
+            // plainly (drift is one sensor's; a field three see plainly is
+            // a probe the fit is failing on). Followed at the half-minute
+            // hold, an off-the-end hover went into the zeros, the return
+            // over row 15 was refused at the chi's limit on the 0.04 mT
+            // absorbed, and half a minute later the probe on the board was
+            // followed too (hover.txt, 2026-09-24). The half-minute hold is
+            // for what is left: a pattern few sensors see and no dipole
+            // explains - a stale zero.
+            bool probeLike = fixLately || fix.rejectedOutside || f.plain >= MAGLOC_OUTSIDE_MIN_SEEN;
+            float holdS = !f.enough ? MAG_OFFSET_HOLDOFF_S : ( probeLike ? MAG_OFFSET_FAR_HOLD_S : MAG_OFFSET_HOLD_S );
             follow = now - unexplainedSinceMs[ i ] > (uint32_t)( holdS * 1000.0f );
         }
         if ( follow ) {
@@ -882,8 +979,8 @@ void MagLocator::keepZeros( const FrameScratch& f ) {
             zeroDoubt[ i ] *= expf( -dtS / MAG_OFFSET_FOLLOW_S ); // followed: what was wrong is going
             if ( zeroDoubt[ i ] < floor )
                 zeroDoubt[ i ] = floor;
-        } else {
-            zeroDoubt[ i ] += MAG_ZERO_DRIFT_MT_PER_S * dtS; // held: the drift goes on unseen
+        } else if ( zeroDoubt[ i ] < MAG_ZERO_DOUBT_MAX_MT ) {
+            zeroDoubt[ i ] += MAG_ZERO_DRIFT_MT_PER_S * dtS; // held: the drift goes on unseen - to the cap
         }
         if ( follow ) {
             // The doubt grows only while the zero follows: grown while it is
@@ -1035,7 +1132,8 @@ ServiceStatus MagLocator::runFit( MagTrackInput* in, FrameScratch& f ) {
         missRun++;
     }
     fix.valid = f.good;
-    f.explained = f.good && fix.seenBy >= 2; // a fix one sensor makes explains nothing (three numbers, five unknowns): keepZeros runs its clock
+    f.explained = f.good && fix.seenBy >= 2; // a fix two sensors make holds the zeros; one sensor's (the far regime) holds them for the far hold only - at the array's reach the chi over the others cannot tell a probe from a zero error's tail (a 0.095 mT phantom followed down to a "probe 89 mm up" and froze, 2026-09-24)
+    f.farOnlyFix = f.good && !f.explained;
     fix.rough = false;
     fix.rawMagnet = position;
     if ( f.good ) {

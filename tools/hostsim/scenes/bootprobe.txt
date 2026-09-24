@@ -1,0 +1,49 @@
+# A boot with the probe ALREADY on the board and two zeros 0.03 mT stale
+# (2026-09-24): the difference between the readings and the saved zero IS a
+# dipole, so the saved zero is kept (and said so), doubted by the boot
+# uncertainty, and the probe is a fix within three seconds. (b) Then a
+# parked probe while each TMAG's zero drifts its own way by up to 0.006 mT:
+# the fix stays (the doubt grows at the drift rate while a zero is held, to
+# a cap). Runs with the bench's 1839 magnet.
+@bias 2 0.03 0 0
+@bias 6 0 0.03 0
+@magnet row 15 3
+@seed 5
+@strength 1839
+:mmc off
+:strength 1839
+@run 3000
+@seen "a magnet was near at boot"
+:screen
+@expect "row: 15 hole 3"
+l
+@expect "magnet at"
+
+# (b) parked for a minute, then each TMAG's zero drifts its own way by up
+# to 0.006 mT (the same 0.006 on every sensor's x is a field, not drift, and
+# moves the fix a row)
+@run 60000
+@bias 0 0.006 0 0
+@bias 1 -0.004 0 0.003
+@bias 2 0.035 0 -0.004
+@bias 3 0 -0.006 0
+@bias 4 0.003 0.004 0
+@bias 5 -0.005 0 0.002
+@bias 6 0 0.033 0.005
+@bias 7 -0.003 0 -0.006
+@run 30000
+l
+@expect "magnet at"
+:screen
+@expect "row: 15 hole"
+@magnet off
+@bias 0 0 0 0
+@bias 1 0 0 0
+@bias 2 0 0 0
+@bias 3 0 0 0
+@bias 4 0 0 0
+@bias 5 0 0 0
+@bias 6 0 0 0
+@bias 7 0 0 0
+@run 30000
+

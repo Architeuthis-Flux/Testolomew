@@ -4,13 +4,17 @@
 # start after the first (the clocks absorbed a steady one after 120 s; a
 # filter that absorbed it at all ended it in 45 s: the MMC's presence margin
 # at 90 mm is 20 %). (ii) The TMAG5273s alone: a probe off the end of the
-# board for a minute (nothing fits there at first, edge.txt) and back over
-# row 15 lands in its hole - the zeros were not pulled after it. Off the
-# end there is no usable fix: the readings fit a WRONG basin (x -36, z 1 for
-# a probe at x -22, z 22) within every sensor's error, and the footprint
-# rule (MAGLOC_OUTSIDE_MM: beyond the array, seen plainly by too few) is what
-# rejects it - under the clocks the plain sensor was absorbed after 20 s and
-# that basin was a proper "tracking" fix at a 38 % misfit.
+# board for a minute. Its readings fit a WRONG basin (x -36, z 1 for a probe
+# at x -22, z 22) within every sensor's error, and the footprint rule
+# (MAGLOC_OUTSIDE_MM: beyond the array, seen plainly by too few) refuses it.
+# A reading refused only by the footprint is a dipole of the held strength
+# the array cannot pin, and is held the far hold (MAG_OFFSET_FAR_HOLD_S)
+# like a one-sensor fix, not followed as drift at the half-minute hold
+# (MAG_OFFSET_HOLD_S, 2026-09-24: followed after 30 s, the return over row
+# 15 was refused at the chi's limit on the absorbed 0.04 mT and the probe on
+# the board was then followed too). After a minute: still no usable fix,
+# nothing offered, the zeros untouched; back over row 15 the probe is a fix
+# in its hole.
 :mmc on
 :strength 4232
 @seed 3
@@ -27,7 +31,10 @@ l
 :load
 @expect "; 1 cold starts since boot"
 @magnet off
-@run 5000
+# (two minutes of nothing first: a reading that was a fix within the far
+# hold keeps the far hold anyway, and (ii) is about the footprint's refusal
+# on its own)
+@run 125000
 
 :mmc off
 @strength 1839
@@ -39,6 +46,8 @@ l
 @expect "track: nothing"
 @magnet row 15 3
 @run 2000
+l
+@expect "magnet at"
 :screen
 @expect "row: 15 hole 3"
 @magnet off

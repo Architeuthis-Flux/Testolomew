@@ -49,8 +49,10 @@ l
 # nothing there and are doubted at the floor; until then it was a far fix
 # for 40 s, then absorbed), and
 # the MMC's zero follows it after the hold (keepZeros, MAG_OFFSET_HOLD_S):
-# no magnet, once, and not found again in bursts (the bench: 249 times in
-# twelve minutes, 2026-09-22).
+# no magnet, and not found again in bursts (the bench: 249 times in twelve
+# minutes, 2026-09-22): presence goes on once at the start and off once on
+# the way down, twice over (four toggles in the block; the far fix of the
+# block above was recent, so the MMC's reading is held the far hold first).
 @bias 8 0.006 0.005 -0.018
 :load
 @run 3000
@@ -61,7 +63,7 @@ l
 l
 @expect "no magnet"
 :load
-@expect "presence toggled 4 times"
+@expect "presence toggled 6 times"
 :load
 @bias 8 0 0 0
 z

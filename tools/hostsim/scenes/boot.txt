@@ -1,61 +1,52 @@
 # What a board meets at boot and at rest (2026-09-24, the Phase 3 review's
-# bench-risk findings). (a) Two TMAG5273 zeros 0.03 mT stale (the bench's
-# post-boot state, knobs.md (7)-(8)) and the probe ALREADY on the board: a
-# fix within three seconds - the fit's acceptance doubts a zero nobody has
-# followed since boot by the boot uncertainty, not by the filter's floor.
-# (b) A parked probe while the zeros drift 0.006 mT: the fix stays (the
-# doubt grows at the drift rate while a zero is held). (c) Two stale zeros
-# over the plain level with nothing there: no magnet within 40 s and no
-# presence flicker (a reading no fit could even try to explain is held only
-# the hold-off, not the two-minute hold). (d) The MMC56x3 switched out: its
-# zero holds under the probe (it was following the probe's field: 0.29 mT
-# into its zero in two seconds). Runs with the bench's 1839 magnet.
-:mmc off
-@strength 1839
-:strength 1839
+# bench-risk findings, and Kevin's bench: "it sees about 0.05 mT when the
+# probe is nowhere near"). (0) Zeros gone stale since the saved zero (0.05 on
+# two TMAGs, 0.02 on three) with nothing near: the live readings are ADOPTED
+# as the zero at boot - their difference from the saved zero is no dipole -
+# and within two seconds the array reads nothing (the probe on the board at
+# boot is bootprobe.txt). (c) Two zeros over the plain level with nothing
+# there mid-session: no magnet within a minute (the half-minute hold, then
+# the follow) and no presence flicker. (d) The MMC56x3 switched out: its
+# zero holds under the probe. Runs with the bench's 1839 magnet.
+# (The stale zeros first: a console command runs frames, and the board has
+# its stale zeros from its first frame.)
+@bias 0 0.05 0 0
+@bias 3 0 -0.05 0
+@bias 1 0.02 0 0
+@bias 5 0 0.02 0
+@bias 7 0 0 0.02
 @seed 5
-@bias 2 0.03 0 0
-@bias 6 0 0.03 0
-@magnet row 15 3
-@run 3000
-:screen
-@expect "row: 15 hole 3"
+@strength 1839
+:mmc off
+:strength 1839
+@run 1500
 l
-@expect "magnet at"
-
-# (b) parked for a minute, then each TMAG's zero drifts its own way by up
-# to 0.006 mT (the same 0.006 on every sensor's x is a field, not drift, and
-# moves the fix a row)
-@run 60000
-@bias 0 0.006 0 0
-@bias 1 -0.004 0 0.003
-@bias 2 0.035 0 -0.004
-@bias 3 0 -0.006 0
-@bias 4 0.003 0.004 0
-@bias 5 -0.005 0 0.002
-@bias 6 0 0.033 0.005
-@bias 7 -0.003 0 -0.006
-@run 30000
-l
-@expect "magnet at"
-:screen
-@expect "row: 15 hole"
-@magnet off
+@expect "no magnet (strongest reading 0.0"
+@seen "adopted as the zero at boot"
+:load
+@expect "presence toggled 0 times"
 @bias 0 0 0 0
-@bias 1 0 0 0
-@bias 2 0 0 0
 @bias 3 0 0 0
-@bias 4 0 0 0
+@bias 1 0 0 0
 @bias 5 0 0 0
-@bias 6 0 0 0
 @bias 7 0 0 0
-@run 30000
+# (a minute: the adopted zeros read back as their negatives once the biases
+# go, and are followed out with nothing present)
+@run 60000
 
-# (c) two zeros over the plain level, nothing there
+# (c) two zeros over the plain level, nothing there: two TMAGs read plainly,
+# presence goes on, the fit is tried and refused (no dipole of the held
+# strength fits two sensors' readings within the others' noise: chi, not
+# the footprint), the readings are held the half-minute hold
+# (MAG_OFFSET_HOLD_S) and followed out; within the minute the array reads
+# nothing and presence has gone off. The cost of one such event: two
+# toggles and some twenty refused cold starts. (Block (0)'s unwind above is
+# the same event - the adopted zeros read back as their negatives once the
+# biases go - so the count below is two events' worth.)
 :load
 @bias 2 0.05 0 0
 @bias 3 0 0.05 0
-@run 40000
+@run 60000
 l
 @expect "no magnet"
 :load
