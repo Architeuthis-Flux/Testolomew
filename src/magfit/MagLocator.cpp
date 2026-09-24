@@ -251,7 +251,6 @@ void MagLocator::simProbeOff( ) {
     fix.present = false;
     result.valid = false; // the real fit starts cold
     haveSmoothed = false;
-    misses = 0;
 }
 
 // One frame from the simulated probe: `fix` as a fit would leave it, and
@@ -645,7 +644,12 @@ ServiceStatus MagLocator::fitFrame( MagTrackInput* in ) {
             else
                 coldWhyFew++;
         }
-        status = tryCoarse( in, f );
+        // Nothing to fit: the track (if any) coasts, and the fit starts from
+        // it when there is something again.
+        fix.valid = false;
+        result.valid = false;
+        haveSmoothed = false;
+        status = ServiceStatus::IDLE;
     } else {
         status = runFit( in, f );
     }
@@ -927,68 +931,52 @@ void MagLocator::keepZeros( const FrameScratch& f ) {
     offsetsBegun = true;
 }
 
-// Stage 4a: present but too few sensors notice it for a fit.
-ServiceStatus MagLocator::tryCoarse( MagTrackInput* in, const FrameScratch& f ) {
-        fix.valid = false;
-        result.valid = false; // next time is a cold start
-        haveSmoothed = false;
-        // Something is there but too few sensors notice it for a fit: the
-        // lattice search still says roughly where, at the cold-start pace -
-        // with the MMC56x3 in, whose far regime this is. With the TMAG5273s
-        // alone the lattice has no memory and its "about here" for a probe off
-        // the end of the array was 15 mm out (2026-09-23, the bench-like sim):
-        // nothing is better than that.
-        if ( fix.present && magArray.useMmc && millis( ) >= nextColdStartMs ) {
-            nextColdStartMs = millis( ) + MAGLOC_COLD_START_PERIOD_MS;
-            MagFitResult coarse = { };
-            uint32_t start = micros( );
-            if ( magFitCoarse( magArray.position, smooth, f.use, magArray.sensorCount( ), &coarse, f.weights ) ) {
-                // ...offered only under the far acceptance (MAGLOC_FAR_MISFIT,
-                // _ERROR_MM): fewer than MAGLOC_MIN_SENSORS notice this, and
-                // a zero error at one of them is not a glow on the LEDs.
-                float chi = chiOf( coarse, f.use );
-                float bar = sqrtf( coarse.sigma.x * coarse.sigma.x + coarse.sigma.y * coarse.sigma.y + coarse.sigma.z * coarse.sigma.z );
-                if ( chi < MAGLOC_FAR_MAX_CHI && bar < MAGLOC_FAR_ERROR_MM ) {
-                    offerRough( in, &coarse );
-                }
-            }
-            fix.fitUs = micros( ) - start;
-        }
-        return ServiceStatus::IDLE;
-}
-
-// Stage 4: the fit itself - a cold start's slices or a warm start, the
-// free fit then the refinement with the strength held, its acceptance
-// (the far probe's own), the rough offer when it is not a fix.
+// Stage 4: the fit itself - a cold start's slices (the lattice) or a warm
+// start from where the fit, or the track, last put the magnet; the free fit,
+// then the refinement with the strength held; and ONE acceptance: the
+// residuals against each sensor's own expected error (magFitChi under
+// MAGLOC_FIT_MAX_CHI), the bar under MAGLOC_MAX_ERROR_MM, and a fix beyond
+// the array's footprint seen plainly by MAGLOC_OUTSIDE_MIN_SEEN. The track is
+// the fit's memory: with a track alive and no answer of its own to start
+// from (a missed frame, a glitch, a rejected fit) the fit starts from where
+// the track predicts the magnet, and the lattice runs only once the track has
+// gone - rejected, not again for MAGLOC_COLD_RETRY_MS. The near and far rules,
+// the TMAGs' confirmation, the rough offer, the misses ride-through and the
+// reacquire window (2026-09-21 to 22, sixteen knobs) did this until
+// 2026-09-23; the tracker's coast is the ride-through now.
 ServiceStatus MagLocator::runFit( MagTrackInput* in, FrameScratch& f ) {
-    // The track lost moments ago: one warm fit from where it last was,
-    // before any lattice (MAGLOC_REACQUIRE_MS).
-    bool reacquiring = false;
-    if ( !result.valid && result.coldStage == 0 && lastFixFar && lastFixMs != 0 && millis( ) - lastFixMs < MAGLOC_REACQUIRE_MS ) {
-        result.position = lastFixPosition;
-        result.moment = lastFixMoment;
-        result.strength = sqrtf( lastFixMoment.x * lastFixMoment.x + lastFixMoment.y * lastFixMoment.y + lastFixMoment.z * lastFixMoment.z );
-        result.valid = true;
-        reacquiring = true;
-        reacquireTries++;
-    }
     bool wasTracking = result.valid;
     bool continuing = result.coldStage > 0;
+    if ( !wasTracking && !continuing && track.enabled && track.state != MAGTRACK_NONE ) {
+        float dtS = MAG_FRAME_PERIOD_US * 1e-6f;
+        result.position = { track.position.x + track.velocity.x * dtS, track.position.y + track.velocity.y * dtS, track.position.z + track.velocity.z * dtS };
+        if ( result.strength <= 0.0f ) {
+            float strength = knownStrength > 0.0f ? knownStrength : MAGLOC_MAGNET_STRENGTH;
+            Vec3 axis = haveLastGood ? lastGoodAxis : Vec3 { 0, 0, -1 };
+            result.moment = { axis.x * strength, axis.y * strength, axis.z * strength };
+            result.strength = strength;
+        }
+        result.valid = true;
+        wasTracking = true;
+    }
     if ( !wasTracking ) {
         // A cold start's slices: one every MAGLOC_COLD_SLICE_MS, or every
-        // frame with the steady load.
+        // frame with the steady load - but a rejected one waits in both.
         uint32_t now = millis( );
-        if ( now < nextColdStartMs && ( !steadyFit || now < farRetryUntilMs ) ) {
-            return ServiceStatus::IDLE; // the steady load slices every frame, but a far retry's wait holds in both modes
+        if ( now < nextColdStartMs && ( !steadyFit || now < coldRetryUntilMs ) ) {
+            return ServiceStatus::IDLE;
         }
         nextColdStartMs = now + MAGLOC_COLD_SLICE_MS;
         if ( !continuing ) {
             coldStarts++;
             coldStartUs = 0;
             coldSliceMaxUs = 0;
+            if ( missRun > 0 ) {
+                coldWhyCoasted++; // the fit failed frame after frame until the track coasted out
+                missRun = 0;
+            }
         }
     }
-    Vec3 lastGood = result.position;
 
     uint32_t start = micros( );
     // The free fit, in slices (a cold start's lattice, its refinement, the
@@ -1003,12 +991,15 @@ ServiceStatus MagLocator::runFit( MagTrackInput* in, FrameScratch& f ) {
     // one far.
     f.hintFree = f.held > 0.0f && f.plain >= MAGLOC_LEARN_MIN_SENSORS;
     f.good = magFitSolveStep( magArray.position, smooth, f.use, magArray.sensorCount( ), MAGLOC_MAX_MISFIT, &result, steadyFit ? (int)( steadyIterations + 0.5f ) : 0, f.weights, f.hintFree ? 0.0f : f.held );
+    MagFitResult freeFit = result; // the free fit's answer, kept: if only the refinement with the held strength fails, the next frame starts from it
+    bool freeGood = false;
     if ( f.hintFree && f.good && result.coldStage == 0 && result.signal > 0.0f && result.strength > 0.0f ) {
         float freeMisfit = result.residual / result.signal;
         float freeErr = sqrtf( result.sigma.x * result.sigma.x + result.sigma.y * result.sigma.y + result.sigma.z * result.sigma.z );
         if ( freeMisfit < MAGLOC_LEARN_MAX_MISFIT && freeErr < MAGLOC_STRENGTH_MAX_ERROR_MM ) {
             measureStrength( result.strength, result.position );
             f.held = knownStrength; // this frame's refinement holds what was just learned
+            freeGood = true;
         }
     }
     if ( f.held > 0.0f && result.coldStage == 0 && result.signal > 0.0f && result.strength > 0.0f ) {
@@ -1027,109 +1018,65 @@ ServiceStatus MagLocator::runFit( MagTrackInput* in, FrameScratch& f ) {
         fix.valid = false;
         return ServiceStatus::BUSY;
     }
-    MagFitResult thisFrame = result; // as fitted, before the ride-through below may put the last f.good position back
     Vec3 position = result.position, sigma = result.sigma;
     float residual = result.residual, signal = result.signal;
 
     fix.residual = residual;
     fix.misfit = signal > 0.0f ? residual / signal : 1.0f;
+    fix.chi = chiSmoothed( result, f.use, f.alpha );
     fix.sigma = sigma;
     fix.errorXyMm = sqrtf( sigma.x * sigma.x + sigma.y * sigma.y );
     fix.errorMm = sqrtf( fix.errorXyMm * fix.errorXyMm + sigma.z * sigma.z );
-    bool solved = f.good; // the solver's own verdict: converged, misfit under MAGLOC_MAX_MISFIT
-    bool nearOk = solved && fix.errorMm <= MAGLOC_MAX_ERROR_MM; // a fix that pins the magnet down: the near rule
-    if ( fix.errorMm > MAGLOC_MAX_ERROR_MM ) {
-        f.good = false; // it "fits", but it could be anywhere
+    // The acceptance. The footprint is the TMAG5273s' bounding box: a fix
+    // beyond it by MAGLOC_OUTSIDE_MM is the mirror-basin case unless enough
+    // sensors see the magnet plainly.
+    Vec3 lo = { 1e9f, 1e9f, 0 }, hi = { -1e9f, -1e9f, 0 };
+    for ( int i = 0; i < magArray.sensorCount( ); i++ ) {
+        if ( magSensorPlaces[ i ].type == MAG_MMC56X3 )
+            continue;
+        const Vec3& p = magArray.position[ i ];
+        lo.x = p.x < lo.x ? p.x : lo.x;
+        lo.y = p.y < lo.y ? p.y : lo.y;
+        hi.x = p.x > hi.x ? p.x : hi.x;
+        hi.y = p.y > hi.y ? p.y : hi.y;
     }
-    // Resting on fewer than MAGLOC_MIN_SENSORS (the far probe, the MMC
-    // alone) the fix has its own acceptance (MAGLOC_FAR_MISFIT, _ERROR_MM):
-    // a tighter misfit, since a zero error at that sensor fits loosely too,
-    // and a wider bar, so that the probe 90 mm up (an 18 mm bar) is a fix
-    // - rough, the far glow - that the next frame starts from, instead of a
-    // rejected one that costs a cold start every frame for as long as it
-    // hovers (2026-09-21: 3-4 lattice searches a second, the V5F's
-    // heaviest work, on a rail that shows it).
-    // "Resting on one sensor" is fewer than two seeing it PLAINLY: a faint
-    // reading (a TMAG5273 between 0.015 and 0.04 mT) is its noise or its
-    // zero gone off (the bench: four of them, 2026-09-21), not a vote.
-    // Since 2026-09-22 the two rules are not switched by who sees the magnet
-    // (a TMAG's zero error crossing the seen level 60 mm from the probe
-    // flipped the fit to the near rule, whose bar it could not make, and
-    // cost a cold start each time - the seam the bench showed as "slow and
-    // choppy"): a frame is a fix if it makes EITHER. The far rule is judged
-    // against each sensor's expected error (MAGLOC_FAR_MAX_CHI), not the
-    // relative misfit: far out a TMAG's reading is its zero. A fix that
-    // only the far rule takes is far-sized, and gets the far tolerances.
-    bool farOk = false, disowned = false;
-    if ( !nearOk && solved ) {
-        float chi = chiOf( result, f.use );
-        farOk = chi < MAGLOC_FAR_MAX_CHI && fix.errorMm < MAGLOC_FAR_ERROR_MM;
-        // The TMAGs' say, when they can have one (MAGLOC_CONFIRM_*) - on
-        // every far-only answer, a wide bar included: a disowned one is a
-        // zero error at the one sensor, and the retry waits for it.
-        float gain = 0.0f, predRms = 0.0f;
-        tmagConsistency( result, f.use, &gain, &predRms );
-        if ( predRms > MAGLOC_CONFIRM_MIN_MT ) {
-            if ( gain < MAGLOC_CONFIRM_MIN_GAIN ) {
-                farOk = false; // the pattern a probe there would make is not in their readings
-                disowned = true;
-            }
+    f.outside = position.x < lo.x - MAGLOC_OUTSIDE_MM || position.x > hi.x + MAGLOC_OUTSIDE_MM || position.y < lo.y - MAGLOC_OUTSIDE_MM || position.y > hi.y + MAGLOC_OUTSIDE_MM;
+    f.good = f.good && fix.chi < MAGLOC_FIT_MAX_CHI && fix.errorMm < MAGLOC_MAX_ERROR_MM && ( !f.outside || fix.seenBy >= MAGLOC_OUTSIDE_MIN_SEEN );
+    if ( !f.good && !wasTracking ) {
+        coldWhyRejected++;
+        if ( ++coldRejectedRun >= 2 ) {
+            nextColdStartMs = millis( ) + MAGLOC_COLD_RETRY_MS; // rejected twice running: not again at once
+            coldRetryUntilMs = nextColdStartMs;
         }
     }
-    f.good = nearOk || farOk;
-    // Far-sized: resting on one plainly-seeing sensor (the MMC alone), or a
-    // bar the near rule would not take. A 65 mm hover has an 11 mm bar and
-    // one plain sensor: far, with the far tolerances (2026-09-22: judged by
-    // the bar alone it got the near track's two misses and a lattice each
-    // time, and the lattice hopped to the mirror basin).
-    f.farOnly = fix.seenBy < 2 || !nearOk;
-    if ( f.farOnly && !f.good && !wasTracking ) {
-        coldWhyRejected++;
-        if ( disowned )
-            coldWhyPhantom++;
-        nextColdStartMs = millis( ) + ( disowned ? MAGLOC_PHANTOM_RETRY_MS : MAGLOC_FAR_RETRY_MS ); // a cold start rejected: not again at once
-        farRetryUntilMs = nextColdStartMs;
+    if ( f.good ) {
+        coldRejectedRun = 0;
+        missRun = 0;
+    } else if ( wasTracking ) {
+        missFrames++; // ridden through: the track carries on, the fit starts from it next frame
+        missRun++;
     }
     fix.valid = f.good;
     f.explained = f.good && fix.seenBy >= 2; // a fix one sensor makes explains nothing (three numbers, five unknowns): keepZeros runs its clock
     fix.rough = false;
     fix.rawMagnet = position;
     if ( f.good ) {
-        lastFixPosition = position;
-        lastFixMoment = result.moment;
         lastFixMs = millis( ) == 0 ? 1 : millis( );
-        lastFixFar = f.farOnly;
-        if ( reacquiring )
-            reacquired++;
     }
-
-    bool keepTracking = f.good;
-    if ( f.good ) {
-        misses = 0;
-    } else if ( wasTracking && misses >= MAGLOC_MAX_MISSES ) {
-        coldWhyMisses++; // the run of misses is over: the next frame starts cold
-    } else if ( wasTracking && misses < MAGLOC_MAX_MISSES ) {
-        // One frame that will not fit (the magnet moved fast enough to smear
-        // the smoothed fields, a glitched reading) is not a lost magnet: no fix
-        // for this frame, but the next one starts from the last good place
-        // instead of waiting out the cold-start period.
-        misses++;
-        missFrames++;
-        result.position = lastGood;
-        keepTracking = true;
+    result.valid = f.good; // the fit's own memory: its answer; without one, the track's (above)
+    if ( !f.good && freeGood ) {
+        // The readings pinned the magnet's strength and the free fit was good;
+        // only the refinement with the held strength failed the chi - the
+        // held strength is wrong (a default, a record of another magnet: the
+        // scenes' settings reset puts 1839 back under a 4232 magnet). The
+        // free fit's answer is the next frame's start, so the strength ring
+        // fills at the frame rate (16 frames) and not one free fit per cold
+        // start (2026-09-23: ten rejected cold starts and three seconds).
+        result = freeFit;
+        result.valid = true;
     }
-    result.valid = keepTracking;
 
     if ( !fix.valid ) {
-        // Not a fix, but the fit's best answer is still roughly right when it
-        // is not far off: a rough fix for the tracker, with its wide bar. One
-        // that a dipole explains (the far probe: misfit low, bar wide) is a
-        // magnet, not drift, and keeps the absorb rule above from eating it.
-        // Resting on one sensor, what did not make the far acceptance above
-        // is not offered at all: a zero error is not a glow on the LEDs.
-        if ( !f.farOnly && offerRough( in, &thisFrame ) && fix.misfit < MAGLOC_MAX_MISFIT ) {
-            f.explained = fix.seenBy >= 2; // a dipole explains it, roughly: a magnet, not drift (keepZeros holds)
-        }
         // Streamed too (valid = 0), so that a spot where nothing fits can be studied.
         Stream* out = console.port( );
         if ( streaming && out != nullptr && ++streamTick % STREAM_EVERY_N_FIXES == 0 ) {
@@ -1240,8 +1187,6 @@ ServiceStatus MagLocator::publishFix( MagTrackInput* in, const FrameScratch& f )
     return ServiceStatus::BUSY;
 }
 
-// A fit result that did not make a fix, offered to the tracker as a rough one
-// if it is not hopeless.
 // The zero audit's sample (ZeroAudit.h): once a second while the fit is
 // good and the TMAGs see the magnet plainly, the fit redone without one
 // sensor predicts that sensor's field; its reading against that goes into
@@ -1443,59 +1388,24 @@ static void onAuditVerb( int argc, char** argv, Stream* out ) {
     magLocator.printAudit( out );
 }
 
-void MagLocator::tmagConsistency( const MagFitResult& r, const bool* use, float* gain, float* predRms ) const {
-    double num = 0, den = 0;
-    int n = 0;
-    for ( int i = 0; i < magArray.sensorCount( ); i++ ) {
-        if ( !use[ i ] || !magArray.fresh[ i ] || magSensorPlaces[ i ].type == MAG_MMC56X3 ) {
+float MagLocator::chiSmoothed( const MagFitResult& r, const bool* use, float alpha ) const {
+    float smoothing = sqrtf( alpha / ( 2.0f - alpha ) ); // what an EMA of alpha leaves of white noise
+    float sigma[ MAGFIT_MAX_SENSORS ];
+    int count = magArray.sensorCount( ) < MAGFIT_MAX_SENSORS ? magArray.sensorCount( ) : MAGFIT_MAX_SENSORS;
+    for ( int i = 0; i < count; i++ ) {
+        sigma[ i ] = 0.0f;
+        if ( !use[ i ] || !magArray.fresh[ i ] )
             continue;
-        }
-        Vec3 p = magFitDipoleField( magArray.position[ i ], r.position, r.moment );
-        const Vec3& b = smooth[ i ];
-        num += (double)p.x * b.x + (double)p.y * b.y + (double)p.z * b.z;
-        den += (double)p.x * p.x + (double)p.y * p.y + (double)p.z * p.z;
-        n += 3;
-    }
-    *gain = den > 0 ? (float)( num / den ) : 0.0f;
-    *predRms = n > 0 ? sqrtf( (float)( den / n ) ) : 0.0f;
-}
-
-float MagLocator::chiOf( const MagFitResult& r, const bool* use ) const {
-    float sum = 0.0f;
-    int n = 0;
-    for ( int i = 0; i < magArray.sensorCount( ); i++ ) {
-        if ( !use[ i ] || !magArray.fresh[ i ] ) {
-            continue;
-        }
-        Vec3 model = magFitDipoleField( magArray.position[ i ], r.position, r.moment );
         const Vec3& b = smooth[ i ];
         float size = sqrtf( b.x * b.x + b.y * b.y + b.z * b.z );
-        float err = magSensorErrorMt( magSensorPlaces[ i ].type, size );
-        float dx = ( b.x - model.x ) / err, dy = ( b.y - model.y ) / err, dz = ( b.z - model.z ) / err;
-        sum += dx * dx + dy * dy + dz * dz;
-        n += 3;
+        float noise = magArray.noiseMt[ i ] * smoothing;
+        float zero = sqrtf( offsets[ i ].variance.x ), least = magSensorTypeZeroMt( magSensorPlaces[ i ].type );
+        if ( zero < least )
+            zero = least;
+        float m = MAG_MODEL_ERROR * size;
+        sigma[ i ] = sqrtf( noise * noise + zero * zero + m * m );
     }
-    return n > 0 ? sqrtf( sum / n ) : 1e9f;
-}
-
-bool MagLocator::offerRough( MagTrackInput* in, const MagFitResult* r ) const {
-    float misfit = r->signal > 0.0f ? r->residual / r->signal : 1.0f;
-    float bar = sqrtf( r->sigma.x * r->sigma.x + r->sigma.y * r->sigma.y + r->sigma.z * r->sigma.z );
-    if ( misfit > MAGLOC_ROUGH_MAX_MISFIT || bar > MAGLOC_ROUGH_MAX_ERROR_MM || r->position.z <= 0.0f ) {
-        return false;
-    }
-    in->rough = true;
-    in->position = r->position;
-    in->sigma = r->sigma;
-    // The fit's bar on a rough answer is not to be believed to the millimetre:
-    // widen it to at least what the lattice search resolves.
-    if ( in->sigma.x < MAGLOC_ROUGH_MIN_SIGMA_MM )
-        in->sigma.x = MAGLOC_ROUGH_MIN_SIGMA_MM;
-    if ( in->sigma.y < MAGLOC_ROUGH_MIN_SIGMA_MM )
-        in->sigma.y = MAGLOC_ROUGH_MIN_SIGMA_MM;
-    if ( in->sigma.z < MAGLOC_ROUGH_MIN_SIGMA_MM )
-        in->sigma.z = MAGLOC_ROUGH_MIN_SIGMA_MM;
-    return true;
+    return magFitChi( magArray.position, smooth, use, count, sigma, &r );
 }
 
 // k: hold the strength (again), and measure it from scratch.
@@ -1726,16 +1636,17 @@ void MagLocator::printFix( Stream* out ) const {
         if ( knownStrength > 0.0f && fix.seenBy >= 1 ) {
             // The far fit was tried on that one sensor (the strength held) and did not make it.
             out->println( line );
-            snprintf( line, sizeof( line ), "  the far fit on it: misfit %.0f %%, error bar %.0f mm - a far fix needs residuals within %.0fx each sensor's expected error and a bar under %.0f mm",
-                      fix.misfit * 100.0f, fix.errorMm, MAGLOC_FAR_MAX_CHI, MAGLOC_FAR_ERROR_MM );
+            snprintf( line, sizeof( line ), "  the fit on it: chi %.1f (limit %.1f: residuals over each sensor's expected error), error bar %.0f mm (limit %.0f)",
+                      fix.chi, MAGLOC_FIT_MAX_CHI, fix.errorMm, MAGLOC_MAX_ERROR_MM );
         }
     } else if ( !fix.valid ) {
-        snprintf( line, sizeof( line ), "magnet seen by %d sensors, faintly by %d (strongest %.2f mT) but no usable fix: misfit %.0f %% (limit %.0f), error bar %.1f mm (limit %.0f)",
-                  fix.seenBy, fix.faintBy, fix.peakMt, fix.misfit * 100.0f, MAGLOC_MAX_MISFIT * 100.0f, fix.errorMm, MAGLOC_MAX_ERROR_MM );
+        snprintf( line, sizeof( line ), "magnet seen by %d sensors, faintly by %d (strongest %.2f mT) but no usable fix: chi %.1f (limit %.1f), misfit %.0f %% (limit %.0f), error bar %.1f mm (limit %.0f)%s",
+                  fix.seenBy, fix.faintBy, fix.peakMt, fix.chi, MAGLOC_FIT_MAX_CHI, fix.misfit * 100.0f, MAGLOC_MAX_MISFIT * 100.0f, fix.errorMm, MAGLOC_MAX_ERROR_MM,
+                  fix.chi < MAGLOC_FIT_MAX_CHI && fix.errorMm < MAGLOC_MAX_ERROR_MM ? " - beyond the array, seen plainly by too few (the mirror basin)" : "" );
     } else {
-        snprintf( line, sizeof( line ), "magnet at x %.1f +/-%.1f  y %.1f +/-%.1f  z %.1f +/-%.1f mm   tilt %.0f deg   strength %.0f%s   misfit %.0f %%   seen by %d+%d faint   fit %lu us",
+        snprintf( line, sizeof( line ), "magnet at x %.1f +/-%.1f  y %.1f +/-%.1f  z %.1f +/-%.1f mm   tilt %.0f deg   strength %.0f%s   misfit %.0f %% chi %.1f   seen by %d+%d faint   fit %lu us",
                   fix.magnet.x, fix.sigma.x, fix.magnet.y, fix.sigma.y, fix.magnet.z, fix.sigma.z, fix.tiltDeg, fix.strength,
-                  knownStrength > 0.0f ? " (held)" : " (free)", fix.misfit * 100.0f, fix.seenBy, fix.faintBy, (unsigned long)fix.fitUs );
+                  knownStrength > 0.0f ? " (held)" : " (free)", fix.misfit * 100.0f, fix.chi, fix.seenBy, fix.faintBy, (unsigned long)fix.fitUs );
     }
     out->println( line );
     if ( knownStrength > 0.0f || strengthMeasured > 0 ) {

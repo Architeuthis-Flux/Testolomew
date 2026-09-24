@@ -15,8 +15,8 @@ ROUGH_MM=5.0       # MAGLOC_ROUGH_ABOVE_MM: a bar wider than this is a rough fix
 
 LOAD_RE=[
     ('cold_starts', r'(\d+) cold starts since boot'),
-    ('absent', r'(\d+) times nothing present'), ('few', r'(\d+) too few noticing'), ('misses', r'(\d+) the misses run out'),
-    ('rejected', r'(\d+) far cold starts rejected'), ('phantom', r'\((\d+) of them disowned'), ('reacquired', r'found again from where it was (\d+) times'),
+    ('absent', r'(\d+) times nothing present'), ('few', r'(\d+) too few noticing'), ('coasted', r'(\d+) the track coasted out'),
+    ('rejected', r'(\d+) (?:far )?cold starts rejected'),
     ('presence_toggles', r'presence toggled (\d+) times'), ('frames_missed', r'(\d+) frames missed while tracking'),
     ('max_peak_level', r'the strongest reading since the last look ([0-9.]+)'),
 ]
@@ -70,8 +70,7 @@ def analyze(lines, skip_s=10):
         a,b=loads[0],loads[-1]
         d=lambda k: b.get(k,0)-a.get(k,0)
         e['cold_starts']=int(d('cold_starts'))
-        e['why']={k:int(d(k)) for k in ('absent','few','misses','rejected','phantom')}
-        e['reacquired']=int(d('reacquired'))
+        e['why']={k:int(d(k)) for k in ('absent','few','coasted','rejected')}
         e['presence_toggles']=int(d('presence_toggles')); e['frames_missed']=int(d('frames_missed'))
         e['max_peak_level']=max(x.get('max_peak_level',0.0) for x in loads[1:])   # the maximum SINCE the first :load reset it
     if len(tracks)>=2:
@@ -131,7 +130,7 @@ def report(name, r, minutes_arg=None):
     e=r['events']; f=r['floors']
     m=minutes_arg if minutes_arg else r['minutes']
     per=lambda n: f"{n/m:.2f}/min" if m>0 else "n/a per min"
-    print(f"   events    " + (f"cold starts {e['cold_starts']} ({per(e['cold_starts'])}: absent {e['why']['absent']}, few {e['why']['few']}, misses {e['why']['misses']}, rejected {e['why']['rejected']}, phantom {e['why']['phantom']}), found again {e['reacquired']}; presence toggles {e['presence_toggles']} ({per(e['presence_toggles'])}); frames missed {e['frames_missed']}; strongest reading since the first :load {e['max_peak_level']:.4f}" if 'cold_starts' in e else "no :load pair (bracket the capture with :load)"))
+    print(f"   events    " + (f"cold starts {e['cold_starts']} ({per(e['cold_starts'])}: absent {e['why']['absent']}, few {e['why']['few']}, coasted out {e['why']['coasted']}, rejected {e['why']['rejected']}); presence toggles {e['presence_toggles']} ({per(e['presence_toggles'])}); frames missed {e['frames_missed']}; strongest reading since the first :load {e['max_peak_level']:.4f}" if 'cold_starts' in e else "no :load pair (bracket the capture with :load)"))
     print(f"             " + (f"track: +{e['track_taken']} fixes, +{e['track_dropped']} dropped ({100.0*e['track_dropped']/max(e['track_taken'],1):.1f} %), +{e['track_restarts']} restarts;" if 'track_taken' in e else "no track: pair (send l at both ends);") + f" stream gaps >{GAP_MS} ms: {e['gaps']} ({e['gap_ms']/1000:.1f} s); states none {e['states'][0]} rough {e['states'][1]} coast {e['states'][2]} track {e['states'][3]}, transitions {e['transitions']}; rough-while-valid {100*e['rough_while_valid']:.1f} %" + (f"; dropped +{e['dropped_delta']}" if 'dropped_delta' in e else ""))
     if f:
         print(f"   floors    sigma_R x {f['sigma_r']['x']:.3f} y {f['sigma_r']['y']:.3f} z {f['sigma_r']['z']:.3f} mm (the R floor: std of second differences / sqrt 6); bar >{ROUGH_MM:.0f} mm: {100*f['error_over_5mm']:.1f} %; seen by min {f['seen_min']} mean {f['seen_mean']:.1f} (+{f['faint_mean']:.1f} faint); gate mean {f['gate_mean']:.2f} sigma, >4: {100*f['gate_over_4']:.1f} %")
@@ -163,7 +162,7 @@ def _synthetic():
     lines=[]
     lines.append("load{")
     lines.append("fit: running, steady load, the last 800 us; 3 cold starts since boot, the last 900 us in all, its longest slice 400 us - the V5F's heaviest work")
-    lines.append("  the track ended before them: 1 times nothing present, 0 too few noticing, 2 the misses run out; 0 far cold starts rejected (0 of them disowned by the TMAGs); found again from where it was 0 times (0 frames tried)")
+    lines.append("  the track ended before them: 1 times nothing present, 0 too few noticing, 0 the track coasted out; 0 cold starts rejected (chi over 2.0, a bar over 30 mm, or beyond the array)")
     lines.append("  presence toggled 1 times; 5 frames missed while tracking; the strongest reading since the last look 0.0210 (TMAG terms; the presence level is 0.040)")
     lines.append("}")
     lines.append("track: tracking  x 1 y 2 z 3 +/-0.1 0.1 0.1 mm  velocity 0 mm/s (moving 0, smoothing alpha 1.00)  tilt 5 deg  cursor aim x 1 y 2 (+/-0.1 mm, reach 0.0)  10 fixes taken, 1 dropped, 0 restarts")
@@ -178,7 +177,7 @@ def _synthetic():
         t+=50
     lines.append("load{")
     lines.append("fit: running, steady load, the last 800 us; 8 cold starts since boot, the last 900 us in all, its longest slice 400 us - the V5F's heaviest work")
-    lines.append("  the track ended before them: 2 times nothing present, 1 too few noticing, 4 the misses run out; 1 far cold starts rejected (0 of them disowned by the TMAGs); found again from where it was 0 times (0 frames tried)")
+    lines.append("  the track ended before them: 2 times nothing present, 1 too few noticing, 0 the track coasted out; 1 cold starts rejected (chi over 2.0, a bar over 30 mm, or beyond the array)")
     lines.append("  presence toggled 4 times; 12 frames missed while tracking; the strongest reading since the last look 0.0310 (TMAG terms; the presence level is 0.040)")
     lines.append("}")
     lines.append("track: tracking  x 1 y 2 z 3 +/-0.1 0.1 0.1 mm  velocity 0 mm/s (moving 0, smoothing alpha 1.00)  tilt 5 deg  cursor aim x 1 y 2 (+/-0.1 mm, reach 0.0)  210 fixes taken, 3 dropped, 1 restarts")
@@ -187,7 +186,7 @@ def _synthetic():
 def selftest():
     r=analyze(_synthetic(), skip_s=0)
     e=r['events']
-    assert e['cold_starts']==5 and e['why']=={'absent':1,'few':1,'misses':2,'rejected':1,'phantom':0}, e
+    assert e['cold_starts']==5 and e['why']=={'absent':1,'few':1,'coasted':0,'rejected':1}, e
     assert e['presence_toggles']==3 and e['frames_missed']==7, e
     assert e['track_dropped']==2 and e['track_restarts']==1 and e['track_taken']==200, e
     assert e['gaps']==1 and 500<=e['gap_ms']<=600, e

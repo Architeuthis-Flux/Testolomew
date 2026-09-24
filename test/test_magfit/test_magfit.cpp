@@ -517,6 +517,36 @@ void test_axis_weights_use_the_quiet_z( void ) {
     TEST_ASSERT_LESS_THAN_FLOAT( rp, rw );
 }
 
+// The fit's chi: the rms of (reading - model) over each sensor's own expected
+// error. A fit as good as the readings gives about 1; a magnet put 6 mm from
+// where the readings say gives well over 2. This is the one acceptance the
+// locator applies (MAGLOC_FIT_MAX_CHI): near, far, one sensor or nine.
+void test_chi_is_one_for_a_fit_as_good_as_the_readings( void ) {
+    srand( 11 );
+    Vec3 magnet = { 25.0f, 12.0f, 30.0f };
+    Vec3 moment = tiltedMoment( N52_6X3_MOMENT, 15.0f, 40.0f );
+    Vec3 fields[ SENSOR_COUNT ];
+    float amplitude = 0.02f;
+    makeFields( magnet, moment, amplitude, fields );
+    bool use[ SENSOR_COUNT ];
+    float sigma[ SENSOR_COUNT ];
+    for ( int i = 0; i < SENSOR_COUNT; i++ ) {
+        use[ i ] = true;
+        sigma[ i ] = amplitude / sqrtf( 3.0f ); // the rms of a uniform +-amplitude
+    }
+    MagFitResult r = { };
+    TEST_ASSERT_TRUE( magFitSolve( sensors, fields, use, SENSOR_COUNT, 0.5f, &r ) );
+    float chi = magFitChi( sensors, fields, use, SENSOR_COUNT, sigma, &r );
+    TEST_ASSERT_TRUE_MESSAGE( chi > 0.6f && chi < 1.4f, "a fit as good as the readings: chi about 1" );
+    MagFitResult off = r;
+    off.position.x += 6.0f;
+    float chiOff = magFitChi( sensors, fields, use, SENSOR_COUNT, sigma, &off );
+    TEST_ASSERT_TRUE_MESSAGE( chiOff > 2.0f, "6 mm off: well over 2" );
+    use[ 3 ] = false; // a sensor left out does not count
+    float chiFewer = magFitChi( sensors, fields, use, SENSOR_COUNT, sigma, &r );
+    TEST_ASSERT_TRUE( chiFewer > 0.5f && chiFewer < 1.5f );
+}
+
 int main( void ) {
     UNITY_BEGIN( );
     RUN_TEST( test_forward_model_on_axis );
@@ -531,6 +561,7 @@ int main( void ) {
     RUN_TEST( test_weak_magnet_seen_plainly_by_two_sensors );
     RUN_TEST( test_weights_favour_the_quiet_sensors );
     RUN_TEST( test_axis_weights_use_the_quiet_z );
+    RUN_TEST( test_chi_is_one_for_a_fit_as_good_as_the_readings );
     RUN_TEST( test_far_probe_needs_the_held_strength_and_the_quiet_sensor );
     RUN_TEST( test_strength_hint_keeps_the_lattice_off_the_weak_magnet_near );
     return UNITY_END( );

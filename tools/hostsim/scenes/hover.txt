@@ -34,6 +34,7 @@ l
 @magnet -22 22 22 0 0 1
 @run 60000
 l
+@expect "no usable fix"
 @magnet row 15 3
 @run 2000
 :screen

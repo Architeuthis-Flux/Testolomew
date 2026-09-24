@@ -76,9 +76,9 @@ int main(int argc, char** argv){ console.begin(&Serial); magArray.begin(); magAr
   // the events behind the tracking figure: what the track spent its time as, and what ended it (the locator's and the tracker's counters)
   { long st[4]={0,0,0,0}, roughN=0; for (auto& s: samples){ st[s.state&3]++; roughN += s.rough; } double n=samples.size();
     printf("  states: none %.1f %%, rough %.1f, coasting %.1f, tracking %.1f; rough fixes %.1f %% of frames\n", 100*st[0]/n, 100*st[1]/n, 100*st[2]/n, 100*st[3]/n, 100*roughN/n);
-    printf("  events: %lu cold starts (the track ended by: absent %lu, few %lu, misses %lu, rejected %lu, phantom %lu), %lu misses ridden through, presence toggled %lu times, reacquired %lu; tracker: accepted %lu, dropped %lu, reinits %lu, coasted %lu\n",
-      (unsigned long)magLocator.coldStarts, (unsigned long)magLocator.coldWhyAbsent, (unsigned long)magLocator.coldWhyFew, (unsigned long)magLocator.coldWhyMisses, (unsigned long)magLocator.coldWhyRejected, (unsigned long)magLocator.coldWhyPhantom,
-      (unsigned long)magLocator.missFrames, (unsigned long)magLocator.presenceToggles, (unsigned long)magLocator.reacquired, (unsigned long)tr.accepted, (unsigned long)tr.dropped, (unsigned long)tr.reinits, (unsigned long)tr.coasted); }
+    printf("  events: %lu cold starts (the track ended by: absent %lu, few %lu, rejected %lu), %lu frames ridden through from the track, presence toggled %lu times; tracker: accepted %lu, dropped %lu, reinits %lu, coasted %lu\n",
+      (unsigned long)magLocator.coldStarts, (unsigned long)magLocator.coldWhyAbsent, (unsigned long)magLocator.coldWhyFew, (unsigned long)magLocator.coldWhyRejected,
+      (unsigned long)magLocator.missFrames, (unsigned long)magLocator.presenceToggles, (unsigned long)tr.accepted, (unsigned long)tr.dropped, (unsigned long)tr.reinits, (unsigned long)tr.coasted); }
   // Over EVERY frame with a track of any state (the lines below count only "tracking" frames, and a state that sets the worst frames aside flatters them):
   { double e2=0; long n=0, none=0; for (auto& s: samples){ if (s.state==0){ none++; continue; } float e=dist(s.track,s.truth); e2+=e*e; n++; }
     printf("  any state: track error %.2f mm rms over %.1f %% of frames (the rest had no track)\n", n?sqrt(e2/n):0, 100.0*n/samples.size()); }

@@ -981,3 +981,18 @@ bool magFitRefineKnownStrength( const Vec3* sensors, const Vec3* fields, const b
     result->valid = result->residual <= maxMisfit * result->signal;
     return result->valid;
 }
+
+float magFitChi( const Vec3* sensors, const Vec3* fields, const bool* use, int count, const float* sigma, const MagFitResult* result ) {
+    float sum = 0.0f;
+    int n = 0;
+    for ( int i = 0; i < count; i++ ) {
+        if ( !use[ i ] || sigma[ i ] <= 0.0f ) {
+            continue;
+        }
+        Vec3 model = magFitDipoleField( sensors[ i ], result->position, result->moment );
+        float dx = ( fields[ i ].x - model.x ) / sigma[ i ], dy = ( fields[ i ].y - model.y ) / sigma[ i ], dz = ( fields[ i ].z - model.z ) / sigma[ i ];
+        sum += dx * dx + dy * dy + dz * dz;
+        n += 3;
+    }
+    return n > 0 ? sqrtf( sum / n ) : 1e9f;
+}

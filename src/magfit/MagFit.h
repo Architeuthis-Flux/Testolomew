@@ -197,6 +197,14 @@ bool magFitRefineKnownStrength( const Vec3* sensors, const Vec3* fields, const b
 // same fields as magFitSolve; result->valid only says there were readings.
 bool magFitCoarse( const Vec3* sensors, const Vec3* fields, const bool* use, int count, MagFitResult* result, const float* weights = nullptr );
 
+// The fit's chi: the rms, over every axis of every used sensor, of (reading -
+// the dipole's field) over that sensor's own expected error sigma[i] (mT: its
+// noise as the readings were smoothed, its zero's doubt, the model's share of
+// what it reads). About 1 for a fit as good as the readings; the one
+// acceptance the locator applies, near or far, one sensor or nine. 1e9 with
+// no sensor used.
+float magFitChi( const Vec3* sensors, const Vec3* fields, const bool* use, int count, const float* sigma, const MagFitResult* result );
+
 // Solve the n x n system a x = b in place, n <= MAGFIT_MAX_PARAMS (Gaussian
 // elimination, partial pivoting; the answer is left in b). false if singular.
 #define MAGFIT_MAX_PARAMS 6

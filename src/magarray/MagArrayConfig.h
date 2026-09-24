@@ -224,23 +224,16 @@ static inline const char* magSensorTypeName( MagSensorType type ) {
 static inline float magSensorTypeNoiseMt( MagSensorType type ) {
     return type == MAG_MMC56X3 ? 0.0003f : MAG_WEIGHT_REFERENCE_MT; // the MMC's is the bench's (2026-09-21: 0.3 uT rms a frame per axis; the datasheet's 0.2 until 2026-09-23)
 }
-// A sensor's weight in the fit for a reading of this size: how much better
-// it is than a TMAG5273 reading the same field. Each sensor's error is its
-// noise plus MAG_MODEL_ERROR of the field it reads, and the weight is a
-// TMAG's total error over this sensor's, capped. A TMAG is exactly 1 at
-// any field, so an array of TMAGs fits as it always did; an MMC56x3 is ~37
-// where it reads noise (the probe far up, which only it can see), ~2 at
-// 0.1 mT and 1 close in, where the model's error is everyone's. Sensor
-// fusion by the book: each reading counts by what it is worth.
-// What a sensor's ZERO is good to between audits: a TMAG5273's drifts and
-// sits 0.01-0.03 mT off on the bench (2026-09-21), the MMC56x3's a few
-// thousandths. Far from the array, where a TMAG's true share of the probe
-// is under its noise, this is most of what a TMAG reads - and a fit that
-// counted those readings as signal to be matched was thrown out at the far
-// acceptance while the MMC alone explained the probe (the bench, 2026-09-22
-// morning: far fixes at a 13-15 % misfit against a 15 % gate, one a second).
-#define MAG_ZERO_UNCERTAINTY_TMAG_MT 0.015f
-#define MAG_ZERO_UNCERTAINTY_MMC_MT 0.003f
+// The least a sensor's zero is doubted, over the offset filter's own doubt
+// (MagLocator::keepZeros): what the fit's acceptance (magFitChi) allows a
+// reading to be off by for its zero alone. ASSUMPTION (2026-09-23: the
+// filter's stationary doubt, 0.00025 mT for a TMAG5273, is what the scenes
+// were judged with; on the bench a zero is known less well than that, and
+// section 8's captures set these). Until 2026-09-23 these were 0.015 and
+// 0.003, the size of a stale post-boot zero, and the far acceptance judged
+// against them could not tell a 0.02 mT zero error at the MMC from a probe.
+#define MAG_ZERO_UNCERTAINTY_TMAG_MT 0.001f
+#define MAG_ZERO_UNCERTAINTY_MMC_MT 0.0005f
 static inline float magSensorTypeZeroMt( MagSensorType type ) {
     return type == MAG_MMC56X3 ? MAG_ZERO_UNCERTAINTY_MMC_MT : MAG_ZERO_UNCERTAINTY_TMAG_MT;
 }
@@ -269,12 +262,6 @@ static inline float magSensorTypeZeroMt( MagSensorType type ) {
 #define MAG_OFFSET_FOLLOW_S 20.0f
 #define MAG_OFFSET_HOLD_S 120.0f
 #define MAG_OFFSET_HOLDOFF_S 10.0f
-// What a reading of this size at this type is expected to be off by, in all:
-// its noise, its zero's uncertainty, and the model's share of the field.
-static inline float magSensorErrorMt( MagSensorType type, float fieldMt ) {
-    float noise = magSensorTypeNoiseMt( type ), zero = magSensorTypeZeroMt( type ), model = MAG_MODEL_ERROR * fieldMt;
-    return sqrtf( noise * noise + zero * zero + model * model );
-}
 static inline float magSensorFrameWeight( MagSensorType type, float fieldMt, float cap ) {
     if ( cap <= 0.0f ) {
         return 1.0f; // the console's w0: every sensor equal

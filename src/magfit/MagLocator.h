@@ -86,9 +86,6 @@
 // of ~12 ms), so five frames; its return after three restarts its history
 // (filterFrame's resync) as before.
 #define MAGLOC_MISSED_HOLD_FRAMES 5
-// A far cold start the TMAGs disown (the consistency test) is a zero error
-// at the MMC, not a probe: the next try waits this long, not MAGLOC_FAR_RETRY_MS.
-#define MAGLOC_PHANTOM_RETRY_MS 2000
 #define MAGLOC_SEEN_MT 0.04f
 // The seen level (and the TMAG's plain level) was set for the 2026-09-18
 // magnet of 4232; a weaker magnet is seen plainly by fewer sensors at the
@@ -125,11 +122,6 @@
 // drift rule; fix.peakMt stays the reading itself.
 #define MAGLOC_TYPE_SCALE_FLOOR 0.2f
 
-// A fit from a cold start (no previous fix to start from) tries seven starting
-// points and measures about 50 ms on the CH32H417; a tracking fit is two or
-// three iterations. So while there is no fix, a cold start is only attempted
-// this often, and the loop stays free for everything else.
-#define MAGLOC_COLD_START_PERIOD_MS 200
 // ...and since a cold start runs in slices (magFitSolveStep: the lattice,
 // its refinement, then up to seven seeds), the slices are spread evenly,
 // one every MAGLOC_COLD_SLICE_MS, with no pause between one cold start and
@@ -144,16 +136,6 @@
 // every 10 ms rather than a burst now and then. Kevin's idea, 2026-09-20.
 #define MAGLOC_STEADY_ITERATIONS 2 // the default of "fit iters" (~0.85 ms each on the CH32H417). tools/hostsim/pencil.cpp: 2 a frame tracks exactly as the natural caps do (error, lag and jitter to the last digit); at 1 it loses 0.1 % of frames. More only makes the pulse the supply shows bigger (2026-09-20).
 
-// While tracking, this many frames in a row may fail to fit before the magnet
-// is called lost and the (slow, paced) cold start takes over: a second. The
-// rejections come in runs and the smoothed fields change slowly; a frame
-// that will not fit is one warm refine from the last good place, not a cold
-// start (it was, under magFitSolve; magFitSolveStep's warm path just says
-// no). Until 2026-09-23 a near track had its own limit of 2 - dead code
-// since the far rule of 09-22 (a frame that fails is "far-sized" by
-// definition, and got the far limit): the bench's 75 track ends "the misses
-// run out" of 09-22 were the old code's. One limit now.
-#define MAGLOC_MAX_MISSES 100
 
 // Worst residual/signal ratio still called a fix (see magFitSolve). Far from
 // the array a real magnet fits to a few percent. Close in it does not: the
@@ -164,7 +146,32 @@
 
 // A fix whose own error bar (all three axes, 1 sigma) is wider than this is not
 // offered as a fix at all.
-#define MAGLOC_MAX_ERROR_MM 15.0f
+// One acceptance for every fit, near or far, one sensor or nine (2026-09-23;
+// the near/far rules, the TMAGs' confirmation and the rough offer before):
+// the residuals against each sensor's own expected error (magFitChi: its
+// noise as smoothed, its zero's doubt, the model's share of what it reads)
+// under this - about 1 is a fit as good as the readings; the bench-like
+// scenes' near fixes 0.9-1.3, a 30 mm hover 1.7, the MMC's far fixes 0.8,
+// the MMC's 0.02 mT phantom 4.0 (the TMAGs read none of what a probe there
+// would give them) - and the bar under MAGLOC_MAX_ERROR_MM (30: the far
+// probe at 90 mm has an 18 mm bar; a fix wider than 5, ROUGH_ABOVE_MM, is
+// rough). ASSUMPTION: the simulator's world; section 8's captures re-tune it.
+#define MAGLOC_FIT_MAX_CHI 2.0f
+// ...and a fix beyond the array's footprint by more than this needs to be
+// seen plainly by MAGLOC_OUTSIDE_MIN_SEEN sensors: a planar array cannot tell
+// a source past its edge from its mirror (the same readings from a magnet on
+// the sensor plane further out), and the wrong basin off the end of the
+// board fitted within every sensor's error (chi 0.8-1.9) while two sensors
+// saw the probe. Row 1 is 9 mm past the array and four sensors see it.
+#define MAGLOC_OUTSIDE_MM 10.0f
+#define MAGLOC_OUTSIDE_MIN_SEEN 3
+// A cold start (the lattice) rejected twice running is not tried again for
+// this long, in either fit load: on a phantom it would run every slice. Once
+// is not held against it: a probe that has just arrived (or jumped a row) is
+// fitted on fields the smoothing is still settling, and that fit fails the
+// chi; the next slice's does not.
+#define MAGLOC_COLD_RETRY_MS 400
+#define MAGLOC_MAX_ERROR_MM 30.0f
 
 // The probe's magnet strength, mT*mm^3, that the fit starts out holding
 // (held, the height noise about halves - magFitSolveKnownStrength - and far
@@ -285,63 +292,6 @@
 // offered as rough if its misfit and bar are under the MAX limits, with the
 // bar never claimed narrower than the lattice search resolves.
 #define MAGLOC_ROUGH_ABOVE_MM 5.0f
-#define MAGLOC_ROUGH_MAX_MISFIT 0.7f
-#define MAGLOC_ROUGH_MAX_ERROR_MM 60.0f
-#define MAGLOC_ROUGH_MIN_SIGMA_MM 3.0f
-// The FAR probe - read plainly by the MMC56x3 alone, fewer than
-// MAGLOC_MIN_SENSORS noticing it - is told from a zero error at the MMC by
-// one thing only: how well a dipole of the held strength explains what is
-// read. The probe 60 mm up fits at 4 % misfit with a 6 mm bar, 90 mm up
-// with an 18 mm bar; a 0.09 mT zero error at the MMC (2026-09-21: its saved
-// zero put back under a newly calibrated table row) "fitted" at 40-70 %
-// with a 30-90 mm bar several times a second, and every such fit was a
-// rough fix - the far glow at the board's centre - and reset the absorb
-// clock, so the error was never absorbed and every near fix leaned on it.
-// So a fit resting on fewer than MAGLOC_MIN_SENSORS is a fix, or a rough
-// one, only under these (tighter than MAGLOC_MAX_MISFIT and
-// MAGLOC_MAX_ERROR_MM, which are for a fit the TMAGs take part in); one
-// that does not make them is nothing fitting, and the MMC's zero follows
-// what it reads after MAG_OFFSET_HOLD_S (MagLocator::keepZeros).
-#define MAGLOC_FAR_MISFIT 0.15f  // (kept for the report; the far acceptance is MAGLOC_FAR_MAX_CHI since 2026-09-22)
-#define MAGLOC_FAR_ERROR_MM 30.0f // (25 until 2026-09-22: with the bench's zero errors the bar at 80 mm is 24, and half the frames fell out)
-// The far acceptance, since 2026-09-22 morning: not a relative misfit but
-// the residuals against what each sensor is expected to be off by
-// (magSensorErrorMt: noise, zero uncertainty, the model's share) - the rms
-// of residual over expected error, over the sensors that voted, under this.
-// A TMAG reading its own zero error 80 mm from the probe is then a reading
-// the model explains within its error, not a failure of the fit (the bench:
-// far fixes rejected at a 13-15 % misfit, one a second, "slow and choppy").
-#define MAGLOC_FAR_MAX_CHI 2.0f
-// ...and CONFIRMED by the TMAGs when it can be: a probe within ~65 mm puts
-// a definite pattern of 0.01-0.04 mT on them, a zero error at the MMC puts
-// nothing. Over the TMAGs that voted, the gain of readings on predictions
-// (sum read.pred / sum pred.pred) is near 1 for a probe and near 0 for a
-// phantom; it is asked for when the predicted pattern's rms is above
-// MAGLOC_CONFIRM_MIN_MT (a TMAG's noise), and must be over
-// MAGLOC_CONFIRM_MIN_GAIN. A fix that two or more sensors make holds
-// the zeros (keepZeros); an unconfirmable far fix (beyond ~65 mm, the MMC
-// alone) is real or not, and only time can say - the MMC's zero follows
-// it after MAG_OFFSET_HOLD_S. (2026-09-22: judged by residuals alone, the
-// post-boot 0.12 mT zero error at the MMC fitted as a probe 43 mm up, its
-// bar cleared the absorb clocks of the day, and it was never absorbed:
-// 542 cold starts in three minutes with nothing there.)
-#define MAGLOC_CONFIRM_MIN_MT 0.012f
-#define MAGLOC_CONFIRM_MIN_GAIN 0.5f
-// A track lost moments ago is looked for first where it last was - one warm
-// fit from the last accepted fix - before any lattice search: the lattice
-// has no memory, and for a far probe it lands as readily in the mirror
-// basin (the same three numbers at the MMC from a magnet 54 mm off the
-// side of the board, on the sensor plane) as in the true one; the bench
-// hopped between the two 112 times in a minute (2026-09-22 morning). Every
-// frame for this long, for a far track (a near one is found again by its
-// own misses and a lattice that is not ambiguous).
-#define MAGLOC_REACQUIRE_MS 3000
-// ...and a cold start that ended in such a rejection is not tried again for
-// this long: a zero error at the MMC is present until the absorb rule has
-// taken it (minutes), and a lattice search every 200 ms meanwhile (3.7 a
-// second on the bench, 2026-09-21) is the V5F's heaviest work for nothing.
-// A probe that then arrives is found at the next try, within a second.
-#define MAGLOC_FAR_RETRY_MS 400 // (1000 until 2026-09-22: a second between tries was the "slow" of a far fix at the edge)
 
 // The baseline check. A baseline taken with the probe lying on the board
 // subtracts the magnet's own field from every reading after it, and nothing
@@ -426,6 +376,7 @@ struct MagProbeFix {
     float strength;  // |moment|, mT*mm^3 (constant for one magnet - a sanity check)
     float residual;  // RMS misfit, mT
     float misfit;    // residual / signal: 0.03 is a clean fix, 0.3 a rough one
+    float chi;       // the rms of (reading - model) over each sensor's own expected error (its noise as smoothed, its zero's doubt, the model's share): 1 is a fit as good as the readings, 2 is not
     Vec3 sigma;      // 1-sigma error bar on the magnet position, mm, per axis (from the fit itself)
     float errorXyMm; // ...across the board: sqrt(sx^2 + sy^2)
     float errorMm;   // ...and in all three axes together
@@ -487,12 +438,10 @@ class MagLocator : public Service {
     bool fitHeld = false;   // :load fit off - the frames flow, nothing is fitted (the fit is the V5F's heaviest work)
     bool steadyFit = false;                          // the fit's work the same every frame instead of bursts (the tracker page's "fit load")
     float steadyIterations = MAGLOC_STEADY_ITERATIONS; // ...and how much: refinement iterations a frame ("fit iters", saved)
-    uint32_t coldWhyPhantom = 0; // far cold starts the TMAGs disowned
-    uint32_t coldWhyAbsent = 0, coldWhyFew = 0, coldWhyMisses = 0, coldWhyRejected = 0; // what ended the track before each cold start: nothing present, too few noticing, the misses run out, a far cold start rejected
+    uint32_t coldWhyAbsent = 0, coldWhyFew = 0, coldWhyCoasted = 0, coldWhyRejected = 0; // what ended the track before each cold start: nothing present, too few noticing, the fit failing until the track coasted out; and cold starts rejected (chi, the bar, beyond the array)
     uint32_t staleFrames[ MAGFIT_MAX_SENSORS ] = { 0 }; // frames in which a sensor was not read (the MMC56x3's 150 Hz against 100 Hz frames)
-    uint32_t reacquired = 0, reacquireTries = 0; // times a lost track was found again from where it last was (MAGLOC_REACQUIRE_MS), and the frames that tried
     uint32_t presenceToggles = 0; // times presence went on or off: the `d` stream prints no absent frame, so a toggle shows there only as a gap (the bench protocol, 2026-09-23)
-    uint32_t missFrames = 0;      // frames that would not fit while tracking and were ridden through (MAGLOC_MAX_MISSES): each a near miss of a cold start
+    uint32_t missFrames = 0;      // frames that gave no fix while the track was alive and were ridden through (the fit starts again from the track): each a near miss of a cold start
     float maxPeakLevel = 0.0f;    // the strongest smoothed reading (TMAG terms) since :load last printed it: the absent run's presence floor
     uint32_t presenceHeldFrames = 0; // frames in which presence rested on a sensor's last reading, the sensor not read that frame (MAGLOC_MISSED_HOLD_FRAMES)
     uint32_t coldStarts = 0, coldStartUs = 0, coldSliceMaxUs = 0; // cold starts since boot; the last one's cost in all, and its longest slice (one per frame)
@@ -582,8 +531,6 @@ class MagLocator : public Service {
     uint32_t lastFrame = 0;
     bool haveSmoothed = false;
     uint32_t nextColdStartMs = 0;
-    uint32_t farRetryUntilMs = 0; // a far retry's wait, honoured in the steady load too
-    int misses = 0; // frames in a row that would not fit, while tracking
     uint32_t streamTick = 0;
     float strengthRing[ MAGLOC_STRENGTH_RING ]; // the free fit's strengths, the last frames that measured it
     int strengthRingAt = 0, strengthRingCount = 0;
@@ -616,29 +563,27 @@ class MagLocator : public Service {
         int plain = 0;                       // sensors reading plainly (above their plain level)
         bool hintFree = false;               // the free fit ran with no strength hint: the readings pinned it (a measurement)
         bool enough = false;                 // enough sensors notice it to try a fit
-        bool farOnly = false;                // the fit rests on fewer than two sensors seeing it plainly
         bool good = false;                   // the fit's verdict
+        bool outside = false;                // the fit's answer is beyond the array's footprint (MAGLOC_OUTSIDE_MM)
         bool explained = false;              // an accepted fix that two or more sensors make (or a rough offer a dipole explains): the offsets hold this frame
         bool quiet[ MAGFIT_MAX_SENSORS ];    // this sensor reads under MAGLOC_QUIET_FRACTION of its faint level: nothing there for it, whatever the array says
     };
     bool filterFrame( FrameScratch& f );
     void assessFrame( FrameScratch& f );
     void keepZeros( const FrameScratch& f );
-    ServiceStatus tryCoarse( MagTrackInput* in, const FrameScratch& f );
     ServiceStatus runFit( MagTrackInput* in, FrameScratch& f );
     ServiceStatus publishFix( MagTrackInput* in, const FrameScratch& f );
     ServiceStatus fitFrame( MagTrackInput* in );
     ServiceStatus simFrame( MagTrackInput* in );
-    bool offerRough( MagTrackInput* in, const MagFitResult* r ) const;
     uint32_t lastZeroSettleMs = 0; // when the saved zeros last followed the drifted ones (MAGLOC_ZERO_SETTLE_MIN_MS) - unused since the audit took over the writing
     uint32_t lastAuditMs = 0;      // the zero audit's last sample
-    Vec3 lastFixPosition = { 0, 0, 0 }, lastFixMoment = { 0, 0, 0 }; // the last accepted fix (rough included), for MAGLOC_REACQUIRE_MS
-    uint32_t lastFixMs = 0;
-    bool lastFixFar = false;       // ...and whether it was far-sized (one plain sensor, or a bar the near rule would not take): only a far track is re-acquired this way
+    uint32_t lastFixMs = 0; // the last accepted fix: the presence hysteresis (MAGLOC_PRESENT_HOLD_MS)
     int auditNext = 0;             // the sensor it looks at next (round robin)
     void auditZeros( const FrameScratch& f );
-    float chiOf( const MagFitResult& r, const bool* use ) const; // the rms of residual over expected error over the sensors that voted
-    void tmagConsistency( const MagFitResult& r, const bool* use, float* gain, float* predRms ) const; // the TMAGs' readings on the fit's predictions
+    float chiSmoothed( const MagFitResult& r, const bool* use, float alpha ) const; // magFitChi with each sensor's error as it stands this frame: its noise as the smoothing left it (alpha), its zero's doubt (the offset filter's, never under magSensorTypeZeroMt), the model's share
+    uint32_t coldRetryUntilMs = 0; // a cold start rejected twice running: not again before this (MAGLOC_COLD_RETRY_MS)
+    int coldRejectedRun = 0;       // cold starts rejected in a row
+    int missRun = 0;               // frames in a row the fit gave no fix (the track carrying on)
 
     Vec3 pointerOf( Vec3 tip, Vec3 shaft ) const;
     void printFixCsv( Stream* out ) const;

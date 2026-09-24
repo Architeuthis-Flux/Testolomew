@@ -86,13 +86,12 @@ l
 @magnet row 15 3
 @run 1000
 :load
-@expect "3 cold starts since boot"
+@expect "4 cold starts since boot"
 @expect "presence toggled 5 times"
 @run 120000
 :load
-@expect "3 cold starts since boot"
+@expect "4 cold starts since boot"
 @expect "presence toggled 5 times"
-@expect "0 the misses run out"
 l
 @expect "track: tracking"
 @expect "0 dropped, 0 restarts"
@@ -115,8 +114,7 @@ s
 @bias 5 0 0 0
 @run 500
 :load
-@expect "3 cold starts since boot"
-@expect "0 the misses run out"
+@expect "4 cold starts since boot"
 l
 @expect "track: tracking"
 
@@ -128,10 +126,10 @@ l
 @magnet row 15 3 30
 @run 1000
 :load
-@expect "3 cold starts since boot"
+@expect "4 cold starts since boot"
 @run 60000
 :load
-@expect "3 cold starts since boot"
+@expect "4 cold starts since boot"
 @expect "frames missed while tracking"
 l
 # ...and lifted away from that ROUGH state, the far glow is gone within 1.2 s
@@ -146,10 +144,10 @@ l
 @magnet off
 @run 1000
 :load
-@expect "3 cold starts since boot"
+@expect "4 cold starts since boot"
 @run 60000
 :load
-@expect "3 cold starts since boot"
+@expect "4 cold starts since boot"
 @expect "presence toggled 6 times"
 l
 @expect "no magnet"
