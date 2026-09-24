@@ -823,7 +823,20 @@ void MagArray::applyGainTrim( int i, Vec3 divideBy ) {
     if ( i < 0 || i >= MAG_SENSOR_COUNT || divideBy.x <= 0.0f || divideBy.y <= 0.0f || divideBy.z <= 0.0f ) {
         return;
     }
-    gainTrim[ i ] = { gainTrim[ i ].x / divideBy.x, gainTrim[ i ].y / divideBy.y, gainTrim[ i ].z / divideBy.z };
+    // The trim in all never goes past MAG_GAIN_TRIM_MAX either way: beyond it
+    // the row is wrong (magcal), and a trim that walked there is undone by
+    // :audit forget, not compounded.
+    float next[ 3 ] = { gainTrim[ i ].x / divideBy.x, gainTrim[ i ].y / divideBy.y, gainTrim[ i ].z / divideBy.z };
+    float d[ 3 ] = { divideBy.x, divideBy.y, divideBy.z };
+    float t[ 3 ] = { gainTrim[ i ].x, gainTrim[ i ].y, gainTrim[ i ].z };
+    for ( int ax = 0; ax < 3; ax++ ) {
+        if ( next[ ax ] > MAG_GAIN_TRIM_MAX || next[ ax ] < 1.0f / MAG_GAIN_TRIM_MAX ) {
+            d[ ax ] = 1.0f; // this axis is not trimmed further
+            next[ ax ] = t[ ax ];
+        }
+    }
+    divideBy = { d[ 0 ], d[ 1 ], d[ 2 ] };
+    gainTrim[ i ] = { next[ 0 ], next[ 1 ], next[ 2 ] };
     baseline[ i ] = { baseline[ i ].x / divideBy.x, baseline[ i ].y / divideBy.y, baseline[ i ].z / divideBy.z };
     zeroed[ i ] = { zeroed[ i ].x / divideBy.x, zeroed[ i ].y / divideBy.y, zeroed[ i ].z / divideBy.z };
     raw[ i ] = { raw[ i ].x / divideBy.x, raw[ i ].y / divideBy.y, raw[ i ].z / divideBy.z };

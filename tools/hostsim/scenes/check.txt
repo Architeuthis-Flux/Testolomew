@@ -445,6 +445,35 @@ z
 @run 3000
 @magnet row 18 5 0 30
 @run 3000
+# ...and once more: a correction takes two windows running that agree.
+@magnet row 5 2 0 20
+@run 3000
+@magnet row 6 3 0 30
+@run 3000
+@magnet row 7 4 0 40
+@run 3000
+@magnet row 8 5 0 10
+@run 3000
+@magnet row 9 1 0 20
+@run 3000
+@magnet row 10 2 0 30
+@run 3000
+@magnet row 11 3 0 40
+@run 3000
+@magnet row 12 4 0 10
+@run 3000
+@magnet row 13 5 0 20
+@run 3000
+@magnet row 14 1 0 30
+@run 3000
+@magnet row 15 2 0 40
+@run 3000
+@magnet row 16 3 0 10
+@run 3000
+@magnet row 17 4 0 20
+@run 3000
+@magnet row 18 5 0 30
+@run 3000
 # The MMC's 0.005 mT zero error is found and taken out - during the taps
 # or after them, whenever the audit's samples have the spread - and nothing
 # else is touched: with per-axis thresholds and zeros corrected before any
@@ -467,6 +496,66 @@ z
 # next fixes land in their hole.
 @gain 5 0.64
 :audit reset
+@magnet row 5 2 0 20
+@run 3000
+@magnet row 6 3 0 30
+@run 3000
+@magnet row 7 4 0 40
+@run 3000
+@magnet row 8 5 0 10
+@run 3000
+@magnet row 9 1 0 20
+@run 3000
+@magnet row 10 2 0 30
+@run 3000
+@magnet row 11 3 0 40
+@run 3000
+@magnet row 12 4 0 10
+@run 3000
+@magnet row 13 5 0 20
+@run 3000
+@magnet row 14 1 0 30
+@run 3000
+@magnet row 15 2 0 40
+@run 3000
+@magnet row 16 3 0 10
+@run 3000
+@magnet row 17 4 0 20
+@run 3000
+@magnet row 18 5 0 30
+@run 3000
+# ...and the same twice more: the first window flags the sensor and takes
+# it out of the others' fits, and a gain is applied only when two windows
+# running agree (the solve's sigma is not honest for a bench's systematic
+# errors).
+@magnet row 5 2 0 20
+@run 3000
+@magnet row 6 3 0 30
+@run 3000
+@magnet row 7 4 0 40
+@run 3000
+@magnet row 8 5 0 10
+@run 3000
+@magnet row 9 1 0 20
+@run 3000
+@magnet row 10 2 0 30
+@run 3000
+@magnet row 11 3 0 40
+@run 3000
+@magnet row 12 4 0 10
+@run 3000
+@magnet row 13 5 0 20
+@run 3000
+@magnet row 14 1 0 30
+@run 3000
+@magnet row 15 2 0 40
+@run 3000
+@magnet row 16 3 0 10
+@run 3000
+@magnet row 17 4 0 20
+@run 3000
+@magnet row 18 5 0 30
+@run 3000
 @magnet row 5 2 0 20
 @run 3000
 @magnet row 6 3 0 30

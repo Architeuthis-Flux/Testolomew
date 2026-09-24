@@ -72,6 +72,9 @@ struct ZeroAuditSensor {
     bool correctable = false;
     Vec3 lastApplied = { 0, 0, 0 };
     Vec3 lastGainApplied = { 1, 1, 1 };
+    Vec3 previousGain = { 1, 1, 1 }; // the last window's solve (kept through a reset): a gain or a zero is applied only when two windows running agree
+    Vec3 previousZero = { 0, 0, 0 };
+    bool hasPrevious = false;
 };
 
 class ZeroAudit {
@@ -82,7 +85,7 @@ class ZeroAudit {
     // Solve sensor i's zero and gain from its samples; false when there are
     // too few samples or too little spread to tell the two apart. The solve
     // is left in the sensor's record either way (for the report).
-    bool solve( int i, int minSamples, float minSpread );
+    bool solve( int i, int minSamples, float minSpread, float minPredMt = 0.0f ); // minPredMt: an axis whose predictions are under this (rms) keeps gain 1 - a gain cannot be read off a signal at the noise floor
     const ZeroAuditSensor& sensor( int i ) const { return s[ i ]; }
     ZeroAuditSensor& sensor( int i ) { return s[ i ]; }
 

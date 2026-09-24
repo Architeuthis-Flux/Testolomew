@@ -11,6 +11,9 @@ void ZeroAudit::reset( int i ) {
     s[ i ].applied = keep.applied;
     s[ i ].lastApplied = keep.lastApplied;
     s[ i ].lastGainApplied = keep.lastGainApplied;
+    s[ i ].previousGain = keep.previousGain;
+    s[ i ].previousZero = keep.previousZero;
+    s[ i ].hasPrevious = keep.hasPrevious;
     s[ i ].excluded = keep.excluded;
     s[ i ].correctable = keep.correctable;
 }
@@ -49,7 +52,7 @@ void ZeroAudit::addSample( int i, Vec3 prediction, Vec3 reading, uint32_t nowMs 
 // minSpread) cannot tell its gain from its zero: it keeps gain 1 and the
 // offset takes the mean difference. The solve's own 1-sigma per axis comes
 // with it: the locator applies a correction only past three of them.
-bool ZeroAudit::solve( int i, int minSamples, float minSpread ) {
+bool ZeroAudit::solve( int i, int minSamples, float minSpread, float minPredMt ) {
     if ( i < 0 || i >= ZERO_AUDIT_MAX )
         return false;
     ZeroAuditSensor& a = s[ i ];
@@ -69,7 +72,8 @@ bool ZeroAudit::solve( int i, int minSamples, float minSpread ) {
         a.spreadAxis[ k ] = sxx > 0.0f && meanP != 0.0f ? sqrtf( ( sxx / n ) / ( meanP * meanP ) ) : 0.0f;
         meanSq += meanP * meanP;
         denAll += sxx > 0.0f ? sxx : 0.0f;
-        bool axisOk = sxx > 0.0f && a.spreadAxis[ k ] >= minSpread;
+        float predRms = sqrtf( a.spp[ k ] / n );
+        bool axisOk = sxx > 0.0f && a.spreadAxis[ k ] >= minSpread && predRms >= minPredMt;
         g[ k ] = axisOk ? sxy / sxx : 1.0f;
         z[ k ] = r0[ k ] - g[ k ] * p0[ k ] + ( mv - g[ k ] * mu );
         float residual = axisOk ? syy - g[ k ] * sxy : syy - 2.0f * sxy + sxx; // the sum of squares left, about the line

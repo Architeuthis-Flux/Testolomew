@@ -393,7 +393,7 @@ void MagLocator::begin( ) {
     consoleAddCommand( 'S', "the breadboard's surface is <number> mm above the sensors (S17<Enter>)", onSurface );
     consoleAddCommand( 'g', "tracker on/off (off = raw fixes, for comparing)", onTracker );
     consoleAddCommand( 'Y', "the probe lay where it last was while the array zeroed: take that magnet back out of the baseline (<number>: 0 = last fix, 1 = the reference)", onUnpollute );
-    consoleAddVerb( "audit", "[reset]", "each sensor's zero and gain against the fit of the others (the zero audit)", CONSOLE_READS, onAuditVerb );
+    consoleAddVerb( "audit", "[reset | forget]", "each sensor's zero and gain against the fit of the others (the zero audit); reset = the samples cleared; forget = the gain trims back to 1 as well", CONSOLE_READS, onAuditVerb );
     consoleAddCommand( 'q', "tip calibration: the point resting in one hole, take the fix at this angle (then another angle, q again...)", onTipSample );
     consoleAddCommand( 'Q', "tip calibration: solve the magnet-to-point distance from the q samples (3 or more angles) and use it", onTipSolve );
 }
@@ -1204,7 +1204,7 @@ void MagLocator::auditZeros( const FrameScratch& f ) {
     // windows start again without that error.
     for ( int k = 0; k < count; k++ ) {
         ZeroAuditSensor& a = audit.sensor( k );
-        if ( a.n >= MAGLOC_AUDIT_MIN_SAMPLES && !( a.excluded && !a.correctable ) && !audit.solve( k, MAGLOC_AUDIT_MIN_SAMPLES, MAGLOC_AUDIT_MIN_SPREAD ) ) {
+        if ( a.n >= MAGLOC_AUDIT_MIN_SAMPLES && !( a.excluded && !a.correctable ) && !audit.solve( k, MAGLOC_AUDIT_MIN_SAMPLES, MAGLOC_AUDIT_MIN_SPREAD, MAGLOC_AUDIT_GAIN_MIN_MT ) ) {
             return; // too little spread yet on one of them: the samples keep accumulating (a window that never gets it starts again at MAGLOC_AUDIT_MAX_SAMPLES)
         }
     }
@@ -1217,12 +1217,13 @@ void MagLocator::auditZeros( const FrameScratch& f ) {
     int best = -1, bestGain = -1, bestCorrectable = -1;
     float bestRatio = 1.0f, bestGainRatio = 1.0f;
     bool newlyExcluded = false; // a sensor the model does not describe was found in the fits: this round's other solves are not to be trusted
+    int newlyCorrectable = -1;  // a sensor found far off-gain this round: the others' windows were taken with it in their fits (polluted); its own are clean
     for ( int k = 0; k < count; k++ ) {
         ZeroAuditSensor& a = audit.sensor( k );
         if ( a.n < MAGLOC_AUDIT_MIN_SAMPLES ) {
             continue;
         }
-        if ( !audit.solve( k, MAGLOC_AUDIT_MIN_SAMPLES, MAGLOC_AUDIT_MIN_SPREAD ) ) {
+        if ( !audit.solve( k, MAGLOC_AUDIT_MIN_SAMPLES, MAGLOC_AUDIT_MIN_SPREAD, MAGLOC_AUDIT_GAIN_MIN_MT ) ) {
             continue;
         }
         float meanPred = sqrtf( ( a.spp[ 0 ] + a.spp[ 1 ] + a.spp[ 2 ] ) / a.n );
@@ -1258,6 +1259,7 @@ void MagLocator::auditZeros( const FrameScratch& f ) {
             // of the others' fits.
             a.excluded = true;
             a.correctable = true;
+            newlyCorrectable = k;
         }
         if ( a.excluded && !a.correctable ) {
             continue;
@@ -1269,6 +1271,7 @@ void MagLocator::auditZeros( const FrameScratch& f ) {
         // windows start again without that error in the fits.
         float zeroAxis[ 3 ] = { a.zero.x, a.zero.y, a.zero.z };
         float zeroSig[ 3 ] = { a.zeroSigma.x, a.zeroSigma.y, a.zeroSigma.z }, gainSig[ 3 ] = { a.gainSigma.x, a.gainSigma.y, a.gainSigma.z };
+        float prevZ[ 3 ] = { a.previousZero.x, a.previousZero.y, a.previousZero.z };
         float ratio = 0.0f, gainRatio = 0.0f;
         for ( int ax = 0; ax < 3; ax++ ) {
             float noise = magArray.noiseMt[ k ] * ( ax == 2 && magSensorPlaces[ k ].type != MAG_MMC56X3 ? MAG_NOISE_Z_MT / MAG_WEIGHT_REFERENCE_MT : 1.0f );
@@ -1277,13 +1280,16 @@ void MagLocator::auditZeros( const FrameScratch& f ) {
                 threshold = MAGLOC_AUDIT_APPLY_MT;
             if ( threshold < 3.0f * zeroSig[ ax ] )
                 threshold = 3.0f * zeroSig[ ax ];
-            float r = fabsf( zeroAxis[ ax ] ) < MAGLOC_AUDIT_MAX_MT ? fabsf( zeroAxis[ ax ] ) / threshold : 0.0f;
+            bool zAgrees = a.hasPrevious && fabsf( zeroAxis[ ax ] - prevZ[ ax ] ) < MAGLOC_AUDIT_ZERO_AGREE;
+            float r = zAgrees && fabsf( zeroAxis[ ax ] ) < MAGLOC_AUDIT_MAX_MT ? fabsf( zeroAxis[ ax ] ) / threshold : 0.0f;
             if ( r > ratio )
                 ratio = r;
             float gThreshold = MAGLOC_AUDIT_APPLY_GAIN;
             if ( gThreshold < 3.0f * gainSig[ ax ] )
                 gThreshold = 3.0f * gainSig[ ax ];
-            float rg = fabsf( gainAxis[ ax ] - 1.0f ) / gThreshold;
+            float prev[ 3 ] = { a.previousGain.x, a.previousGain.y, a.previousGain.z };
+            bool agrees = a.hasPrevious && fabsf( gainAxis[ ax ] - prev[ ax ] ) < MAGLOC_AUDIT_GAIN_AGREE;
+            float rg = agrees ? fabsf( gainAxis[ ax ] - 1.0f ) / gThreshold : 0.0f;
             if ( rg > gainRatio )
                 gainRatio = rg;
         }
@@ -1298,6 +1304,31 @@ void MagLocator::auditZeros( const FrameScratch& f ) {
             bestGainRatio = gainRatio;
             bestGain = k;
         }
+    }
+    if ( newlyCorrectable >= 0 ) {
+        // The others' windows were taken with this sensor's error in their
+        // fits: emptied, nothing kept. Its own window is its first word;
+        // the next, from fits without it, decides.
+        for ( int k = 0; k < count; k++ ) {
+            ZeroAuditSensor& w = audit.sensor( k );
+            if ( k == newlyCorrectable && w.solved ) {
+                w.previousGain = w.gain;
+                w.previousZero = w.zero;
+                w.hasPrevious = true;
+            } else {
+                w.hasPrevious = false;
+            }
+            audit.reset( k );
+        }
+        Stream* out = console.port( );
+        if ( out != nullptr ) {
+            const ZeroAuditSensor& w = audit.sensor( newlyCorrectable );
+            char line[ 200 ];
+            snprintf( line, sizeof( line ), "zero audit: sensor %d's gain is off (x %.3f y %.3f z %.3f): out of the audit's fits of the others; corrected when its next window agrees", newlyCorrectable,
+                      w.previousGain.x, w.previousGain.y, w.previousGain.z );
+            out->println( line );
+        }
+        return;
     }
     bool gainRound = false;
     if ( bestCorrectable >= 0 ) {
@@ -1325,14 +1356,23 @@ void MagLocator::auditZeros( const FrameScratch& f ) {
                 threshold = MAGLOC_AUDIT_APPLY_MT;
             if ( threshold < 3.0f * zeroSig[ ax ] )
                 threshold = 3.0f * zeroSig[ ax ];
-            if ( fabsf( zeroAxis[ ax ] ) > threshold && fabsf( zeroAxis[ ax ] ) < MAGLOC_AUDIT_MAX_MT ) {
+            float prevZ[ 3 ] = { a.previousZero.x, a.previousZero.y, a.previousZero.z };
+            bool zAgrees = a.hasPrevious && fabsf( zeroAxis[ ax ] - prevZ[ ax ] ) < MAGLOC_AUDIT_ZERO_AGREE;
+            // On a sensor flagged for its gain, a zero is applied only on an
+            // axis whose gain was judged: on one too weak to judge (gain held
+            // at 1) the gain error leaks into the zero (the 36 %-low sensor of
+            // check.txt: x 0.012 and z 0.008 of "zero" that were its gain).
+            bool judged = gainSig[ ax ] < 1e8f;
+            if ( zAgrees && ( !a.correctable || judged ) && fabsf( zeroAxis[ ax ] ) > threshold && fabsf( zeroAxis[ ax ] ) < MAGLOC_AUDIT_MAX_MT ) {
                 zApply[ ax ] = zeroAxis[ ax ];
                 anyZero = true;
             }
             float gThreshold = MAGLOC_AUDIT_APPLY_GAIN;
             if ( gThreshold < 3.0f * gainSig[ ax ] )
                 gThreshold = 3.0f * gainSig[ ax ];
-            if ( gainRound && fabsf( gainAxis[ ax ] - 1.0f ) > gThreshold ) {
+            float prev[ 3 ] = { a.previousGain.x, a.previousGain.y, a.previousGain.z };
+            bool agrees = a.hasPrevious && fabsf( gainAxis[ ax ] - prev[ ax ] ) < MAGLOC_AUDIT_GAIN_AGREE;
+            if ( gainRound && agrees && fabsf( gainAxis[ ax ] - 1.0f ) > gThreshold ) {
                 gApply[ ax ] = gainAxis[ ax ];
                 anyGain = true;
             }
@@ -1367,6 +1407,14 @@ void MagLocator::auditZeros( const FrameScratch& f ) {
             }
         }
         for ( int k = 0; k < count; k++ ) {
+            ZeroAuditSensor& w = audit.sensor( k );
+            if ( k != best && w.solved ) {
+                w.previousGain = w.gain; // this window's word, for the next to agree with
+                w.previousZero = w.zero;
+                w.hasPrevious = true;
+            } else if ( k == best ) {
+                w.hasPrevious = false; // corrected: the next window starts the count again
+            }
             audit.reset( k ); // every window again, against fits without that error
         }
     } else if ( newlyExcluded ) {
@@ -1377,17 +1425,30 @@ void MagLocator::auditZeros( const FrameScratch& f ) {
         // Nothing crossed its threshold: the windows go on filling, and the
         // estimates sharpen with root n (a 0.005 mT zero error at the
         // bench's noise takes a hundred samples to tell from nothing) - up
-        // to a cap, past which a sensor's window starts again.
+        // to a cap, past which a sensor's window starts again. A window
+        // whose gain is over the floor but has no earlier window to agree
+        // with (or disagrees with it) ends now, its word kept for the next:
+        // a gain needs two windows running, not one long one.
         for ( int k = 0; k < count; k++ ) {
-            if ( audit.sensor( k ).n >= MAGLOC_AUDIT_MAX_SAMPLES )
+            ZeroAuditSensor& w = audit.sensor( k );
+            bool gainOver = w.solved && ( fabsf( w.gain.x - 1.0f ) > MAGLOC_AUDIT_APPLY_GAIN || fabsf( w.gain.y - 1.0f ) > MAGLOC_AUDIT_APPLY_GAIN || fabsf( w.gain.z - 1.0f ) > MAGLOC_AUDIT_APPLY_GAIN );
+            float zf = MAGLOC_AUDIT_APPLY_MT;
+            bool zeroOver = w.solved && ( fabsf( w.zero.x ) > zf || fabsf( w.zero.y ) > zf || fabsf( w.zero.z ) > zf );
+            if ( gainOver || zeroOver || w.n >= MAGLOC_AUDIT_MAX_SAMPLES ) {
+                if ( w.solved ) {
+                    w.previousGain = w.gain;
+                    w.previousZero = w.zero;
+                    w.hasPrevious = true;
+                }
                 audit.reset( k );
+            }
         }
     }
 }
 
 void MagLocator::printAudit( Stream* out ) const {
     char line[ 220 ];
-    snprintf( line, sizeof( line ), "zero audit: each sensor against the fit of the others while the probe is near (a sample a second; a zero applied past %.3f mT and a gain past 1 %%, each past three of its own sigma, with %d samples over spread %.1f; the gain per axis)", MAGLOC_AUDIT_APPLY_MT,
+    snprintf( line, sizeof( line ), "zero audit: each sensor against the fit of the others while the probe is near (a sample a second; per axis, a zero applied past %.3f mT and a gain past 20 %%, each past three of its own sigma and only when two windows of %d samples over spread %.1f agree; zeros before gains)", MAGLOC_AUDIT_APPLY_MT,
               MAGLOC_AUDIT_MIN_SAMPLES, MAGLOC_AUDIT_MIN_SPREAD );
     out->println( line );
     int applied = 0;
@@ -1400,7 +1461,7 @@ void MagLocator::printAudit( Stream* out ) const {
         ZeroAuditSensor a = audit.sensor( i );
         if ( a.n >= 2 ) {
             ZeroAudit copy = audit;
-            copy.solve( i, 2, 0.0f );
+            copy.solve( i, 2, 0.0f, MAGLOC_AUDIT_GAIN_MIN_MT );
             a = copy.sensor( i );
         }
         if ( a.n >= 2 && a.spread < MAGLOC_AUDIT_MIN_SPREAD ) {
@@ -1419,6 +1480,24 @@ static void onAuditVerb( int argc, char** argv, Stream* out ) {
     if ( argc >= 2 && strcmp( argv[ 1 ], "reset" ) == 0 ) {
         magLocator.audit.resetAll( );
         out->println( "zero audit: samples cleared" );
+        return;
+    }
+    if ( argc >= 2 && strcmp( argv[ 1 ], "forget" ) == 0 ) {
+        // The gain trims back to 1 (the zeros they scaled follow), the
+        // windows cleared, the settings' sensorgain= lines dropped: the undo
+        // for a trim the bench's own errors put on a sensor.
+        int dropped = 0;
+        for ( int i = 0; i < magArray.sensorCount( ); i++ ) {
+            const Vec3& t = magArray.gainTrim[ i ];
+            if ( t.x != 1.0f || t.y != 1.0f || t.z != 1.0f ) {
+                magArray.applyGainTrim( i, { 1.0f / t.x, 1.0f / t.y, 1.0f / t.z } );
+                dropped++;
+            }
+        }
+        magLocator.audit.resetAll( );
+        char line[ 120 ];
+        snprintf( line, sizeof( line ), "zero audit: %d sensor%s gain trim forgotten (back to the table's), samples cleared", dropped, dropped == 1 ? "'s" : "s'" );
+        out->println( line );
         return;
     }
     magLocator.printAudit( out );

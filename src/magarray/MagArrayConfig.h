@@ -259,6 +259,9 @@ static inline float magSensorTypeZeroMt( MagSensorType type ) {
 // plainly), and followed on every absent frame its field was eaten in a
 // cascade - less field, less presence, more following (2026-09-23, the sim:
 // 0.027 mT into the end sensors in a minute, the next row-15 fix a row off).
+// ...and the zero audit's gain trim on a sensor never goes further from 1
+// than this, either way (MagArray::applyGainTrim): a row that wants magcal.
+#define MAG_GAIN_TRIM_MAX 2.0f
 #define MAG_OFFSET_FOLLOW_S 20.0f
 #define MAG_OFFSET_HOLD_S 120.0f
 #define MAG_OFFSET_HOLDOFF_S 10.0f

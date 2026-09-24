@@ -319,8 +319,23 @@
 #define MAGLOC_AUDIT_MIN_SPREAD 0.3f
 #define MAGLOC_AUDIT_APPLY_MT 0.004f         // ...or 0.6 of the sensor's own noise, whichever is more (a TMAG: 0.008)
 #define MAGLOC_AUDIT_APPLY_NOISE 0.6f
-#define MAGLOC_AUDIT_APPLY_GAIN 0.01f        // a gain is corrected past this (1 %), and past three of the solve's own sigma
-#define MAGLOC_AUDIT_MAX_GAIN_TRIM 2.0f      // ...but a gain further from 1 than this (either way) is a row that wants magcal, not a trim
+// A gain is corrected past this (the datasheet's typical spread: under it a
+// 40-sample solve is noise - in a clean world the solve scatters +-3 % and
+// at 1 % the audit "corrected" sixteen times in ten minutes, a flash write
+// each, 2026-09-23), past three of the solve's own sigma, and only when two
+// windows running agree within MAGLOC_AUDIT_GAIN_AGREE (the solve's sigma is
+// not honest for the bench's systematic errors: with a misplaced sensor in
+// the fits one Z gain swung 0.68, 1.57, 0.76 window after window).
+// ...and a gain only past 20 % (the datasheet's MAXIMUM spread: a real bad
+// sensor, the 09-21 TMAG at 64 %), because a leave-one-out audit cannot tell
+// a sensor's gain from another sensor's place: with one sensor 1 mm off in
+// the bench-like world the solve put a consistent 16 % on a true sensor's Y
+// (2026-09-23). Under 20 % the gain is reported (:audit) for magcal.
+#define MAGLOC_AUDIT_APPLY_GAIN 0.20f
+#define MAGLOC_AUDIT_GAIN_AGREE 0.03f
+#define MAGLOC_AUDIT_GAIN_MIN_MT 0.02f      // a gain is judged only on an axis whose predicted signal is at least this (rms, twice a TMAG's noise): at the noise floor a Z "gain" of 0.65 was read off nothing
+#define MAGLOC_AUDIT_ZERO_AGREE 0.005f       // ...and a zero likewise: two windows running within this (in a clean world one window said +0.012 mT, the next -0.014: a walk, each a flash write)
+#define MAGLOC_AUDIT_MAX_GAIN_TRIM 2.0f      // a gain further from 1 than this (either way) is a row that wants magcal, not a trim; the trim itself never goes past it in all
 #define MAGLOC_AUDIT_MAX_GAIN_ERROR 0.15f    // a sensor whose gain solves further from 1 than this...
 #define MAGLOC_AUDIT_MAX_UNEXPLAINED 0.15f   // ...or whose residual after the solve is more than this of its field, is left out of the audit's fits
 #define MAGLOC_AUDIT_MAX_MT 0.3f
