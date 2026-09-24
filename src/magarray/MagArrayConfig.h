@@ -244,6 +244,31 @@ static inline float magSensorTypeNoiseMt( MagSensorType type ) {
 static inline float magSensorTypeZeroMt( MagSensorType type ) {
     return type == MAG_MMC56X3 ? MAG_ZERO_UNCERTAINTY_MMC_MT : MAG_ZERO_UNCERTAINTY_TMAG_MT;
 }
+// Each sensor's zero is a state with a doubt (MagOffsetFilter.h; the locator
+// sets the live baseline from it every frame, MagLocator::keepZeros). It
+// FOLLOWS the reading, with this time constant, whenever the reading is not
+// the magnet's: nothing present (and none lately), or this sensor quiet
+// (MAGLOC_QUIET_FRACTION) - the drift (20 s, as the slow drift rule was). A reading no dipole
+// explains is HELD for MAG_OFFSET_HOLD_S first, then followed at the same
+// rate: a probe in a hand does not hold still for two minutes, a zero
+// error or a screwdriver does - and time is the only evidence the array has
+// against a steady phantom until the fit's acceptance over every sensor's
+// own doubt (Phase 3 step 4) can disown it. Under an accepted fix that at
+// least two sensors make,
+// the zero holds: a hover is a magnet, not drift (a one-sensor far fix
+// explains nothing - three numbers, five unknowns - so it runs the clock,
+// and the far glow of a steady probe at the edge of reach goes after the
+// hold, as it did). ASSUMPTION (2026-09-23): the simulator's scenes; the
+// bench protocol (docs/knobs.md section 8) re-tunes both.
+// ...and for MAG_OFFSET_HOLDOFF_S after a magnet was last present, a reading
+// that is not quiet is not followed even with nothing present: a probe
+// at the edge of reach flickers in and out of presence (one sensor reads it
+// plainly), and followed on every absent frame its field was eaten in a
+// cascade - less field, less presence, more following (2026-09-23, the sim:
+// 0.027 mT into the end sensors in a minute, the next row-15 fix a row off).
+#define MAG_OFFSET_FOLLOW_S 20.0f
+#define MAG_OFFSET_HOLD_S 120.0f
+#define MAG_OFFSET_HOLDOFF_S 10.0f
 // What a reading of this size at this type is expected to be off by, in all:
 // its noise, its zero's uncertainty, and the model's share of the field.
 static inline float magSensorErrorMt( MagSensorType type, float fieldMt ) {

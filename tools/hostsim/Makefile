@@ -62,6 +62,7 @@ check: sim
 	./sim scenes/strength.txt -q
 	./sim scenes/bench.txt -q
 	./sim scenes/edge.txt -q
+	./sim scenes/hover.txt -q
 
 screens: sim
 	rm -rf out

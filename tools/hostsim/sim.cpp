@@ -130,7 +130,7 @@ class WorldService : public Service {
             // Each sensor's noise scaled by its type's (an MMC56x3 is 30-50x quieter than a TMAG5273).
             float k = magArray.noiseMt[ i ] / MAG_WEIGHT_REFERENCE_MT;
             // As the array does it: the reading into raw[], the field less the
-            // baseline - so the zero's drift rules (MagArray::driftBaseline)
+            // baseline - so the zero's drift rules (MagLocator::keepZeros)
             // act here as on the board.
             magArray.raw[ i ] = { gain[ i ] * b.x + bias[ i ].x + gauss( noise.x * k ), gain[ i ] * b.y + bias[ i ].y + gauss( noise.y * k ), gain[ i ] * b.z + bias[ i ].z + gauss( noise.z * k ) };
             Vec3 zero = magArray.baselineOf( i );

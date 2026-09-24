@@ -974,17 +974,11 @@ void MagArray::shiftBaseline( int i, Vec3 by ) {
     zeroed[ i ] = baseline[ i ];
 }
 
-void MagArray::driftBaseline( float fraction, const bool* only ) {
-    if ( baselineLeft > 0 ) {
+void MagArray::setBaseline( int i, Vec3 zero ) {
+    if ( i < 0 || i >= MAG_SENSOR_COUNT || baselineLeft > 0 ) {
         return;
     }
-    for ( int i = 0; i < MAG_SENSOR_COUNT; i++ ) {
-        if ( !fresh[ i ] || ( only != nullptr && !only[ i ] ) )
-            continue;
-        baseline[ i ].x += fraction * ( raw[ i ].x - baseline[ i ].x );
-        baseline[ i ].y += fraction * ( raw[ i ].y - baseline[ i ].y );
-        baseline[ i ].z += fraction * ( raw[ i ].z - baseline[ i ].z );
-    }
+    baseline[ i ] = zero;
 }
 
 // A reading (the sensor's own frame, mT) into the running sums (the frame

@@ -52,7 +52,10 @@ l
 @run 3000
 l
 @expect "magnet at"
-@run 40000
+@run 100000
+l
+@expect "magnet at"
+@run 60000
 l
 @expect "no magnet"
 :load

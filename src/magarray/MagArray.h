@@ -219,9 +219,10 @@ class MagArray : public Service {
 
     void startBaseline( );                        // every sensor zeroes afresh
     void startBaselineFor( const bool* which ); // ...or only these; the others keep theirs
-    // Move the baseline a fraction of the way to the latest raw readings (the
-    // locator calls this while it sees nothing, to track slow drift).
-    void driftBaseline( float fraction, const bool* only = nullptr ); // only (may be null): just these sensors
+    // The live baseline set outright (the locator's offset filter, every
+    // frame: MagLocator::keepZeros). The saved zero (zeroed[]) is not touched:
+    // that is z's and the audit's. Refused while a zeroing is under way.
+    void setBaseline( int i, Vec3 zero );
     void printStatus( Stream* out ) const;
     // An MMC56x3 looked at from this core: its Status1 and raw data bytes
     // three times, 50 ms apart (do they change? is a measurement done?),

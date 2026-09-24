@@ -257,9 +257,6 @@ void MagLocator::simProbeOff( ) {
 // One frame from the simulated probe: `fix` as a fit would leave it, and
 // the tracker's input.
 ServiceStatus MagLocator::simFrame( MagTrackInput* in ) {
-    uint32_t nowMs = millis( );
-    lastPresentMs = nowMs == 0 ? 1 : nowMs; // no drift tracking while it is "here"
-    roughOnlySinceMs = 0;
     fix.present = true;
     fix.rough = sim.rough;
     fix.valid = !sim.rough;
@@ -615,7 +612,6 @@ ServiceStatus MagLocator::fitFrame( MagTrackInput* in ) {
     assessFrame( f );
     in->alpha = f.alpha;
     smoothAlpha = f.alpha;
-    keepZeros( f );
     // The weights for this frame's fit: each sensor's by what it reads
     // (MagArray::frameWeights - the MMC56x3 counts for ~37 TMAGs where it
     // reads noise, for one close in).
@@ -641,6 +637,7 @@ ServiceStatus MagLocator::fitFrame( MagTrackInput* in ) {
     // the seen level is its stale zero after a boot, and this clause would
     // run the lattice on it every 400 ms until the absorb took it.)
     f.enough = fix.seenBy + fix.faintBy >= MAGLOC_MIN_SENSORS || ( f.held > 0.0f && magArray.useMmc && fix.seenBy >= 1 );
+    ServiceStatus status;
     if ( !fix.present || !f.enough ) {
         if ( result.valid ) {
             if ( !fix.present )
@@ -648,9 +645,12 @@ ServiceStatus MagLocator::fitFrame( MagTrackInput* in ) {
             else
                 coldWhyFew++;
         }
-        return tryCoarse( in, f );
+        status = tryCoarse( in, f );
+    } else {
+        status = runFit( in, f );
     }
-    return runFit( in, f );
+    keepZeros( f );
+    return status;
 }
 
 // Stage 1: the glitch filter and which sensors may vote; the smoothing
@@ -766,9 +766,7 @@ void MagLocator::assessFrame( FrameScratch& f ) {
     bool peakHeld = false;
     f.plain = 0;
     for ( int i = 0; i < magArray.sensorCount( ); i++ ) {
-        f.quiet[ i ] = false;
-        f.plainHere[ i ] = false;
-        f.steady[ i ] = false;
+        f.quiet[ i ] = true;
         if ( magArray.ignored( i ) ) {
             continue; // the MMC56x3 switched out (sensors / use MMC): not here at all
         }
@@ -780,42 +778,13 @@ void MagLocator::assessFrame( FrameScratch& f ) {
             continue;
         }
         Vec3& b = smooth[ i ];
-        float sq;
         if ( !held ) {
             float k = f.resync[ i ] ? 1.0f : f.alpha;
             b.x += k * ( f.filtered[ i ].x - b.x );
             b.y += k * ( f.filtered[ i ].y - b.y );
             b.z += k * ( f.filtered[ i ].z - b.z );
-            sq = b.x * b.x + b.y * b.y + b.z * b.z;
-            // Steady? The reading AS MEASURED (before the baseline), smoothed
-            // the same way, against a slow average of itself (MAGLOC_STEADY_*):
-            // what a static probe or a zero error holds still while the
-            // absorb (keepZeros) moves the baseline under it. Judged on the
-            // baseline-removed reading, the absorb made the sensor "unsteady"
-            // itself and stopped, the slow average caught up, it went on: a
-            // probe lying beside the board was absorbed in bursts, and
-            // presence and the far track flapped once a second for twelve
-            // minutes (the bench, 2026-09-22 22:44-22:56: found again 249
-            // times). The threshold is still a fraction of the baseline-
-            // removed reading: that is the size of what is there.
-            const Vec3& r = magArray.raw[ i ];
-            Vec3& rs = rawSmooth[ i ];
-            if ( f.resync[ i ] )
-                rs = r;
-            rs.x += k * ( r.x - rs.x );
-            rs.y += k * ( r.y - rs.y );
-            rs.z += k * ( r.z - rs.z );
-            Vec3& ref = slowRef[ i ];
-            if ( f.resync[ i ] )
-                ref = rs;
-            float dx = rs.x - ref.x, dy = rs.y - ref.y, dz = rs.z - ref.z;
-            f.steady[ i ] = dx * dx + dy * dy + dz * dz < MAGLOC_STEADY_FRACTION * MAGLOC_STEADY_FRACTION * sq + 0.002f * 0.002f;
-            ref.x += MAGLOC_STEADY_ALPHA * dx;
-            ref.y += MAGLOC_STEADY_ALPHA * dy;
-            ref.z += MAGLOC_STEADY_ALPHA * dz;
-        } else {
-            sq = b.x * b.x + b.y * b.y + b.z * b.z;
         }
+        float sq = b.x * b.x + b.y * b.y + b.z * b.z;
         if ( sq > peakSq ) {
             peakSq = sq;
         }
@@ -835,7 +804,6 @@ void MagLocator::assessFrame( FrameScratch& f ) {
         // boot the restored zeros are 0.02-0.04 mT stale, 2026-09-22).
         float plainLevel = magSensorPlaces[ i ].type == MAG_MMC56X3 ? MAGLOC_SEEN_ABSORB_LEVEL : MAGLOC_SEEN_MT; // plainly is the HIGH bar, not scaled: the strength is learned and the absorb judged only on strong readings (scaled, the learning fired at the array's end where the calibration errors bias it most, 2026-09-23)
         if ( levelSq > plainLevel * plainLevel ) {
-            f.plainHere[ i ] = true;
             f.plain++;
             if ( magSensorPlaces[ i ].type != MAG_MMC56X3 )
                 tmagPlain++;
@@ -851,30 +819,8 @@ void MagLocator::assessFrame( FrameScratch& f ) {
                 tmagSeen++;
         } else if ( levelSq > MAGLOC_FAINT_MT * MAGLOC_FAINT_MT ) {
             fix.faintBy++;
-        } else if ( levelSq < MAGLOC_QUIET_FRACTION * MAGLOC_QUIET_FRACTION * MAGLOC_FAINT_MT * MAGLOC_FAINT_MT ) {
-            f.quiet[ i ] = true;
         }
-        // This sensor's own clock for the absorb rule below: it runs while
-        // the sensor itself reads anything (above its quiet level) that no
-        // fix explains, stops when it reads nothing - and a frame it was
-        // not read in leaves it alone. (The bench, 2026-09-21: the MMC
-        // dropped off its bus every minute or so; each time, presence fell,
-        // the shared clock restarted, and a zero error at the MMC that the
-        // simulator absorbs in three minutes was never absorbed at all.
-        // Then its last 0.008 mT sat at its presence level for good, which
-        // kept presence on and the TMAGs' own 0.02 mT zero errors, below
-        // presence, from ever following their drift: hence any reading, not
-        // only one above presence.)
-        if ( held ) {
-            continue; // its clock, like its history, is left alone by a frame it was not read in
-        }
-        uint32_t nowHere = millis( );
-        if ( !f.quiet[ i ] ) {
-            if ( presentSinceMs[ i ] == 0 )
-                presentSinceMs[ i ] = nowHere == 0 ? 1 : nowHere;
-        } else {
-            presentSinceMs[ i ] = 0;
-        }
+        f.quiet[ i ] = levelSq < MAGLOC_QUIET_FRACTION * MAGLOC_QUIET_FRACTION * MAGLOC_FAINT_MT * MAGLOC_FAINT_MT;
     }
     fix.peakMt = sqrtf( peakSq );
     fix.peakLevel = sqrtf( peakLevelSq );
@@ -900,79 +846,85 @@ void MagLocator::assessFrame( FrameScratch& f ) {
         presenceToggles++;
     }
     fix.present = evidence;
+    if ( fix.present ) {
+        uint32_t now = millis( );
+        lastPresentMs = now == 0 ? 1 : now;
+    }
     if ( fix.present && peakHeld ) {
         presenceHeldFrames++;
     }
-    f.nowMs = millis( );
-    if ( fix.present ) {
-        lastPresentMs = f.nowMs == 0 ? 1 : f.nowMs;
-    }
-
 }
 
-// Stage 3: the zeros - the drift with nothing present, the absorb rules
-// with something present that nothing fits, and what the settings keep.
+// Stage 3: the zeros. Each sensor's zero is a state with a doubt
+// (MagOffsetFilter): the doubt grows every frame; the filter FOLLOWS the
+// reading as measured (MAG_OFFSET_FOLLOW_S) whenever the reading is not the
+// magnet's - nothing present (and none lately), or this sensor quiet; it HOLDS
+// under a fix that two or more sensors make; and a reading no fix explains
+// is held for MAG_OFFSET_HOLD_S on this sensor's own clock, then followed
+// (a zero error, a screwdriver, the MMC's tail of a zero error that IS a
+// probe 90 mm up to three numbers with the strength held - or a steady
+// probe at the edge of reach, which goes after the hold as it did). Four
+// clocks, two rates, a steadiness
+// test and the plain/faint distinction did this until 2026-09-23; what
+// they could not express (the doubt, and a restored zero's) the filter
+// does. The live baseline is set from it every frame; the saved zero
+// (zeroed[]) is still only z's and the audit's. A baseline moved by anyone
+// else (z, Y, the audit, a restore) restarts the filter from it. Runs after
+// the fit: it needs this frame's verdict.
 void MagLocator::keepZeros( const FrameScratch& f ) {
-    if ( !fix.present ) {
-        // Nothing here: let the zero follow the drift - unless a magnet was
-        // here moments ago, which may only be wavering at the edge of reach.
-        // (Below presence, not only below faint: a sensor reading between
-        // the two with nothing present is its zero gone off - the MMC's
-        // 0.0001 mT a minute sat between its faint and present levels for
-        // good, 2026-09-21 - and a probe that hovers there for the 20 s
-        // it takes to be absorbed costs the near fit less than that
-        // sensor's noise.)
-        // An absorb under way finishes here (fast, while the reading is
-        // steady, until the sensor reads quiet): what is left of it is
-        // below presence now, and left to the slow drift it sat at the seen
-        // level for tens of seconds with presence and the far track
-        // flickering at it (the sim, 2026-09-22 evening: the track found
-        // again once during each absorb).
-        bool fast[ MAG_SENSOR_COUNT ];
-        bool any = false;
-        for ( int i = 0; i < magArray.sensorCount( ); i++ ) {
-            if ( f.quiet[ i ] )
-                absorbing[ i ] = false; // done
-            fast[ i ] = absorbing[ i ] && f.steady[ i ];
-            any = any || fast[ i ];
+    float dtS = MAG_FRAME_PERIOD_US * 1e-6f;
+    uint32_t now = millis( );
+    for ( int i = 0; i < magArray.sensorCount( ) && i < MAGFIT_MAX_SENSORS; i++ ) {
+        MagSensorType type = magSensorPlaces[ i ].type;
+        float n = magArray.noiseMt[ i ];
+        Vec3 noise = { n, n, n }; // the type's noise on every axis: the follow rate is a design time, the same on Z (its quieter noise would halve it)
+        Vec3 b = magArray.baselineOf( i );
+        if ( !offsetsBegun || b.x != offsetWritten[ i ].x || b.y != offsetWritten[ i ].y || b.z != offsetWritten[ i ].z ) {
+            // The walk that follows a reading of nothing with the follow time
+            // constant (the steady gain is sqrt(q/R) a frame: q = (noise dt / tau)^2),
+            // and the doubt it settles to (sqrt(q R)) as the doubt to start from:
+            // larger, the filter would follow at once for its first seconds.
+            float walk = n * sqrtf( dtS ) / MAG_OFFSET_FOLLOW_S;
+            float sigma = sqrtf( n * walk * sqrtf( dtS ) );
+            magOffsetInit( &offsets[ i ], b, sigma, walk );
+            offsetWritten[ i ] = b;
+            unexplainedSinceMs[ i ] = 0;
         }
-        if ( any ) {
-            magArray.driftBaseline( MAGLOC_ABSORB_FAST, fast );
+        if ( !magArray.fresh[ i ] ) {
+            continue; // not read this frame: nothing to say (its clock, like its history, is left alone)
         }
-        if ( lastPresentMs == 0 || f.nowMs - lastPresentMs > MAGLOC_DRIFT_HOLDOFF_MS ) {
-            magArray.driftBaseline( MAGLOC_BASELINE_DRIFT );
-            // (What the zero drifts to stays in the live baseline only: the
-            // settings keep what `z` and the zero audit take - the evening's
-            // settle-to-flash made a real hover's absorption permanent.)
-        }
-        roughOnlySinceMs = 0;
-    } else {
-        // Present. Something that never fits for MAGLOC_ROUGH_ONLY_ABSORB_MS
-        // is drift or a stuck reading, and the zero follows it too. (A far
-        // probe FITS - roughly, its bar wide, but as a dipole, at a low
-        // misfit - and is not absorbed: see the rough fix below.)
-        uint32_t now = millis( );
-        if ( roughOnlySinceMs == 0 )
-            roughOnlySinceMs = now == 0 ? 1 : now;
-        if ( now - roughOnlySinceMs > MAGLOC_ROUGH_ONLY_ABSORB_MS ) {
-            magArray.driftBaseline( MAGLOC_BASELINE_DRIFT );
+        bool follow;
+        bool presentLately = lastPresentMs != 0 && now - lastPresentMs < (uint32_t)( MAG_OFFSET_HOLDOFF_S * 1000.0f );
+        if ( f.quiet[ i ] || ( !fix.present && !presentLately ) ) {
+            follow = true; // not the magnet's reading: the drift
+            unexplainedSinceMs[ i ] = 0;
+        } else if ( magArray.ignored( i ) || ( fix.present && f.explained ) ) {
+            follow = false; // a magnet, not drift (a switched-out sensor: read and shown, its zero follows the drift with nothing there and holds otherwise, as before)
+            unexplainedSinceMs[ i ] = 0;
         } else {
-            // ...and a sensor that has ITSELF read above presence for that
-            // long with nothing fitting follows its drift (its own clock,
-            // presentSinceMs: a dropout of the sensor does not restart it).
-            bool fast[ MAG_SENSOR_COUNT ];
-            for ( int i = 0; i < magArray.sensorCount( ); i++ ) {
-                uint32_t limit = f.plainHere[ i ] ? MAGLOC_SEEN_ABSORB_MS : MAGLOC_ROUGH_ONLY_ABSORB_MS;
-                if ( presentSinceMs[ i ] != 0 && now - presentSinceMs[ i ] > limit )
-                    absorbing[ i ] = true;
-                if ( f.quiet[ i ] )
-                    absorbing[ i ] = false; // done
-                fast[ i ] = absorbing[ i ] && f.steady[ i ]; // a probe in a hand moves; a zero error does not
-            }
-            magArray.driftBaseline( MAGLOC_BASELINE_DRIFT, f.quiet );
-            magArray.driftBaseline( MAGLOC_ABSORB_FAST, fast );
+            // Not quiet, with no fix explaining it (or in the hold-off after
+            // presence, wavering at the edge): held on its own clock, then
+            // followed. (A frame the TMAGs disown is not evidence about the
+            // zeros: at 90 mm their say is noise, and following on those
+            // frames absorbed a real far hover's share, 2026-09-23.)
+            if ( unexplainedSinceMs[ i ] == 0 )
+                unexplainedSinceMs[ i ] = now == 0 ? 1 : now;
+            follow = now - unexplainedSinceMs[ i ] > (uint32_t)( MAG_OFFSET_HOLD_S * 1000.0f );
+        }
+        if ( follow ) {
+            // The doubt grows only while the zero follows: grown while it is
+            // held, it made the first frames of a follow catch up faster, and
+            // a sensor just above quiet whose noise dips under it now and then
+            // ate its share of a far probe in a cascade - each nibble a
+            // smaller reading, a smaller reading quiet more often (the sim,
+            // 2026-09-23: 0.7 % of frames quiet at 20 s, 97 % at 90 s).
+            magOffsetPredict( &offsets[ i ], dtS );
+            magOffsetUpdate( &offsets[ i ], magArray.raw[ i ], noise );
+            magArray.setBaseline( i, offsets[ i ].offset );
+            offsetWritten[ i ] = magArray.baselineOf( i ); // what was actually written (refused during a zeroing)
         }
     }
+    offsetsBegun = true;
 }
 
 // Stage 4a: present but too few sensors notice it for a fit.
@@ -1109,7 +1061,6 @@ ServiceStatus MagLocator::runFit( MagTrackInput* in, FrameScratch& f ) {
     // relative misfit: far out a TMAG's reading is its zero. A fix that
     // only the far rule takes is far-sized, and gets the far tolerances.
     bool farOk = false, disowned = false;
-    f.confirmed = nearOk;
     if ( !nearOk && solved ) {
         float chi = chiOf( result, f.use );
         farOk = chi < MAGLOC_FAR_MAX_CHI && fix.errorMm < MAGLOC_FAR_ERROR_MM;
@@ -1122,8 +1073,7 @@ ServiceStatus MagLocator::runFit( MagTrackInput* in, FrameScratch& f ) {
             if ( gain < MAGLOC_CONFIRM_MIN_GAIN ) {
                 farOk = false; // the pattern a probe there would make is not in their readings
                 disowned = true;
-            } else if ( farOk )
-                f.confirmed = true;
+            }
         }
     }
     f.good = nearOk || farOk;
@@ -1141,6 +1091,7 @@ ServiceStatus MagLocator::runFit( MagTrackInput* in, FrameScratch& f ) {
         farRetryUntilMs = nextColdStartMs;
     }
     fix.valid = f.good;
+    f.explained = f.good && fix.seenBy >= 2; // a fix one sensor makes explains nothing (three numbers, five unknowns): keepZeros runs its clock
     fix.rough = false;
     fix.rawMagnet = position;
     if ( f.good ) {
@@ -1177,8 +1128,7 @@ ServiceStatus MagLocator::runFit( MagTrackInput* in, FrameScratch& f ) {
         // Resting on one sensor, what did not make the far acceptance above
         // is not offered at all: a zero error is not a glow on the LEDs.
         if ( !f.farOnly && offerRough( in, &thisFrame ) && fix.misfit < MAGLOC_MAX_MISFIT ) {
-            roughOnlySinceMs = 0;
-            clearPresentClocks( );
+            f.explained = fix.seenBy >= 2; // a dipole explains it, roughly: a magnet, not drift (keepZeros holds)
         }
         // Streamed too (valid = 0), so that a spot where nothing fits can be studied.
         Stream* out = console.port( );
@@ -1275,24 +1225,6 @@ ServiceStatus MagLocator::publishFix( MagTrackInput* in, const FrameScratch& f )
     auditZeros( f );
 
     fix.rough = fix.errorMm > MAGLOC_ROUGH_ABOVE_MM;
-    // A fix that pins the magnet down (its bar under MAGLOC_MAX_ERROR_MM -
-    // rough or not: the far probe's fix at 90 mm is rough with a 12 mm bar,
-    // and without this the MMC's clock ran on under a 60 mm hover and
-    // absorbed it in 20 s) is a magnet the readings agree on: not drift.
-    // One that could be anywhere within 25 mm may also be the tail of a
-    // zero error at the MMC (0.01 mT there IS a probe 90 mm up, to three
-    // numbers with the strength held), so the clocks keep running under it
-    // and it is absorbed - as a probe beyond about 100 mm is, after two
-    // minutes.
-    if ( fix.errorMm < MAGLOC_MAX_ERROR_MM && f.confirmed ) {
-        roughOnlySinceMs = 0;
-        clearPresentClocks( );
-        if ( fix.seenBy >= 2 ) {
-            // The TMAGs take part: a magnet, not the MMC's tail (above).
-            for ( int i = 0; i < MAGFIT_MAX_SENSORS; i++ )
-                absorbing[ i ] = false;
-        }
-    }
     in->valid = !fix.rough;
     in->rough = fix.rough;
     in->position = fix.rawMagnet;
@@ -1544,11 +1476,6 @@ float MagLocator::chiOf( const MagFitResult& r, const bool* use ) const {
         n += 3;
     }
     return n > 0 ? sqrtf( sum / n ) : 1e9f;
-}
-
-void MagLocator::clearPresentClocks( ) {
-    for ( int i = 0; i < MAGFIT_MAX_SENSORS; i++ )
-        presentSinceMs[ i ] = 0;
 }
 
 bool MagLocator::offerRough( MagTrackInput* in, const MagFitResult* r ) const {
