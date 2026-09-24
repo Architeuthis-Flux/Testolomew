@@ -23,9 +23,12 @@
 // over that sensor's reading and the prediction. When a sensor has enough
 // samples over enough spread, the solve gives its zero z and gain g; a zero
 // past the apply threshold is taken out of the baseline (MagArray::
-// shiftBaseline, which the settings then keep) and logged. The gain is
-// reported, not applied: a gain that is not 1 is a table row to look at
-// (magcal), or a sensor reading something the dipole is not.
+// shiftBaseline, which the settings then keep) and logged; a gain past its
+// threshold, per axis, is applied as a trim on the reading (MagArray::
+// applyGainTrim, kept as sensorgain=) - since 2026-09-23; before that a
+// gain was reported only. A gain beyond 2x, or a residual the line cannot
+// explain, is a table row to look at (magcal), or a sensor reading
+// something the dipole is not: left out.
 //
 // The model, per sensor, per sample k, per axis a:
 //   reading_ka = z_a + g * pred_ka
