@@ -300,8 +300,8 @@
 // So a fit resting on fewer than MAGLOC_MIN_SENSORS is a fix, or a rough
 // one, only under these (tighter than MAGLOC_MAX_MISFIT and
 // MAGLOC_MAX_ERROR_MM, which are for a fit the TMAGs take part in); one
-// that does not make them is nothing fitting, and the absorb rule takes
-// what the MMC reads into its zero in MAGLOC_ROUGH_ONLY_ABSORB_MS.
+// that does not make them is nothing fitting, and the MMC's zero follows
+// what it reads after MAG_OFFSET_HOLD_S (MagLocator::keepZeros).
 #define MAGLOC_FAR_MISFIT 0.15f  // (kept for the report; the far acceptance is MAGLOC_FAR_MAX_CHI since 2026-09-22)
 #define MAGLOC_FAR_ERROR_MM 30.0f // (25 until 2026-09-22: with the bench's zero errors the bar at 80 mm is 24, and half the frames fell out)
 // The far acceptance, since 2026-09-22 morning: not a relative misfit but
@@ -318,12 +318,12 @@
 // (sum read.pred / sum pred.pred) is near 1 for a probe and near 0 for a
 // phantom; it is asked for when the predicted pattern's rms is above
 // MAGLOC_CONFIRM_MIN_MT (a TMAG's noise), and must be over
-// MAGLOC_CONFIRM_MIN_GAIN. Only a confirmed fix (or a near one) clears
-// the absorb clocks: an unconfirmable far fix (beyond ~65 mm) is real or
-// not, and only the clocks can say - a still one is absorbed in time, a
-// moving probe is not (MAGLOC_STEADY_FRACTION). (2026-09-22: judged by
-// residuals alone, the post-boot 0.12 mT zero error at the MMC fitted as a
-// probe 43 mm up, its bar cleared the clocks, and it was never absorbed:
+// MAGLOC_CONFIRM_MIN_GAIN. A fix that two or more sensors make holds
+// the zeros (keepZeros); an unconfirmable far fix (beyond ~65 mm, the MMC
+// alone) is real or not, and only time can say - the MMC's zero follows
+// it after MAG_OFFSET_HOLD_S. (2026-09-22: judged by residuals alone, the
+// post-boot 0.12 mT zero error at the MMC fitted as a probe 43 mm up, its
+// bar cleared the absorb clocks of the day, and it was never absorbed:
 // 542 cold starts in three minutes with nothing there.)
 #define MAGLOC_CONFIRM_MIN_MT 0.012f
 #define MAGLOC_CONFIRM_MIN_GAIN 0.5f
