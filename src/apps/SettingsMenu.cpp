@@ -192,6 +192,7 @@ void settingsMenuBuild( Menu* m ) {
     menuAddNumber( m, tracker, "floor", &magLocator.track.sigmaFloorMm, 0.1f, 3.0f, 0.1f, "mm" );
     menuAddNumber( m, tracker, "gate", &magLocator.track.gate, 2.0f, 10.0f, 0.5f, "sd" );
     menuAddNumber( m, tracker, "presence", &magLocator.presentMt, 0.02f, 0.20f, 0.01f, "mT" );
+    menuAddNumber( m, tracker, "fit chi", &magLocator.fitMaxChi, 1.0f, 6.0f, 0.5f, "" );
     menuAddNumber( m, tracker, "far hold", &magLocator.track.roughHoldS, 0.5f, 10.0f, 0.5f, "s" );
     int fitLoad = menuAddToggle( m, tracker, "fit load", &magLocator.steadyFit ); // steady: the same work every frame (the supply shows bursts)
     menuSetToggleText( m, fitLoad, "steady", "burst" );

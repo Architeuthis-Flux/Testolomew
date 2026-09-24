@@ -645,10 +645,13 @@ ServiceStatus MagLocator::fitFrame( MagTrackInput* in ) {
                 coldWhyFew++;
         }
         // Nothing to fit: the track (if any) coasts, and the fit starts from
-        // it when there is something again.
+        // it when there is something again - afresh: what ran before is not
+        // held against it.
         fix.valid = false;
         result.valid = false;
         haveSmoothed = false;
+        missRun = 0;
+        coldRejectedRun = 0;
         status = ServiceStatus::IDLE;
     } else {
         status = runFit( in, f );
@@ -1041,7 +1044,7 @@ ServiceStatus MagLocator::runFit( MagTrackInput* in, FrameScratch& f ) {
         hi.y = p.y > hi.y ? p.y : hi.y;
     }
     f.outside = position.x < lo.x - MAGLOC_OUTSIDE_MM || position.x > hi.x + MAGLOC_OUTSIDE_MM || position.y < lo.y - MAGLOC_OUTSIDE_MM || position.y > hi.y + MAGLOC_OUTSIDE_MM;
-    f.good = f.good && fix.chi < MAGLOC_FIT_MAX_CHI && fix.errorMm < MAGLOC_MAX_ERROR_MM && ( !f.outside || fix.seenBy >= MAGLOC_OUTSIDE_MIN_SEEN );
+    f.good = f.good && fix.chi < fitMaxChi && fix.errorMm < MAGLOC_MAX_ERROR_MM && ( !f.outside || fix.seenBy >= MAGLOC_OUTSIDE_MIN_SEEN );
     if ( !f.good && !wasTracking ) {
         coldWhyRejected++;
         if ( ++coldRejectedRun >= 2 ) {
@@ -1637,12 +1640,12 @@ void MagLocator::printFix( Stream* out ) const {
             // The far fit was tried on that one sensor (the strength held) and did not make it.
             out->println( line );
             snprintf( line, sizeof( line ), "  the fit on it: chi %.1f (limit %.1f: residuals over each sensor's expected error), error bar %.0f mm (limit %.0f)",
-                      fix.chi, MAGLOC_FIT_MAX_CHI, fix.errorMm, MAGLOC_MAX_ERROR_MM );
+                      fix.chi, fitMaxChi, fix.errorMm, MAGLOC_MAX_ERROR_MM );
         }
     } else if ( !fix.valid ) {
         snprintf( line, sizeof( line ), "magnet seen by %d sensors, faintly by %d (strongest %.2f mT) but no usable fix: chi %.1f (limit %.1f), misfit %.0f %% (limit %.0f), error bar %.1f mm (limit %.0f)%s",
-                  fix.seenBy, fix.faintBy, fix.peakMt, fix.chi, MAGLOC_FIT_MAX_CHI, fix.misfit * 100.0f, MAGLOC_MAX_MISFIT * 100.0f, fix.errorMm, MAGLOC_MAX_ERROR_MM,
-                  fix.chi < MAGLOC_FIT_MAX_CHI && fix.errorMm < MAGLOC_MAX_ERROR_MM ? " - beyond the array, seen plainly by too few (the mirror basin)" : "" );
+                  fix.seenBy, fix.faintBy, fix.peakMt, fix.chi, fitMaxChi, fix.misfit * 100.0f, MAGLOC_MAX_MISFIT * 100.0f, fix.errorMm, MAGLOC_MAX_ERROR_MM,
+                  fix.chi < fitMaxChi && fix.errorMm < MAGLOC_MAX_ERROR_MM ? " - beyond the array, seen plainly by too few (the mirror basin)" : "" );
     } else {
         snprintf( line, sizeof( line ), "magnet at x %.1f +/-%.1f  y %.1f +/-%.1f  z %.1f +/-%.1f mm   tilt %.0f deg   strength %.0f%s   misfit %.0f %% chi %.1f   seen by %d+%d faint   fit %lu us",
                   fix.magnet.x, fix.sigma.x, fix.magnet.y, fix.sigma.y, fix.magnet.z, fix.sigma.z, fix.tiltDeg, fix.strength,

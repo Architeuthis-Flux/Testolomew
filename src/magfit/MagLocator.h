@@ -478,6 +478,7 @@ class MagLocator : public Service {
     uint32_t surfaceLearned = 0; // times the surface came down to the floor
     void learnFloor( uint32_t nowMs );
     float presentMt = MAGLOC_PRESENT_MT; // the strongest smoothed reading that counts as a magnet (menu: presence)
+    float fitMaxChi = MAGLOC_FIT_MAX_CHI; // the fit's acceptance: residuals over each sensor's own expected error (menu: fit chi - loosened at the bench when its errors are not the simulator's)
     float levelScale( ) const;           // the seen level's scale for the held strength (MAGLOC_THRESHOLDS_TUNED_AT)
     float seenLevelMt( ) const;          // ...and the level itself
     // The last good fix (a sharp one, misfit under MAGLOC_LEARN_MAX_MISFIT):

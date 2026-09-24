@@ -426,7 +426,7 @@ static void onLoadVerb( int argc, char** argv, Stream* out ) {
               (unsigned long)magLocator.coldStarts, (unsigned long)magLocator.coldStartUs, (unsigned long)magLocator.coldSliceMaxUs );
     out->println( line );
     snprintf( line, sizeof( line ), "  the track ended before them: %lu times nothing present, %lu too few noticing, %lu the track coasted out; %lu cold starts rejected (chi over %.1f, a bar over %.0f mm, or beyond the array)",
-              (unsigned long)magLocator.coldWhyAbsent, (unsigned long)magLocator.coldWhyFew, (unsigned long)magLocator.coldWhyCoasted, (unsigned long)magLocator.coldWhyRejected, MAGLOC_FIT_MAX_CHI, MAGLOC_MAX_ERROR_MM );
+              (unsigned long)magLocator.coldWhyAbsent, (unsigned long)magLocator.coldWhyFew, (unsigned long)magLocator.coldWhyCoasted, (unsigned long)magLocator.coldWhyRejected, magLocator.fitMaxChi, MAGLOC_MAX_ERROR_MM );
     out->println( line );
     snprintf( line, sizeof( line ), "  frames a sensor was not read in: 0:%lu 1:%lu 2:%lu 3:%lu 4:%lu 5:%lu 6:%lu 7:%lu 8:%lu; a missing sensor's last reading carried presence %lu frames; magnet strength held at %.0f (measured by %lu frames, another magnet taken %lu times, the settings hold %.0f)",
               (unsigned long)magLocator.staleFrames[ 0 ], (unsigned long)magLocator.staleFrames[ 1 ], (unsigned long)magLocator.staleFrames[ 2 ], (unsigned long)magLocator.staleFrames[ 3 ], (unsigned long)magLocator.staleFrames[ 4 ],
