@@ -79,6 +79,9 @@ int main(int argc, char** argv){ console.begin(&Serial); magArray.begin(); magAr
     printf("  events: %lu cold starts (the track ended by: absent %lu, few %lu, misses %lu, rejected %lu, phantom %lu), %lu misses ridden through, presence toggled %lu times, reacquired %lu; tracker: accepted %lu, dropped %lu, reinits %lu, coasted %lu\n",
       (unsigned long)magLocator.coldStarts, (unsigned long)magLocator.coldWhyAbsent, (unsigned long)magLocator.coldWhyFew, (unsigned long)magLocator.coldWhyMisses, (unsigned long)magLocator.coldWhyRejected, (unsigned long)magLocator.coldWhyPhantom,
       (unsigned long)magLocator.missFrames, (unsigned long)magLocator.presenceToggles, (unsigned long)magLocator.reacquired, (unsigned long)tr.accepted, (unsigned long)tr.dropped, (unsigned long)tr.reinits, (unsigned long)tr.coasted); }
+  // Over EVERY frame with a track of any state (the lines below count only "tracking" frames, and a state that sets the worst frames aside flatters them):
+  { double e2=0; long n=0, none=0; for (auto& s: samples){ if (s.state==0){ none++; continue; } float e=dist(s.track,s.truth); e2+=e*e; n++; }
+    printf("  any state: track error %.2f mm rms over %.1f %% of frames (the rest had no track)\n", n?sqrt(e2/n):0, 100.0*n/samples.size()); }
   lagOf(samples, &Sample::truth, &Sample::track, "track");
   lagOf(samples, &Sample::truth, &Sample::view, "view");
   lagOf(samples, &Sample::cursorTruth, &Sample::cursor, "cursor");

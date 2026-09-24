@@ -373,7 +373,12 @@ void magTrackUpdate( MagTrack* t, float dtS, const MagTrackInput* in ) {
             } else if ( !t->hadProperFix || t->ageMs > MAGTRACK_COAST_MS ) {
                 t->state = MAGTRACK_ROUGH;
             } else {
-                t->state = MAGTRACK_COASTING; // a rough fix while a real track is fresh: carried, not trusted
+                // A rough fix that agrees with a fresh track: the filter took it
+                // at its own (wide) weight, and the track goes on as a track.
+                // Calling this "coasting" dimmed the LEDs and swapped the error
+                // bar on 30 % of frames at a hover, where the fit's bar
+                // straddles the rough line (2026-09-23, the far pencil).
+                t->state = MAGTRACK_TRACKING;
             }
             t->sinceAnyMs = 0;
         }

@@ -400,6 +400,31 @@ void test_soft_gate_weights_a_borderline_fix( void ) {
     TEST_ASSERT_EQUAL_INT_MESSAGE( 1, track.droppedRun, "...and counts toward a restart" );
 }
 
+// A rough fix (a wide bar) that agrees with a fresh track goes into the
+// filter at its own weight and the track STAYS tracking. At a hover the fit's
+// bar straddles the rough line, and a state that flipped with it dimmed the
+// LEDs and swapped the error bar on 30 % of frames (2026-09-23, the bench-like
+// far pencil: 30 % "coasting" with one cold start). Only a track with no
+// proper fix for MAGTRACK_COAST_MS becomes rough.
+void test_a_rough_fix_inside_the_gate_keeps_a_fresh_track_tracking( void ) {
+    Vec3 p = { 20, 20, 35 };
+    for ( int k = 0; k < 50; k++ ) {
+        MagTrackInput in = fixAt( p, 2.0f );
+        magTrackUpdate( &track, DT, &in );
+    }
+    TEST_ASSERT_EQUAL( MAGTRACK_TRACKING, track.state );
+    MagTrackInput rough = fixAt( { p.x + 1.0f, p.y, p.z }, 8.0f );
+    rough.valid = false;
+    rough.rough = true;
+    rough.haveShaft = false;
+    magTrackUpdate( &track, DT, &rough );
+    TEST_ASSERT_FALSE( track.lastDropped );
+    TEST_ASSERT_EQUAL_MESSAGE( MAGTRACK_TRACKING, track.state, "a rough fix that agrees with a fresh track: tracking, not coasting" );
+    for ( int k = 0; k < MAGTRACK_COAST_MS / 10 + 2; k++ )
+        magTrackUpdate( &track, DT, &rough );
+    TEST_ASSERT_EQUAL_MESSAGE( MAGTRACK_ROUGH, track.state, "no proper fix for the coast time: a rough track" );
+}
+
 int main( int argc, char** argv ) {
     (void)argc;
     (void)argv;
@@ -409,6 +434,7 @@ int main( int argc, char** argv ) {
     RUN_TEST( test_teleport_dropped_and_real_jump_followed );
     RUN_TEST( test_restarts_on_a_moving_hand );
     RUN_TEST( test_soft_gate_weights_a_borderline_fix );
+    RUN_TEST( test_a_rough_fix_inside_the_gate_keeps_a_fresh_track_tracking );
     RUN_TEST( test_coasts_through_a_gap );
     RUN_TEST( test_rough_fixes_keep_a_far_probe_on_the_map );
     RUN_TEST( test_cursor_modes_and_the_surface_plane );
