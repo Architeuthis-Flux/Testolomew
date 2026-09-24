@@ -15,7 +15,7 @@
 
 static float gauss(float s){ float u1=(rand()+1.0f)/((float)RAND_MAX+2.0f), u2=(rand()+1.0f)/((float)RAND_MAX+2.0f); return s*sqrtf(-2*logf(u1))*cosf(2*M_PI*u2);}
 static float frand(float a, float b){ return a + (b-a)*rand()/(float)RAND_MAX; }
-struct Sample { Vec3 truth, shaftTruth, track, view, cursorTruth, cursor; Vec3 shaft; bool tracking, moving, turning; };
+struct Sample { Vec3 truth, shaftTruth, track, view, cursorTruth, cursor; Vec3 shaft; bool tracking, moving, turning; int state; bool rough; };
 static float dist(Vec3 a, Vec3 b){ return sqrtf((a.x-b.x)*(a.x-b.x)+(a.y-b.y)*(a.y-b.y)+(a.z-b.z)*(a.z-b.z)); }
 static float deg(Vec3 a, Vec3 b){ float d=a.x*b.x+a.y*b.y+a.z*b.z; if(d>1)d=1; if(d<-1)d=-1; return acosf(d)*180/M_PI; }
 // best lag (frames) of `out` behind `truth`, over moving samples
@@ -67,12 +67,18 @@ int main(int argc, char** argv){ console.begin(&Serial); magArray.begin(); magAr
     magArray.frameCount++; magLocator.service();
     // the cursor's truth: down the shaft to the surface plane (17.5), as the tracker defines it
     Vec3 ct = p; { float reachT = 0; ct = magTrackPointer(magLocator.boardZ, MAGTRACK_MAX_REACH_MM, p, shaft, &reachT); } // the cursor's truth: the same geometry the tracker uses (touching = the point, else the pointer)
-    Sample s = { p, shaft, tr.position, tr.viewPosition, ct, tr.cursor, tr.shaft, tr.state==MAGTRACK_TRACKING, moving, turning };
+    Sample s = { p, shaft, tr.position, tr.viewPosition, ct, tr.cursor, tr.shaft, tr.state==MAGTRACK_TRACKING, moving, turning, (int)tr.state, magLocator.fix.valid && magLocator.fix.rough };
     samples.push_back(s);
     if (!moving && !turning && dwell>0) { restSpeed += magLocator.smoothSpeed; restAlpha += magLocator.smoothAlpha; restN++; } else if (moving) { moveSpeed += magLocator.smoothSpeed; moveN++; }
   }
   long tracking=0; for (auto& s: samples) tracking += s.tracking;
   printf("pencil: %zu frames, tracking %.1f %%\n", samples.size(), 100.0*tracking/samples.size());
+  // the events behind the tracking figure: what the track spent its time as, and what ended it (the locator's and the tracker's counters)
+  { long st[4]={0,0,0,0}, roughN=0; for (auto& s: samples){ st[s.state&3]++; roughN += s.rough; } double n=samples.size();
+    printf("  states: none %.1f %%, rough %.1f, coasting %.1f, tracking %.1f; rough fixes %.1f %% of frames\n", 100*st[0]/n, 100*st[1]/n, 100*st[2]/n, 100*st[3]/n, 100*roughN/n);
+    printf("  events: %lu cold starts (the track ended by: absent %lu, few %lu, misses %lu, rejected %lu, phantom %lu), %lu misses ridden through, presence toggled %lu times, reacquired %lu; tracker: accepted %lu, dropped %lu, reinits %lu, coasted %lu\n",
+      (unsigned long)magLocator.coldStarts, (unsigned long)magLocator.coldWhyAbsent, (unsigned long)magLocator.coldWhyFew, (unsigned long)magLocator.coldWhyMisses, (unsigned long)magLocator.coldWhyRejected, (unsigned long)magLocator.coldWhyPhantom,
+      (unsigned long)magLocator.missFrames, (unsigned long)magLocator.presenceToggles, (unsigned long)magLocator.reacquired, (unsigned long)tr.accepted, (unsigned long)tr.dropped, (unsigned long)tr.reinits, (unsigned long)tr.coasted); }
   lagOf(samples, &Sample::truth, &Sample::track, "track");
   lagOf(samples, &Sample::truth, &Sample::view, "view");
   lagOf(samples, &Sample::cursorTruth, &Sample::cursor, "cursor");
