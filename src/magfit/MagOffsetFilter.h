@@ -7,13 +7,11 @@
 // variance is how sure of that the filter is. Every frame the doubt grows by
 // the walk (a zero drifts with temperature: a TMAG5273's 3-10 uT/degC); a
 // frame explained as "nothing here" updates it with the reading against the
-// noise alone; a frame with a field no dipole explains updates it against a
-// wider sigma (the caller's: the field's own size), so a static lone-sensor
-// error is absorbed on the filter's own time and a real probe is not; a
-// frame a dipole explains holds it. The steady gain is about sqrt(q/R) a
-// frame: for a TMAG5273 (0.012 mT noise, 0.00025 mT/sqrt(s) walk) a clean
-// step is absorbed with a 5 s time constant, a 0.1 mT unexplained one at
-// 40 s.
+// noise alone; a frame a dipole explains, or one with a field no dipole
+// explains that is still within its hold, leaves it (the locator decides
+// which, MagLocator::keepZeros: the filter only follows or holds). The
+// steady gain is about sqrt(q/R) a frame: the locator sets the walk so that
+// a reading of nothing is followed with MAG_OFFSET_FOLLOW_S.
 //
 // Pure: no Arduino; tested under test/test_magoffset.
 // ---------------------------------------------------------------------------

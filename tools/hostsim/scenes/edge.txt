@@ -4,9 +4,10 @@
 # z 22); with Z weighed by its quietness that basin misfits at 49 % and is
 # REJECTED (at 26 % it was accepted as a rough fix); since Phase 3 step 4
 # (2026-09-23) a rejected fit is nothing - no rough offer, no far glow - and
-# at the second place, 6 mm further out, one TMAG reads 0.038 mT and the
-# array says no magnet (presence takes two reading plainly). The lattice's
-# memoryless offer is gone with the rough class.
+# at the second place, 6 mm further out, one TMAG reads 0.038 mT: still
+# "present" (once present the array stays so down to three quarters of the
+# bar, 2026-09-24) but only two sensors notice and nothing is offered. The
+# lattice's memoryless offer is gone with the rough class.
 :mmc off
 @strength 1839
 @seed 3
@@ -17,7 +18,7 @@ l
 @magnet -28 22 22 0 0 1
 @run 3000
 l
-@expect "no magnet"
+@expect "only 2 sensors notice"
 @expect "track: nothing"
 @magnet off
 @run 2000
@@ -26,17 +27,19 @@ l
 # post-boot range, knobs.md (7)-(8)) and nothing present: NOT a magnet.
 # With the seen level scaled for the weak magnet (0.022), two sensors above
 # it are not enough to say a probe is there - the corroboration takes two
-# TMAGs reading PLAINLY (0.04). The offset filters follow the stale zeros out
-# at once (nothing present, no magnet lately): presence never toggles in the
-# half minute - the count stays at the two toggles of the probe above (the
-# clocks let the 0.045 zero plus noise put two sensors over 0.04 now and then:
-# two toggles here, twelve at the scaled bar; 2026-09-23).
+# TMAGs reading PLAINLY (0.04). The 0.045 zero plus the 0.03 one's noise put
+# two sensors over 0.04 once: presence goes on, stays on while one still
+# reads over three quarters of the bar (the hysteresis, 2026-09-24: without
+# it a zero followed out flickered presence on its way down), and goes off
+# once the filters have followed them out after the hold-off - two toggles
+# in the half minute on top of the probe's two above (the clocks: twelve at
+# the scaled bar, 2026-09-23).
 @bias 2 0.045 0 0
 @bias 3 0.03 0 0
 :load
 @run 30000
 :load
-@expect "presence toggled 2 times"
+@expect "presence toggled 4 times"
 l
 @expect "no magnet"
 @bias 2 0 0 0

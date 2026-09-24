@@ -84,7 +84,7 @@ bool ZeroAudit::solve( int i, int minSamples, float minSpread, float minPredMt )
         before += n * d0 * d0 + 2.0f * d0 * ( a.sv[ k ] - a.su[ k ] ) + ( a.svv[ k ] - 2.0f * a.suv[ k ] + a.suu[ k ] );
         float var = residual / ( n > 2.0f ? n - 2.0f : 1.0f );
         gs[ k ] = axisOk ? sqrtf( var / sxx ) : 1e9f;
-        zs[ k ] = sqrtf( var / n );
+        zs[ k ] = axisOk ? sqrtf( var * ( 1.0f / n + meanP * meanP / sxx ) ) : sqrtf( var / n ); // the intercept's own: with little spread a zero and a gain trade off
     }
     a.spread = meanSq > 0.0f ? sqrtf( ( denAll / n ) / meanSq ) : 0.0f;
     a.rmsBefore = sqrtf( before > 0.0f ? before / n : 0.0f );

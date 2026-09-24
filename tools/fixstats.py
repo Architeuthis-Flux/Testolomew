@@ -8,7 +8,7 @@
 # one runnable check. The bench protocol is docs/knobs.md section 8.
 import sys, statistics as st, math, re
 
-cols="fix,t_ms,present,valid,x,y,z,tip_x,tip_y,tip_z,axis_x,axis_y,axis_z,tilt_deg,strength,residual_mT,fit_us,misfit,seen_by,sigma_x,sigma_y,sigma_z,faint_by,raw_x,raw_y,raw_z,track_state,track_x,track_y,track_z,track_sx,track_sy,track_sz,cursor_x,cursor_y,cursor_z,gate,dropped".split(',')
+cols="fix,t_ms,present,valid,x,y,z,tip_x,tip_y,tip_z,axis_x,axis_y,axis_z,tilt_deg,strength,residual_mT,fit_us,misfit,seen_by,sigma_x,sigma_y,sigma_z,faint_by,raw_x,raw_y,raw_z,track_state,track_x,track_y,track_z,track_sx,track_sy,track_sz,cursor_x,cursor_y,cursor_z,gate,dropped,chi".split(',')
 ix={c:i for i,c in enumerate(cols)}
 GAP_MS=60          # a hole in the stream longer than this is an absent / too-few-noticing spell
 ROUGH_MM=5.0       # MAGLOC_ROUGH_ABOVE_MM: a bar wider than this is a rough fix
@@ -32,7 +32,8 @@ def parse(lines):
         if m: line=m.group(1)
         if line.startswith('fix,'):
             p=line.split(',')
-            if len(p)<len(cols): continue
+            if len(p)<38: continue   # 38 columns until 2026-09-24; chi is the 39th (absent in an older capture: nan)
+            p=p+['nan']*(len(cols)-len(p))
             try: rows.append([0]+[float(v) for v in p[1:len(cols)]])
             except ValueError: continue
         elif line.startswith('load{'):
@@ -177,7 +178,7 @@ def _synthetic():
         t+=50
     lines.append("load{")
     lines.append("fit: running, steady load, the last 800 us; 8 cold starts since boot, the last 900 us in all, its longest slice 400 us - the V5F's heaviest work")
-    lines.append("  the track ended before them: 2 times nothing present, 1 too few noticing, 0 the track coasted out; 1 cold starts rejected (chi over 2.0, a bar over 30 mm, or beyond the array)")
+    lines.append("  the track ended before them: 2 times nothing present, 1 too few noticing, 1 the track coasted out; 1 cold starts rejected (chi over 2.0, a bar over 30 mm, or beyond the array)")
     lines.append("  presence toggled 4 times; 12 frames missed while tracking; the strongest reading since the last look 0.0310 (TMAG terms; the presence level is 0.040)")
     lines.append("}")
     lines.append("track: tracking  x 1 y 2 z 3 +/-0.1 0.1 0.1 mm  velocity 0 mm/s (moving 0, smoothing alpha 1.00)  tilt 5 deg  cursor aim x 1 y 2 (+/-0.1 mm, reach 0.0)  210 fixes taken, 3 dropped, 1 restarts")
@@ -186,7 +187,7 @@ def _synthetic():
 def selftest():
     r=analyze(_synthetic(), skip_s=0)
     e=r['events']
-    assert e['cold_starts']==5 and e['why']=={'absent':1,'few':1,'coasted':0,'rejected':1}, e
+    assert e['cold_starts']==5 and e['why']=={'absent':1,'few':1,'coasted':1,'rejected':1}, e
     assert e['presence_toggles']==3 and e['frames_missed']==7, e
     assert e['track_dropped']==2 and e['track_restarts']==1 and e['track_taken']==200, e
     assert e['gaps']==1 and 500<=e['gap_ms']<=600, e

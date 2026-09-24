@@ -224,18 +224,26 @@ static inline const char* magSensorTypeName( MagSensorType type ) {
 static inline float magSensorTypeNoiseMt( MagSensorType type ) {
     return type == MAG_MMC56X3 ? 0.0003f : MAG_WEIGHT_REFERENCE_MT; // the MMC's is the bench's (2026-09-21: 0.3 uT rms a frame per axis; the datasheet's 0.2 until 2026-09-23)
 }
-// The least a sensor's zero is doubted, over the offset filter's own doubt
-// (MagLocator::keepZeros): what the fit's acceptance (magFitChi) allows a
-// reading to be off by for its zero alone. ASSUMPTION (2026-09-23: the
-// filter's stationary doubt, 0.00025 mT for a TMAG5273, is what the scenes
-// were judged with; on the bench a zero is known less well than that, and
-// section 8's captures set these). Until 2026-09-23 these were 0.015 and
-// 0.003, the size of a stale post-boot zero, and the far acceptance judged
-// against them could not tell a 0.02 mT zero error at the MMC from a probe.
-#define MAG_ZERO_UNCERTAINTY_TMAG_MT 0.001f
-#define MAG_ZERO_UNCERTAINTY_MMC_MT 0.0005f
+// How far a sensor's zero may be off, as the fit's acceptance (magFitChi)
+// doubts it: at boot a saved or compiled zero is doubted by the first pair
+// (the bench's post-boot zeros are 0.02-0.045 mT stale); the doubt decays
+// with the follow's time constant while the offset filter follows a reading
+// of nothing, never under the floor (the second pair); and while a zero is
+// HELD under a present magnet it grows at the drift rate (the third: a
+// parked probe's zeros drift, and a fit the chi rejected for that could
+// never be followed back - the zeros follow only with nothing present).
+// ASSUMPTION (2026-09-24): the drift is knobs.md's bench note (0.0002 mT/s,
+// right after power-up) halved; section 8's absent and rest captures set it.
+#define MAG_ZERO_UNCERTAINTY_TMAG_MT 0.015f
+#define MAG_ZERO_UNCERTAINTY_MMC_MT 0.003f
+#define MAG_ZERO_DOUBT_FLOOR_TMAG_MT 0.001f
+#define MAG_ZERO_DOUBT_FLOOR_MMC_MT 0.0005f
+#define MAG_ZERO_DRIFT_MT_PER_S 0.0001f
 static inline float magSensorTypeZeroMt( MagSensorType type ) {
     return type == MAG_MMC56X3 ? MAG_ZERO_UNCERTAINTY_MMC_MT : MAG_ZERO_UNCERTAINTY_TMAG_MT;
+}
+static inline float magSensorTypeZeroFloorMt( MagSensorType type ) {
+    return type == MAG_MMC56X3 ? MAG_ZERO_DOUBT_FLOOR_MMC_MT : MAG_ZERO_DOUBT_FLOOR_TMAG_MT;
 }
 // Each sensor's zero is a state with a doubt (MagOffsetFilter.h; the locator
 // sets the live baseline from it every frame, MagLocator::keepZeros). It

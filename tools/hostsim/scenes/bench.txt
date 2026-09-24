@@ -86,21 +86,24 @@ l
 @magnet row 15 3
 @run 1000
 :load
-@expect "4 cold starts since boot"
+@expect "; 4 cold starts since boot"
 @expect "presence toggled 5 times"
 @run 120000
 :load
-@expect "4 cold starts since boot"
+@expect "; 4 cold starts since boot"
 @expect "presence toggled 5 times"
 l
 @expect "track: tracking"
-@expect "0 dropped, 0 restarts"
-# ...and the settings' record says the held strength was MEASURED (1700:
-# measured over 4 places at the array's end, where this world's gain and
-# place errors bias it 8 % low, and not revised within 5 % since; a default
-# is never written as if it had been measured).
+@expect " taken, 0 dropped, 0 restarts"
+# ...and the settings' record says the held strength was MEASURED: learned
+# over 4 places during the rest block (about 1700 at first: this world's
+# gain and place errors bias it 8 % low at the array's end; revised to about
+# 1790 over more places later) and sealed a minute after - even where the
+# learned value is within the 5 % save step of the default, the seal follows
+# the measurement (2026-09-24). A default is never written as if it had been
+# measured.
 s
-@expect "strength=1700 measured"
+@expect " measured"
 
 # A 70 ms glitch on three sensors (the LED strip's data line into SDA, a
 # corrupt read: the bus has no CRC) is ridden through from the last good
@@ -114,7 +117,7 @@ s
 @bias 5 0 0 0
 @run 500
 :load
-@expect "4 cold starts since boot"
+@expect "; 4 cold starts since boot"
 l
 @expect "track: tracking"
 
@@ -126,10 +129,10 @@ l
 @magnet row 15 3 30
 @run 1000
 :load
-@expect "4 cold starts since boot"
+@expect "; 4 cold starts since boot"
 @run 60000
 :load
-@expect "4 cold starts since boot"
+@expect "; 4 cold starts since boot"
 @expect "frames missed while tracking"
 l
 # ...and lifted away from that ROUGH state, the far glow is gone within 1.2 s
@@ -144,13 +147,16 @@ l
 @magnet off
 @run 1000
 :load
-@expect "4 cold starts since boot"
+@expect "; 4 cold starts since boot"
 @run 60000
 :load
-@expect "4 cold starts since boot"
+@expect "; 4 cold starts since boot"
 @expect "presence toggled 6 times"
 l
 @expect "no magnet"
+s
+@expect " measured"
+@expect "strength=1"
 
 # Lift: the probe taken away; the track is gone within 1.2 s (a tracking
 # track coasts 400 ms; a ROUGH one is held 2.5 s: the far glow).

@@ -270,12 +270,11 @@
 // 7.1 mm above the base PCB (plus wherever the sensors sit below that).
 #define MAGLOC_BOARD_Z_MM 17.5f
 
-// A fit is offered to the tracker as a ROUGH fix ("somewhere about here",
-// the wide glow on the LEDs, no row counted) rather than a proper one when
-// its error bar is wider than MAGLOC_ROUGH_ABOVE_MM - a probe far up or off
-// the edge - and a fit that is not good enough to be a fix at all is still
-// offered as rough if its misfit and bar are under the MAX limits, with the
-// bar never claimed narrower than the lattice search resolves.
+// A fix goes to the tracker as a ROUGH one ("somewhere about here", the wide
+// glow on the LEDs, no row counted) rather than a proper one when its error
+// bar is wider than this - a probe far up or off the edge. Rough is the
+// fit's own bar, not a class: a fit the acceptance refuses is nothing (the
+// rough offer of a refused fit went 2026-09-23, Phase 3 step 4b).
 #define MAGLOC_ROUGH_ABOVE_MM 5.0f
 
 // The baseline check. A baseline taken with the probe lying on the board
@@ -379,6 +378,7 @@ struct MagProbeFix {
     float residual;  // RMS misfit, mT
     float misfit;    // residual / signal: 0.03 is a clean fix, 0.3 a rough one
     float chi;       // the rms of (reading - model) over each sensor's own expected error (its noise as smoothed, its zero's doubt, the model's share): 1 is a fit as good as the readings, 2 is not
+    bool rejectedOutside; // the last fit was refused for being beyond the array's footprint on too few plain sensors (the mirror basin), not by the chi or the bar
     Vec3 sigma;      // 1-sigma error bar on the magnet position, mm, per axis (from the fit itself)
     float errorXyMm; // ...across the board: sqrt(sx^2 + sy^2)
     float errorMm;   // ...and in all three axes together
@@ -443,6 +443,7 @@ class MagLocator : public Service {
     uint32_t coldWhyAbsent = 0, coldWhyFew = 0, coldWhyCoasted = 0, coldWhyRejected = 0; // what ended the track before each cold start: nothing present, too few noticing, the fit failing until the track coasted out; and cold starts rejected (chi, the bar, beyond the array)
     uint32_t staleFrames[ MAGFIT_MAX_SENSORS ] = { 0 }; // frames in which a sensor was not read (the MMC56x3's 150 Hz against 100 Hz frames)
     uint32_t presenceToggles = 0; // times presence went on or off: the `d` stream prints no absent frame, so a toggle shows there only as a gap (the bench protocol, 2026-09-23)
+    uint32_t refineRejected = 0;  // frames in which only the held strength's refinement failed the acceptance and the free fit went on (:load)
     uint32_t missFrames = 0;      // frames that gave no fix while the track was alive and were ridden through (the fit starts again from the track): each a near miss of a cold start
     float maxPeakLevel = 0.0f;    // the strongest smoothed reading (TMAG terms) since :load last printed it: the absent run's presence floor
     uint32_t presenceHeldFrames = 0; // frames in which presence rested on a sensor's last reading, the sensor not read that frame (MAGLOC_MISSED_HOLD_FRAMES)
@@ -521,6 +522,8 @@ class MagLocator : public Service {
     MagOffsetFilter offsets[ MAGFIT_MAX_SENSORS ] = { }; // each sensor's zero as a state with a doubt (MagOffsetFilter.h): the live baseline is set from it every frame (keepZeros)
     Vec3 offsetWritten[ MAGFIT_MAX_SENSORS ] = { };      // ...as last written, so a baseline moved by anyone else (z, Y, the audit, a restore) restarts the filter from it
     bool offsetsBegun = false;
+    float zeroDoubt[ MAGFIT_MAX_SENSORS ] = { 0 }; // how far each zero may be off, as the acceptance doubts it (mT): the boot uncertainty, decaying while followed, growing at the drift rate while held (MagArrayConfig.h)
+    int freeWarmRun = 0;           // frames running in which only the held-strength refinement failed and the free fit was the next start (bounded: MAGLOC_STRENGTH_MIN_SAMPLES)
     uint32_t lastPresentMs = 0; // when a magnet was last present (0 = never): the follow's hold-off, MAG_OFFSET_HOLDOFF_S
     uint32_t unexplainedSinceMs[ MAGFIT_MAX_SENSORS ] = { 0 }; // since when this sensor has read the magnet's level with no fix explaining it (0 = it does not): the one clock, MAG_OFFSET_HOLD_S
     Vec3 recent[ MAGFIT_MAX_SENSORS ][ 2 ] = { }; // each sensor's last two frames, for the glitch filter

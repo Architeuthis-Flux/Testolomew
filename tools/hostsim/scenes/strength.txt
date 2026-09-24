@@ -36,20 +36,23 @@ l
 l
 @expect "z 6"
 :load
-@expect "0 times nothing present"
+@expect "them: 0 times nothing present"
 @expect "carried presence"
 @magnet off
-@run 6000
+@run 60000
 
 # A static field at the MMC that nothing confirms - the bench's probe lying
 # beside the board (0.02 mT at the MMC, the TMAGs at their zeros) - is NOT a
 # fix (2026-09-23, Phase 3 step 4: the residuals over every sensor's own
 # error, chi 3.7 against 2.0 - the TMAGs read none of what a probe there
-# would give them; until then it was a far fix for 40 s, then absorbed), and
+# would give them - once their zeros have been followed for a minute with
+# nothing there and are doubted at the floor; until then it was a far fix
+# for 40 s, then absorbed), and
 # the MMC's zero follows it after the hold (keepZeros, MAG_OFFSET_HOLD_S):
 # no magnet, once, and not found again in bursts (the bench: 249 times in
 # twelve minutes, 2026-09-22).
 @bias 8 0.006 0.005 -0.018
+:load
 @run 3000
 l
 @expect "only 1 sensor"
@@ -57,6 +60,8 @@ l
 @run 160000
 l
 @expect "no magnet"
+:load
+@expect "presence toggled 4 times"
 :load
 @bias 8 0 0 0
 z

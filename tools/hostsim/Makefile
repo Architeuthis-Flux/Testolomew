@@ -63,6 +63,8 @@ check: sim
 	./sim scenes/bench.txt -q
 	./sim scenes/edge.txt -q
 	./sim scenes/hover.txt -q
+	./sim scenes/boot.txt -q
+	./sim scenes/session.txt -q
 
 screens: sim
 	rm -rf out

@@ -397,8 +397,9 @@ l
 # A zero error at the MMC56x3 is not a far probe (2026-09-21, evening: its
 # saved zero, put back under a newly calibrated table row, read 0.09 mT
 # with nothing there, and the far mode kept it alive as a probe 45 mm up).
-# It never fits under MAGLOC_FAR_MISFIT / MAGLOC_FAR_ERROR_MM, so nothing
-# is shown, and the absorb rule takes it into the zero in a few minutes.
+# The TMAG5273s read none of what a probe there would give them, so the chi
+# rejects it (Phase 3 step 4b) and nothing is shown; after the hold the
+# MMC's zero follows it (keepZeros).
 @bias 8 -0.021 -0.013 -0.092
 @run 3000
 l
@@ -592,7 +593,7 @@ z
 @expect "row: 15 hole 3"
 @magnet off
 @gain 5 1.0
-:audit reset
+:audit forget
 z
 @run 2000
 

@@ -426,6 +426,18 @@ static bool directive( const std::vector<std::string>& w, int lineNo ) {
             Vec3 z = magArray.baselineOf( i );
             printf( "baseline %d: %.4f %.4f %.4f  field %.4f %.4f %.4f\n", i, z.x, z.y, z.z, magArray.field[ i ].x, magArray.field[ i ].y, magArray.field[ i ].z );
         }
+        {
+            char over[ 64 ] = "";
+            for ( int i = 0; i < MAG_SENSOR_COUNT; i++ ) {
+                Vec3 z = magArray.baselineOf( i );
+                if ( fabsf( z.x ) > 0.02f || fabsf( z.y ) > 0.02f || fabsf( z.z ) > 0.02f )
+                    snprintf( over + strlen( over ), sizeof( over ) - strlen( over ), " %d", i );
+            }
+            char summary[ 96 ];
+            snprintf( summary, sizeof( summary ), "baselines over 0.02 mT:%s\n", over[ 0 ] ? over : " none" );
+            printf( "%s", summary );
+            outText += summary; // a directive's line, into the capture so a scene can expect it
+        }
     } else if ( d == "@dead" && w.size( ) >= 3 ) {
         int i = atoi( w[ 1 ].c_str( ) );
         if ( i >= 0 && i < MAG_SENSOR_COUNT )

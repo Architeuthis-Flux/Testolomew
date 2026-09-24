@@ -46,7 +46,7 @@ static void onUnpollute( Stream* out ) {
 static void onStream( Stream* out ) {
     magLocator.streaming = !magLocator.streaming;
     if ( magLocator.streaming ) {
-        out->println( "fix,t_ms,present,valid,x,y,z,tip_x,tip_y,tip_z,axis_x,axis_y,axis_z,tilt_deg,strength,residual_mT,fit_us,misfit,seen_by,sigma_x,sigma_y,sigma_z,faint_by,raw_x,raw_y,raw_z,track_state,track_x,track_y,track_z,track_sx,track_sy,track_sz,cursor_x,cursor_y,cursor_z,gate,dropped" );
+        out->println( "fix,t_ms,present,valid,x,y,z,tip_x,tip_y,tip_z,axis_x,axis_y,axis_z,tilt_deg,strength,residual_mT,fit_us,misfit,seen_by,sigma_x,sigma_y,sigma_z,faint_by,raw_x,raw_y,raw_z,track_state,track_x,track_y,track_z,track_sx,track_sy,track_sz,cursor_x,cursor_y,cursor_z,gate,dropped,chi" );
     }
 }
 
@@ -703,13 +703,15 @@ void MagLocator::assessFrame( FrameScratch& f ) {
     fix.faintBy = 0;
     bool haveMmc = false, mmcPresent = false;
     int tmagPlain = 0; // TMAGs reading plainly (the unscaled level): what corroborates presence
+    int tmagPlainLow = 0; // ...and at three quarters of it: what keeps presence on once it is (a zero followed out does not flicker it on its way down)
     int tmagSeen = 0;
     bool peakHeld = false;
     f.plain = 0;
     for ( int i = 0; i < magArray.sensorCount( ); i++ ) {
         f.quiet[ i ] = true;
         if ( magArray.ignored( i ) ) {
-            continue; // the MMC56x3 switched out (sensors / use MMC): not here at all
+            f.quiet[ i ] = false; // the MMC56x3 switched out (sensors / use MMC): not here at all - and not "quiet" either, or its zero followed the probe's field (0.29 mT in two seconds, 2026-09-24)
+            continue;
         }
         // Not read this frame: its last smoothed reading still says what is
         // there for a frame or two (MAGLOC_MISSED_HOLD_FRAMES) - presence
@@ -749,6 +751,8 @@ void MagLocator::assessFrame( FrameScratch& f ) {
             if ( magSensorPlaces[ i ].type != MAG_MMC56X3 )
                 tmagPlain++;
         }
+        if ( magSensorPlaces[ i ].type != MAG_MMC56X3 && levelSq > 0.75f * 0.75f * plainLevel * plainLevel )
+            tmagPlainLow++;
         if ( magSensorPlaces[ i ].type == MAG_MMC56X3 ) {
             haveMmc = true;
             if ( levelSq > presentMt * presentMt )
@@ -771,7 +775,10 @@ void MagLocator::assessFrame( FrameScratch& f ) {
     // Stickiness, so a magnet at the threshold does not flicker in and out:
     // once present it stays so down to half the level.
     bool fixedLately = lastFixMs != 0 && millis( ) - lastFixMs < MAGLOC_PRESENT_HOLD_MS;
-    float level = fix.present && fixedLately ? MAGLOC_PRESENT_LOW * presentMt : presentMt;
+    // ...and, once present, down to three quarters of the level with no fix
+    // lately: a zero followed out crossed the bar back and forth on its way
+    // down (six toggles in a stale-zero block, 2026-09-24).
+    float level = fix.present ? ( fixedLately ? MAGLOC_PRESENT_LOW : 0.75f ) * presentMt : presentMt;
     bool evidence = fix.peakLevel > level;
     if ( evidence && !fixedLately ) {
         // The MMC's word, or two TMAGs' (MAGLOC_PRESENT_TMAGS): one TMAG
@@ -781,7 +788,11 @@ void MagLocator::assessFrame( FrameScratch& f ) {
         // the level scaled for a weak magnet (0.022) two post-boot stale zeros
         // (0.03-0.045) flapped presence twelve times in half a minute with
         // nothing there (2026-09-23, the review's scene, now scenes/edge.txt).
-        evidence = ( haveMmc && mmcPresent ) || tmagPlain >= MAGLOC_PRESENT_TMAGS;
+        // ...and, once present, it stays while ONE TMAG still reads plainly:
+        // two stale zeros at the plain level flickered presence at the noise
+        // (thirty toggles in forty seconds, 2026-09-24) until they were
+        // followed out; a probe leaving takes its last plain sensor with it.
+        evidence = ( haveMmc && mmcPresent ) || tmagPlain >= MAGLOC_PRESENT_TMAGS || ( fix.present && tmagPlainLow >= 1 );
     }
     if ( evidence != fix.present ) {
         presenceToggles++;
@@ -821,6 +832,9 @@ void MagLocator::keepZeros( const FrameScratch& f ) {
         Vec3 noise = { n, n, n }; // the type's noise on every axis: the follow rate is a design time, the same on Z (its quieter noise would halve it)
         Vec3 b = magArray.baselineOf( i );
         if ( !offsetsBegun || b.x != offsetWritten[ i ].x || b.y != offsetWritten[ i ].y || b.z != offsetWritten[ i ].z ) {
+            // A zero put back at boot is doubted by the boot uncertainty; one
+            // z, Y or the audit just wrote is as good as the floor.
+            zeroDoubt[ i ] = offsetsBegun ? magSensorTypeZeroFloorMt( type ) : magSensorTypeZeroMt( type );
             // The walk that follows a reading of nothing with the follow time
             // constant (the steady gain is sqrt(q/R) a frame: q = (noise dt / tau)^2),
             // and the doubt it settles to (sqrt(q R)) as the doubt to start from:
@@ -832,25 +846,44 @@ void MagLocator::keepZeros( const FrameScratch& f ) {
             unexplainedSinceMs[ i ] = 0;
         }
         if ( !magArray.fresh[ i ] ) {
-            continue; // not read this frame: nothing to say (its clock, like its history, is left alone)
+            zeroDoubt[ i ] += MAG_ZERO_DRIFT_MT_PER_S * dtS; // not read this frame: nothing to say (its clock, like its history, is left alone); the doubt drifts on
+            continue;
         }
         bool follow;
         bool presentLately = lastPresentMs != 0 && now - lastPresentMs < (uint32_t)( MAG_OFFSET_HOLDOFF_S * 1000.0f );
-        if ( f.quiet[ i ] || ( !fix.present && !presentLately ) ) {
-            follow = true; // not the magnet's reading: the drift
+        bool explained = fix.present && f.explained;
+        if ( ( f.quiet[ i ] && !explained ) || ( !fix.present && !presentLately ) ) {
+            // Not the magnet's reading: the drift. (A quiet sensor under a fix
+            // the array explains holds too: its small share of the magnet is
+            // real, and followed it went into its zero and was put back by
+            // the audit every window, a flash write each - 2026-09-24.)
+            follow = true;
             unexplainedSinceMs[ i ] = 0;
-        } else if ( magArray.ignored( i ) || ( fix.present && f.explained ) ) {
-            follow = false; // a magnet, not drift (a switched-out sensor: read and shown, its zero follows the drift with nothing there and holds otherwise, as before)
+        } else if ( magArray.ignored( i ) || explained ) {
+            follow = false; // a magnet, not drift (a switched-out sensor: read and shown, its zero follows the drift with nothing there and holds otherwise)
             unexplainedSinceMs[ i ] = 0;
         } else {
             // Not quiet, with no fix explaining it (or in the hold-off after
             // presence, wavering at the edge): held on its own clock, then
-            // followed. (A frame the TMAGs disown is not evidence about the
-            // zeros: at 90 mm their say is noise, and following on those
+            // followed - the two-minute hold when a fit was at least tried
+            // (something the array could explain may be there), the hold-off
+            // alone when too few sensors notice anything for a fit to try
+            // (two stale zeros after boot flickered presence for 2.5 minutes
+            // at 997e74b). (A frame the TMAGs disown is not evidence about
+            // the zeros: at 90 mm their say is noise, and following on those
             // frames absorbed a real far hover's share, 2026-09-23.)
             if ( unexplainedSinceMs[ i ] == 0 )
                 unexplainedSinceMs[ i ] = now == 0 ? 1 : now;
-            follow = now - unexplainedSinceMs[ i ] > (uint32_t)( MAG_OFFSET_HOLD_S * 1000.0f );
+            float holdS = f.enough ? MAG_OFFSET_HOLD_S : MAG_OFFSET_HOLDOFF_S;
+            follow = now - unexplainedSinceMs[ i ] > (uint32_t)( holdS * 1000.0f );
+        }
+        if ( follow ) {
+            float floor = magSensorTypeZeroFloorMt( type );
+            zeroDoubt[ i ] *= expf( -dtS / MAG_OFFSET_FOLLOW_S ); // followed: what was wrong is going
+            if ( zeroDoubt[ i ] < floor )
+                zeroDoubt[ i ] = floor;
+        } else {
+            zeroDoubt[ i ] += MAG_ZERO_DRIFT_MT_PER_S * dtS; // held: the drift goes on unseen
         }
         if ( follow ) {
             // The doubt grows only while the zero follows: grown while it is
@@ -968,8 +1001,8 @@ ServiceStatus MagLocator::runFit( MagTrackInput* in, FrameScratch& f ) {
     // beyond it by MAGLOC_OUTSIDE_MM is the mirror-basin case unless enough
     // sensors see the magnet plainly.
     Vec3 lo = { 1e9f, 1e9f, 0 }, hi = { -1e9f, -1e9f, 0 };
-    for ( int i = 0; i < magArray.sensorCount( ); i++ ) {
-        if ( magSensorPlaces[ i ].type == MAG_MMC56X3 )
+    for ( int i = 0; i < magArray.sensorCount( ) && i < MAGFIT_MAX_SENSORS; i++ ) {
+        if ( magSensorPlaces[ i ].type == MAG_MMC56X3 || !f.use[ i ] )
             continue;
         const Vec3& p = magArray.position[ i ];
         lo.x = p.x < lo.x ? p.x : lo.x;
@@ -978,11 +1011,19 @@ ServiceStatus MagLocator::runFit( MagTrackInput* in, FrameScratch& f ) {
         hi.y = p.y > hi.y ? p.y : hi.y;
     }
     f.outside = position.x < lo.x - MAGLOC_OUTSIDE_MM || position.x > hi.x + MAGLOC_OUTSIDE_MM || position.y < lo.y - MAGLOC_OUTSIDE_MM || position.y > hi.y + MAGLOC_OUTSIDE_MM;
-    f.good = f.good && fix.chi < fitMaxChi && fix.errorMm < MAGLOC_MAX_ERROR_MM && ( !f.outside || fix.seenBy >= MAGLOC_OUTSIDE_MIN_SEEN );
+    // ...seen PLAINLY (the unscaled 0.04, f.plain: TMAGs): at the scaled seen
+    // level a third sensor's noise let the mirror basin through one frame in
+    // four (2026-09-24, the review).
+    bool solved = f.good;
+    fix.rejectedOutside = solved && fix.chi < fitMaxChi && fix.errorMm < MAGLOC_MAX_ERROR_MM && f.outside && f.plain < MAGLOC_OUTSIDE_MIN_SEEN;
+    f.good = f.good && fix.chi < fitMaxChi && fix.errorMm < MAGLOC_MAX_ERROR_MM && ( !f.outside || f.plain >= MAGLOC_OUTSIDE_MIN_SEEN );
     if ( !f.good && !wasTracking ) {
         coldWhyRejected++;
         if ( ++coldRejectedRun >= 2 ) {
-            nextColdStartMs = millis( ) + MAGLOC_COLD_RETRY_MS; // rejected twice running: not again at once
+            // Rejected twice running: not again at once; and after four, five
+            // times as long (a phantom that rejects every lattice is a steady
+            // V5F load at the slice pace otherwise).
+            nextColdStartMs = millis( ) + MAGLOC_COLD_RETRY_MS * ( coldRejectedRun >= 4 ? 5 : 1 );
             coldRetryUntilMs = nextColdStartMs;
         }
     }
@@ -1001,14 +1042,21 @@ ServiceStatus MagLocator::runFit( MagTrackInput* in, FrameScratch& f ) {
         lastFixMs = millis( ) == 0 ? 1 : millis( );
     }
     result.valid = f.good; // the fit's own memory: its answer; without one, the track's (above)
-    if ( !f.good && freeGood ) {
+    if ( f.good ) {
+        freeWarmRun = 0;
+    }
+    if ( !f.good && freeGood && ++freeWarmRun <= MAGLOC_STRENGTH_MIN_SAMPLES ) {
+        refineRejected++;
         // The readings pinned the magnet's strength and the free fit was good;
         // only the refinement with the held strength failed the chi - the
         // held strength is wrong (a default, a record of another magnet: the
         // scenes' settings reset puts 1839 back under a 4232 magnet). The
         // free fit's answer is the next frame's start, so the strength ring
         // fills at the frame rate (16 frames) and not one free fit per cold
-        // start (2026-09-23: ten rejected cold starts and three seconds).
+        // start (2026-09-23: ten rejected cold starts and three seconds) - for
+        // as many frames as the ring needs; past that the held strength is
+        // not the trouble, and the track's start or a cold start (the seeds)
+        // gets its turn.
         result = freeFit;
         result.valid = true;
     }
@@ -1231,14 +1279,14 @@ void MagLocator::auditZeros( const FrameScratch& f ) {
         float noiseFloor = 3.0f * magArray.noiseMt[ k ];
         if ( unexplainedLimit < noiseFloor )
             unexplainedLimit = noiseFloor;
-        float gainAxis[ 3 ] = { a.gain.x, a.gain.y, a.gain.z };
-        bool wild = false;
-        for ( int ax = 0; ax < 3; ax++ )
-            wild = wild || gainAxis[ ax ] > MAGLOC_AUDIT_MAX_GAIN_TRIM || gainAxis[ ax ] < 1.0f / MAGLOC_AUDIT_MAX_GAIN_TRIM;
+        float gainAxis[ 3 ] = { a.gain.x, a.gain.y, a.gain.z }, gainSigma[ 3 ] = { a.gainSigma.x, a.gainSigma.y, a.gainSigma.z };
+        bool wild = false, offGain = false;
+        for ( int ax = 0; ax < 3; ax++ ) {
+            bool judged = gainSigma[ ax ] < 1e8f && fabsf( gainAxis[ ax ] - 1.0f ) > 3.0f * gainSigma[ ax ]; // a point estimate alone judged nothing (a true far sensor was left out for good)
+            wild = wild || ( judged && ( gainAxis[ ax ] > MAGLOC_AUDIT_MAX_GAIN_TRIM || gainAxis[ ax ] < 1.0f / MAGLOC_AUDIT_MAX_GAIN_TRIM ) );
+            offGain = offGain || ( judged && fabsf( gainAxis[ ax ] - 1.0f ) > MAGLOC_AUDIT_MAX_GAIN_ERROR );
+        }
         bool bad = wild || ( meanPred > 0.0f && a.rmsAfter > unexplainedLimit );
-        bool offGain = false;
-        for ( int ax = 0; ax < 3; ax++ )
-            offGain = offGain || fabsf( gainAxis[ ax ] - 1.0f ) > MAGLOC_AUDIT_MAX_GAIN_ERROR;
         if ( bad && !( a.excluded && !a.correctable ) ) {
             a.excluded = true;
             a.correctable = false;
@@ -1377,13 +1425,17 @@ void MagLocator::auditZeros( const FrameScratch& f ) {
                 anyGain = true;
             }
         }
-        Vec3 by = { -zApply[ 0 ], -zApply[ 1 ], -zApply[ 2 ] };
-        magArray.shiftBaseline( best, by );
-        smooth[ best ] = { smooth[ best ].x - zApply[ 0 ], smooth[ best ].y - zApply[ 1 ], smooth[ best ].z - zApply[ 2 ] };
+        if ( anyZero ) {
+            Vec3 by = { -zApply[ 0 ], -zApply[ 1 ], -zApply[ 2 ] };
+            magArray.shiftBaseline( best, by ); // (only with a zero to apply: shiftBaseline seals the live baseline into the saved zero)
+            smooth[ best ] = { smooth[ best ].x - zApply[ 0 ], smooth[ best ].y - zApply[ 1 ], smooth[ best ].z - zApply[ 2 ] };
+        }
         if ( anyGain ) {
             Vec3 g = { gApply[ 0 ], gApply[ 1 ], gApply[ 2 ] };
             magArray.applyGainTrim( best, g );
             smooth[ best ] = { smooth[ best ].x / g.x, smooth[ best ].y / g.y, smooth[ best ].z / g.z };
+            for ( int h = 0; h < 2; h++ ) // the glitch filter's two frames of history are readings too
+                recent[ best ][ h ] = { recent[ best ][ h ].x / g.x, recent[ best ][ h ].y / g.y, recent[ best ][ h ].z / g.z };
             a.lastGainApplied = g;
         }
         a.applied++;
@@ -1514,9 +1566,7 @@ float MagLocator::chiSmoothed( const MagFitResult& r, const bool* use, float alp
         const Vec3& b = smooth[ i ];
         float size = sqrtf( b.x * b.x + b.y * b.y + b.z * b.z );
         float noise = magArray.noiseMt[ i ] * smoothing;
-        float zero = sqrtf( offsets[ i ].variance.x ), least = magSensorTypeZeroMt( magSensorPlaces[ i ].type );
-        if ( zero < least )
-            zero = least;
+        float zero = zeroDoubt[ i ]; // the boot uncertainty, decayed by the follow, grown by the drift while held (keepZeros)
         float m = MAG_MODEL_ERROR * size;
         sigma[ i ] = sqrtf( noise * noise + zero * zero + m * m );
     }
@@ -1713,7 +1763,11 @@ void MagLocator::measureStrength( float strength, Vec3 at ) {
 // write a minute at most, and a probe waved over the board for a moment
 // writes nothing.
 void MagLocator::keepStrengthRecord( uint32_t nowMs ) {
-    if ( knownStrength <= 0.0f || fabsf( knownStrength - strengthSaved ) < MAGLOC_STRENGTH_SAVE_STEP * strengthSaved ) {
+    // A measured strength within the save step of an UNCONFIRMED record still
+    // seals it as measured (2026-09-24: the bench-like world's magnet learned
+    // 3 % from the default, and the record said unconfirmed for good).
+    bool sealOnly = strengthIsMeasured && !strengthSavedMeasured;
+    if ( knownStrength <= 0.0f || ( !sealOnly && fabsf( knownStrength - strengthSaved ) < MAGLOC_STRENGTH_SAVE_STEP * strengthSaved ) ) {
         strengthAwaySinceMs = 0;
         return;
     }
@@ -1731,13 +1785,13 @@ void MagLocator::keepStrengthRecord( uint32_t nowMs ) {
 
 void MagLocator::printFixCsv( Stream* out ) const {
     char line[ 440 ];
-    snprintf( line, sizeof( line ), "fix,%lu,%d,%d,%.2f,%.2f,%.2f,%.2f,%.2f,%.2f,%.3f,%.3f,%.3f,%.1f,%.0f,%.3f,%lu,%.3f,%d,%.2f,%.2f,%.2f,%d,%.2f,%.2f,%.2f,%d,%.2f,%.2f,%.2f,%.2f,%.2f,%.2f,%.2f,%.2f,%.2f,%.1f,%lu",
+    snprintf( line, sizeof( line ), "fix,%lu,%d,%d,%.2f,%.2f,%.2f,%.2f,%.2f,%.2f,%.3f,%.3f,%.3f,%.1f,%.0f,%.3f,%lu,%.3f,%d,%.2f,%.2f,%.2f,%d,%.2f,%.2f,%.2f,%d,%.2f,%.2f,%.2f,%.2f,%.2f,%.2f,%.2f,%.2f,%.2f,%.1f,%lu,%.2f",
               (unsigned long)millis( ), fix.present, fix.valid, fix.magnet.x, fix.magnet.y, fix.magnet.z,
               fix.tip.x, fix.tip.y, fix.tip.z, fix.axis.x, fix.axis.y, fix.axis.z,
               fix.tiltDeg, fix.strength, fix.residual, (unsigned long)fix.fitUs, fix.misfit, fix.seenBy, fix.sigma.x, fix.sigma.y, fix.sigma.z,
               fix.faintBy, fix.rawMagnet.x, fix.rawMagnet.y, fix.rawMagnet.z,
               (int)track.state, track.position.x, track.position.y, track.position.z, track.sigma.x, track.sigma.y, track.sigma.z,
-              track.cursor.x, track.cursor.y, track.cursor.z, track.lastGate, (unsigned long)track.dropped );
+              track.cursor.x, track.cursor.y, track.cursor.z, track.lastGate, (unsigned long)track.dropped, fix.chi );
     out->println( line );
 }
 
@@ -1757,7 +1811,7 @@ void MagLocator::printFix( Stream* out ) const {
     } else if ( !fix.valid ) {
         snprintf( line, sizeof( line ), "magnet seen by %d sensors, faintly by %d (strongest %.2f mT) but no usable fix: chi %.1f (limit %.1f), misfit %.0f %% (limit %.0f), error bar %.1f mm (limit %.0f)%s",
                   fix.seenBy, fix.faintBy, fix.peakMt, fix.chi, fitMaxChi, fix.misfit * 100.0f, MAGLOC_MAX_MISFIT * 100.0f, fix.errorMm, MAGLOC_MAX_ERROR_MM,
-                  fix.chi < fitMaxChi && fix.errorMm < MAGLOC_MAX_ERROR_MM ? " - beyond the array, seen plainly by too few (the mirror basin)" : "" );
+                  fix.rejectedOutside ? " - beyond the array, seen plainly by too few (the mirror basin)" : "" );
     } else {
         snprintf( line, sizeof( line ), "magnet at x %.1f +/-%.1f  y %.1f +/-%.1f  z %.1f +/-%.1f mm   tilt %.0f deg   strength %.0f%s   misfit %.0f %% chi %.1f   seen by %d+%d faint   fit %lu us",
                   fix.magnet.x, fix.sigma.x, fix.magnet.y, fix.sigma.y, fix.magnet.z, fix.sigma.z, fix.tiltDeg, fix.strength,

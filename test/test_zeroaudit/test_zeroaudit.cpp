@@ -70,10 +70,32 @@ void test_reset_keeps_the_applied_count( ) {
     TEST_ASSERT_EQUAL( 3, a.sensor( 2 ).applied );
 }
 
+// The zero's sigma carries the intercept term: with little spread a zero and
+// a gain trade off, and the zero's doubt is larger for it (the same noise,
+// the same samples: about three times at the minimum spread against a wide
+// one). Without it the audit applied zeros it had no right to.
+void test_zero_sigma_grows_as_the_spread_shrinks( ) {
+    ZeroAudit wide, narrow;
+    for ( int k = 0; k < 60; k++ ) {
+        float noise = 0.002f * ( ( k * 7919 ) % 13 - 6 ) / 6.0f; // a fixed pseudo-noise, the same for both
+        float sw = 0.5f + 1.5f * ( k % 7 ) / 6.0f, sn = 0.85f + 0.3f * ( k % 7 ) / 6.0f;
+        Vec3 pw = { 0.20f * sw, -0.10f * sw, 0.30f * sw }, pn = { 0.20f * sn, -0.10f * sn, 0.30f * sn };
+        Vec3 rw = { 0.004f + pw.x + noise, -0.002f + pw.y + noise, 0.010f + pw.z + noise };
+        Vec3 rn = { 0.004f + pn.x + noise, -0.002f + pn.y + noise, 0.010f + pn.z + noise };
+        wide.addSample( 1, pw, rw, 1000 + 10 * k );
+        narrow.addSample( 1, pn, rn, 1000 + 10 * k );
+    }
+    TEST_ASSERT_TRUE( wide.solve( 1, 40, 0.05f ) );
+    TEST_ASSERT_TRUE( narrow.solve( 1, 40, 0.05f ) ); // the narrow feed's spread is 0.1: judged, but under the locator's 0.3
+    float ratio = narrow.sensor( 1 ).zeroSigma.x / wide.sensor( 1 ).zeroSigma.x;
+    TEST_ASSERT_TRUE_MESSAGE( ratio > 2.0f, "a narrow spread doubts the zero more" );
+}
+
 int main( ) {
     UNITY_BEGIN( );
     RUN_TEST( test_zero_and_gain_come_back );
     RUN_TEST( test_an_axis_without_spread_keeps_its_gain );
+    RUN_TEST( test_zero_sigma_grows_as_the_spread_shrinks );
     RUN_TEST( test_no_spread_no_solve );
     RUN_TEST( test_too_few_samples_no_solve );
     RUN_TEST( test_reset_keeps_the_applied_count );

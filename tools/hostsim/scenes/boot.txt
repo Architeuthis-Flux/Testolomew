@@ -1,0 +1,73 @@
+# What a board meets at boot and at rest (2026-09-24, the Phase 3 review's
+# bench-risk findings). (a) Two TMAG5273 zeros 0.03 mT stale (the bench's
+# post-boot state, knobs.md (7)-(8)) and the probe ALREADY on the board: a
+# fix within three seconds - the fit's acceptance doubts a zero nobody has
+# followed since boot by the boot uncertainty, not by the filter's floor.
+# (b) A parked probe while the zeros drift 0.006 mT: the fix stays (the
+# doubt grows at the drift rate while a zero is held). (c) Two stale zeros
+# over the plain level with nothing there: no magnet within 40 s and no
+# presence flicker (a reading no fit could even try to explain is held only
+# the hold-off, not the two-minute hold). (d) The MMC56x3 switched out: its
+# zero holds under the probe (it was following the probe's field: 0.29 mT
+# into its zero in two seconds). Runs with the bench's 1839 magnet.
+:mmc off
+@strength 1839
+:strength 1839
+@seed 5
+@bias 2 0.03 0 0
+@bias 6 0 0.03 0
+@magnet row 15 3
+@run 3000
+:screen
+@expect "row: 15 hole 3"
+l
+@expect "magnet at"
+
+# (b) parked for a minute, then each TMAG's zero drifts its own way by up
+# to 0.006 mT (the same 0.006 on every sensor's x is a field, not drift, and
+# moves the fix a row)
+@run 60000
+@bias 0 0.006 0 0
+@bias 1 -0.004 0 0.003
+@bias 2 0.035 0 -0.004
+@bias 3 0 -0.006 0
+@bias 4 0.003 0.004 0
+@bias 5 -0.005 0 0.002
+@bias 6 0 0.033 0.005
+@bias 7 -0.003 0 -0.006
+@run 30000
+l
+@expect "magnet at"
+:screen
+@expect "row: 15 hole"
+@magnet off
+@bias 0 0 0 0
+@bias 1 0 0 0
+@bias 2 0 0 0
+@bias 3 0 0 0
+@bias 4 0 0 0
+@bias 5 0 0 0
+@bias 6 0 0 0
+@bias 7 0 0 0
+@run 30000
+
+# (c) two zeros over the plain level, nothing there
+:load
+@bias 2 0.05 0 0
+@bias 3 0 0.05 0
+@run 40000
+l
+@expect "no magnet"
+:load
+@expect "presence toggled 4 times"
+@bias 2 0 0 0
+@bias 3 0 0 0
+@run 30000
+
+# (d) the switched-out MMC's zero under the probe
+@magnet row 15 3
+@run 30000
+@baselines
+@seen "baselines over 0.02 mT: none"
+@magnet off
+@run 2000

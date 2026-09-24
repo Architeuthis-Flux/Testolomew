@@ -1,0 +1,834 @@
+# Ten minutes of ordinary taps, twice (2026-09-24): the zero audit must not
+# walk. In a world with no errors it applies NO correction (at 997e74b it
+# "corrected" gains sixteen times on noise and walked a zero, a flash write
+# each); in the bench-like world it finds the two zero errors to a
+# thousandth and nothing else - a quiet far sensor's real share of the
+# probe is held, not followed into its zero and then put back by the audit
+# (a flash write every window at 997e74b).
+:mmc on
+:strength 4232
+@seed 4
+@run 2000
+@magnet row 5 1 0 0
+@run 3000
+@magnet row 7 4 0 7
+@run 3000
+@magnet row 9 2 0 14
+@run 3000
+@magnet row 11 5 0 21
+@run 3000
+@magnet row 13 3 0 28
+@run 3000
+@magnet row 15 1 0 35
+@run 3000
+@magnet row 17 4 0 2
+@run 3000
+@magnet row 19 2 0 9
+@run 3000
+@magnet row 21 5 0 16
+@run 3000
+@magnet row 23 3 0 23
+@run 3000
+@magnet row 25 1 0 30
+@run 3000
+@magnet row 5 4 0 37
+@run 3000
+@magnet row 7 2 0 4
+@run 3000
+@magnet row 9 5 0 11
+@run 3000
+@magnet row 11 3 0 18
+@run 3000
+@magnet row 13 1 0 25
+@run 3000
+@magnet row 15 4 0 32
+@run 3000
+@magnet row 17 2 0 39
+@run 3000
+@magnet row 19 5 0 6
+@run 3000
+@magnet row 21 3 0 13
+@run 3000
+@magnet row 23 1 0 20
+@run 3000
+@magnet row 25 4 0 27
+@run 3000
+@magnet row 5 2 0 34
+@run 3000
+@magnet row 7 5 0 1
+@run 3000
+@magnet row 9 3 0 8
+@run 3000
+@magnet row 11 1 0 15
+@run 3000
+@magnet row 13 4 0 22
+@run 3000
+@magnet row 15 2 0 29
+@run 3000
+@magnet row 17 5 0 36
+@run 3000
+@magnet row 19 3 0 3
+@run 3000
+@magnet row 21 1 0 10
+@run 3000
+@magnet row 23 4 0 17
+@run 3000
+@magnet row 25 2 0 24
+@run 3000
+@magnet row 5 5 0 31
+@run 3000
+@magnet row 7 3 0 38
+@run 3000
+@magnet row 9 1 0 5
+@run 3000
+@magnet row 11 4 0 12
+@run 3000
+@magnet row 13 2 0 19
+@run 3000
+@magnet row 15 5 0 26
+@run 3000
+@magnet row 17 3 0 33
+@run 3000
+@magnet row 19 1 0 0
+@run 3000
+@magnet row 21 4 0 7
+@run 3000
+@magnet row 23 2 0 14
+@run 3000
+@magnet row 25 5 0 21
+@run 3000
+@magnet row 5 3 0 28
+@run 3000
+@magnet row 7 1 0 35
+@run 3000
+@magnet row 9 4 0 2
+@run 3000
+@magnet row 11 2 0 9
+@run 3000
+@magnet row 13 5 0 16
+@run 3000
+@magnet row 15 3 0 23
+@run 3000
+@magnet row 17 1 0 30
+@run 3000
+@magnet row 19 4 0 37
+@run 3000
+@magnet row 21 2 0 4
+@run 3000
+@magnet row 23 5 0 11
+@run 3000
+@magnet row 25 3 0 18
+@run 3000
+@magnet row 5 1 0 25
+@run 3000
+@magnet row 7 4 0 32
+@run 3000
+@magnet row 9 2 0 39
+@run 3000
+@magnet row 11 5 0 6
+@run 3000
+@magnet row 13 3 0 13
+@run 3000
+@magnet row 15 1 0 20
+@run 3000
+@magnet row 17 4 0 27
+@run 3000
+@magnet row 19 2 0 34
+@run 3000
+@magnet row 21 5 0 1
+@run 3000
+@magnet row 23 3 0 8
+@run 3000
+@magnet row 25 1 0 15
+@run 3000
+@magnet row 5 4 0 22
+@run 3000
+@magnet row 7 2 0 29
+@run 3000
+@magnet row 9 5 0 36
+@run 3000
+@magnet row 11 3 0 3
+@run 3000
+@magnet row 13 1 0 10
+@run 3000
+@magnet row 15 4 0 17
+@run 3000
+@magnet row 17 2 0 24
+@run 3000
+@magnet row 19 5 0 31
+@run 3000
+@magnet row 21 3 0 38
+@run 3000
+@magnet row 23 1 0 5
+@run 3000
+@magnet row 25 4 0 12
+@run 3000
+@magnet row 5 2 0 19
+@run 3000
+@magnet row 7 5 0 26
+@run 3000
+@magnet row 9 3 0 33
+@run 3000
+@magnet row 11 1 0 0
+@run 3000
+@magnet row 13 4 0 7
+@run 3000
+@magnet row 15 2 0 14
+@run 3000
+@magnet row 17 5 0 21
+@run 3000
+@magnet row 19 3 0 28
+@run 3000
+@magnet row 21 1 0 35
+@run 3000
+@magnet row 23 4 0 2
+@run 3000
+@magnet row 25 2 0 9
+@run 3000
+@magnet row 5 5 0 16
+@run 3000
+@magnet row 7 3 0 23
+@run 3000
+@magnet row 9 1 0 30
+@run 3000
+@magnet row 11 4 0 37
+@run 3000
+@magnet row 13 2 0 4
+@run 3000
+@magnet row 15 5 0 11
+@run 3000
+@magnet row 17 3 0 18
+@run 3000
+@magnet row 19 1 0 25
+@run 3000
+@magnet row 21 4 0 32
+@run 3000
+@magnet row 23 2 0 39
+@run 3000
+@magnet row 25 5 0 6
+@run 3000
+@magnet row 5 3 0 13
+@run 3000
+@magnet row 7 1 0 20
+@run 3000
+@magnet row 9 4 0 27
+@run 3000
+@magnet row 11 2 0 34
+@run 3000
+@magnet row 13 5 0 1
+@run 3000
+@magnet row 15 3 0 8
+@run 3000
+@magnet row 17 1 0 15
+@run 3000
+@magnet row 19 4 0 22
+@run 3000
+@magnet row 21 2 0 29
+@run 3000
+@magnet row 23 5 0 36
+@run 3000
+@magnet row 25 3 0 3
+@run 3000
+@magnet row 5 1 0 10
+@run 3000
+@magnet row 7 4 0 17
+@run 3000
+@magnet row 9 2 0 24
+@run 3000
+@magnet row 11 5 0 31
+@run 3000
+@magnet row 13 3 0 38
+@run 3000
+@magnet row 15 1 0 5
+@run 3000
+@magnet row 17 4 0 12
+@run 3000
+@magnet row 19 2 0 19
+@run 3000
+@magnet row 21 5 0 26
+@run 3000
+@magnet row 23 3 0 33
+@run 3000
+@magnet row 25 1 0 0
+@run 3000
+@magnet row 5 4 0 7
+@run 3000
+@magnet row 7 2 0 14
+@run 3000
+@magnet row 9 5 0 21
+@run 3000
+@magnet row 11 3 0 28
+@run 3000
+@magnet row 13 1 0 35
+@run 3000
+@magnet row 15 4 0 2
+@run 3000
+@magnet row 17 2 0 9
+@run 3000
+@magnet row 19 5 0 16
+@run 3000
+@magnet row 21 3 0 23
+@run 3000
+@magnet row 23 1 0 30
+@run 3000
+@magnet row 25 4 0 37
+@run 3000
+@magnet row 5 2 0 4
+@run 3000
+@magnet row 7 5 0 11
+@run 3000
+@magnet row 9 3 0 18
+@run 3000
+@magnet row 11 1 0 25
+@run 3000
+@magnet row 13 4 0 32
+@run 3000
+@magnet row 15 2 0 39
+@run 3000
+@magnet row 17 5 0 6
+@run 3000
+@magnet row 19 3 0 13
+@run 3000
+@magnet row 21 1 0 20
+@run 3000
+@magnet row 23 4 0 27
+@run 3000
+@magnet row 25 2 0 34
+@run 3000
+@magnet row 5 5 0 1
+@run 3000
+@magnet row 7 3 0 8
+@run 3000
+@magnet row 9 1 0 15
+@run 3000
+@magnet row 11 4 0 22
+@run 3000
+@magnet row 13 2 0 29
+@run 3000
+@magnet row 15 5 0 36
+@run 3000
+@magnet row 17 3 0 3
+@run 3000
+@magnet row 19 1 0 10
+@run 3000
+@magnet row 21 4 0 17
+@run 3000
+@magnet row 23 2 0 24
+@run 3000
+@magnet row 25 5 0 31
+@run 3000
+@magnet row 5 3 0 38
+@run 3000
+@magnet row 7 1 0 5
+@run 3000
+@magnet row 9 4 0 12
+@run 3000
+@magnet row 11 2 0 19
+@run 3000
+@magnet row 13 5 0 26
+@run 3000
+@magnet row 15 3 0 33
+@run 3000
+@magnet row 17 1 0 0
+@run 3000
+@magnet row 19 4 0 7
+@run 3000
+@magnet row 21 2 0 14
+@run 3000
+@magnet row 23 5 0 21
+@run 3000
+@magnet row 25 3 0 28
+@run 3000
+@magnet row 5 1 0 35
+@run 3000
+@magnet row 7 4 0 2
+@run 3000
+@magnet row 9 2 0 9
+@run 3000
+@magnet row 11 5 0 16
+@run 3000
+@magnet row 13 3 0 23
+@run 3000
+@magnet row 15 1 0 30
+@run 3000
+@magnet row 17 4 0 37
+@run 3000
+@magnet row 19 2 0 4
+@run 3000
+@magnet row 21 5 0 11
+@run 3000
+@magnet row 23 3 0 18
+@run 3000
+@magnet row 25 1 0 25
+@run 3000
+@magnet row 5 4 0 32
+@run 3000
+@magnet row 7 2 0 39
+@run 3000
+@magnet row 9 5 0 6
+@run 3000
+@magnet row 11 3 0 13
+@run 3000
+@magnet row 13 1 0 20
+@run 3000
+@magnet row 15 4 0 27
+@run 3000
+@magnet row 17 2 0 34
+@run 3000
+@magnet row 19 5 0 1
+@run 3000
+@magnet row 21 3 0 8
+@run 3000
+@magnet row 23 1 0 15
+@run 3000
+@magnet row 25 4 0 22
+@run 3000
+@magnet row 5 2 0 29
+@run 3000
+@magnet row 7 5 0 36
+@run 3000
+@magnet row 9 3 0 3
+@run 3000
+@magnet row 11 1 0 10
+@run 3000
+@magnet row 13 4 0 17
+@run 3000
+@magnet row 15 2 0 24
+@run 3000
+@magnet row 17 5 0 31
+@run 3000
+@magnet row 19 3 0 38
+@run 3000
+@magnet row 21 1 0 5
+@run 3000
+@magnet row 23 4 0 12
+@run 3000
+@magnet row 25 2 0 19
+@run 3000
+@magnet row 5 5 0 26
+@run 3000
+@magnet row 7 3 0 33
+@run 3000
+:audit
+@expect "corrections applied since boot: 0"
+@magnet off
+@run 2000
+
+# ...and the bench-like world (the MMC out, 1839, two gains off, two zero errors, one sensor 1 mm off)
+:mmc off
+@strength 1839
+:strength 1839
+:audit reset
+@seed 3
+@gain 2 1.03
+@gain 5 0.96
+@bias 1 0.015 0 0
+@bias 6 0 -0.012 0.008
+@place 5 0.8 0.5 0
+@run 2000
+@magnet row 5 1 0 0
+@run 3000
+@magnet row 7 4 0 7
+@run 3000
+@magnet row 9 2 0 14
+@run 3000
+@magnet row 11 5 0 21
+@run 3000
+@magnet row 13 3 0 28
+@run 3000
+@magnet row 15 1 0 35
+@run 3000
+@magnet row 17 4 0 2
+@run 3000
+@magnet row 19 2 0 9
+@run 3000
+@magnet row 21 5 0 16
+@run 3000
+@magnet row 23 3 0 23
+@run 3000
+@magnet row 25 1 0 30
+@run 3000
+@magnet row 5 4 0 37
+@run 3000
+@magnet row 7 2 0 4
+@run 3000
+@magnet row 9 5 0 11
+@run 3000
+@magnet row 11 3 0 18
+@run 3000
+@magnet row 13 1 0 25
+@run 3000
+@magnet row 15 4 0 32
+@run 3000
+@magnet row 17 2 0 39
+@run 3000
+@magnet row 19 5 0 6
+@run 3000
+@magnet row 21 3 0 13
+@run 3000
+@magnet row 23 1 0 20
+@run 3000
+@magnet row 25 4 0 27
+@run 3000
+@magnet row 5 2 0 34
+@run 3000
+@magnet row 7 5 0 1
+@run 3000
+@magnet row 9 3 0 8
+@run 3000
+@magnet row 11 1 0 15
+@run 3000
+@magnet row 13 4 0 22
+@run 3000
+@magnet row 15 2 0 29
+@run 3000
+@magnet row 17 5 0 36
+@run 3000
+@magnet row 19 3 0 3
+@run 3000
+@magnet row 21 1 0 10
+@run 3000
+@magnet row 23 4 0 17
+@run 3000
+@magnet row 25 2 0 24
+@run 3000
+@magnet row 5 5 0 31
+@run 3000
+@magnet row 7 3 0 38
+@run 3000
+@magnet row 9 1 0 5
+@run 3000
+@magnet row 11 4 0 12
+@run 3000
+@magnet row 13 2 0 19
+@run 3000
+@magnet row 15 5 0 26
+@run 3000
+@magnet row 17 3 0 33
+@run 3000
+@magnet row 19 1 0 0
+@run 3000
+@magnet row 21 4 0 7
+@run 3000
+@magnet row 23 2 0 14
+@run 3000
+@magnet row 25 5 0 21
+@run 3000
+@magnet row 5 3 0 28
+@run 3000
+@magnet row 7 1 0 35
+@run 3000
+@magnet row 9 4 0 2
+@run 3000
+@magnet row 11 2 0 9
+@run 3000
+@magnet row 13 5 0 16
+@run 3000
+@magnet row 15 3 0 23
+@run 3000
+@magnet row 17 1 0 30
+@run 3000
+@magnet row 19 4 0 37
+@run 3000
+@magnet row 21 2 0 4
+@run 3000
+@magnet row 23 5 0 11
+@run 3000
+@magnet row 25 3 0 18
+@run 3000
+@magnet row 5 1 0 25
+@run 3000
+@magnet row 7 4 0 32
+@run 3000
+@magnet row 9 2 0 39
+@run 3000
+@magnet row 11 5 0 6
+@run 3000
+@magnet row 13 3 0 13
+@run 3000
+@magnet row 15 1 0 20
+@run 3000
+@magnet row 17 4 0 27
+@run 3000
+@magnet row 19 2 0 34
+@run 3000
+@magnet row 21 5 0 1
+@run 3000
+@magnet row 23 3 0 8
+@run 3000
+@magnet row 25 1 0 15
+@run 3000
+@magnet row 5 4 0 22
+@run 3000
+@magnet row 7 2 0 29
+@run 3000
+@magnet row 9 5 0 36
+@run 3000
+@magnet row 11 3 0 3
+@run 3000
+@magnet row 13 1 0 10
+@run 3000
+@magnet row 15 4 0 17
+@run 3000
+@magnet row 17 2 0 24
+@run 3000
+@magnet row 19 5 0 31
+@run 3000
+@magnet row 21 3 0 38
+@run 3000
+@magnet row 23 1 0 5
+@run 3000
+@magnet row 25 4 0 12
+@run 3000
+@magnet row 5 2 0 19
+@run 3000
+@magnet row 7 5 0 26
+@run 3000
+@magnet row 9 3 0 33
+@run 3000
+@magnet row 11 1 0 0
+@run 3000
+@magnet row 13 4 0 7
+@run 3000
+@magnet row 15 2 0 14
+@run 3000
+@magnet row 17 5 0 21
+@run 3000
+@magnet row 19 3 0 28
+@run 3000
+@magnet row 21 1 0 35
+@run 3000
+@magnet row 23 4 0 2
+@run 3000
+@magnet row 25 2 0 9
+@run 3000
+@magnet row 5 5 0 16
+@run 3000
+@magnet row 7 3 0 23
+@run 3000
+@magnet row 9 1 0 30
+@run 3000
+@magnet row 11 4 0 37
+@run 3000
+@magnet row 13 2 0 4
+@run 3000
+@magnet row 15 5 0 11
+@run 3000
+@magnet row 17 3 0 18
+@run 3000
+@magnet row 19 1 0 25
+@run 3000
+@magnet row 21 4 0 32
+@run 3000
+@magnet row 23 2 0 39
+@run 3000
+@magnet row 25 5 0 6
+@run 3000
+@magnet row 5 3 0 13
+@run 3000
+@magnet row 7 1 0 20
+@run 3000
+@magnet row 9 4 0 27
+@run 3000
+@magnet row 11 2 0 34
+@run 3000
+@magnet row 13 5 0 1
+@run 3000
+@magnet row 15 3 0 8
+@run 3000
+@magnet row 17 1 0 15
+@run 3000
+@magnet row 19 4 0 22
+@run 3000
+@magnet row 21 2 0 29
+@run 3000
+@magnet row 23 5 0 36
+@run 3000
+@magnet row 25 3 0 3
+@run 3000
+@magnet row 5 1 0 10
+@run 3000
+@magnet row 7 4 0 17
+@run 3000
+@magnet row 9 2 0 24
+@run 3000
+@magnet row 11 5 0 31
+@run 3000
+@magnet row 13 3 0 38
+@run 3000
+@magnet row 15 1 0 5
+@run 3000
+@magnet row 17 4 0 12
+@run 3000
+@magnet row 19 2 0 19
+@run 3000
+@magnet row 21 5 0 26
+@run 3000
+@magnet row 23 3 0 33
+@run 3000
+@magnet row 25 1 0 0
+@run 3000
+@magnet row 5 4 0 7
+@run 3000
+@magnet row 7 2 0 14
+@run 3000
+@magnet row 9 5 0 21
+@run 3000
+@magnet row 11 3 0 28
+@run 3000
+@magnet row 13 1 0 35
+@run 3000
+@magnet row 15 4 0 2
+@run 3000
+@magnet row 17 2 0 9
+@run 3000
+@magnet row 19 5 0 16
+@run 3000
+@magnet row 21 3 0 23
+@run 3000
+@magnet row 23 1 0 30
+@run 3000
+@magnet row 25 4 0 37
+@run 3000
+@magnet row 5 2 0 4
+@run 3000
+@magnet row 7 5 0 11
+@run 3000
+@magnet row 9 3 0 18
+@run 3000
+@magnet row 11 1 0 25
+@run 3000
+@magnet row 13 4 0 32
+@run 3000
+@magnet row 15 2 0 39
+@run 3000
+@magnet row 17 5 0 6
+@run 3000
+@magnet row 19 3 0 13
+@run 3000
+@magnet row 21 1 0 20
+@run 3000
+@magnet row 23 4 0 27
+@run 3000
+@magnet row 25 2 0 34
+@run 3000
+@magnet row 5 5 0 1
+@run 3000
+@magnet row 7 3 0 8
+@run 3000
+@magnet row 9 1 0 15
+@run 3000
+@magnet row 11 4 0 22
+@run 3000
+@magnet row 13 2 0 29
+@run 3000
+@magnet row 15 5 0 36
+@run 3000
+@magnet row 17 3 0 3
+@run 3000
+@magnet row 19 1 0 10
+@run 3000
+@magnet row 21 4 0 17
+@run 3000
+@magnet row 23 2 0 24
+@run 3000
+@magnet row 25 5 0 31
+@run 3000
+@magnet row 5 3 0 38
+@run 3000
+@magnet row 7 1 0 5
+@run 3000
+@magnet row 9 4 0 12
+@run 3000
+@magnet row 11 2 0 19
+@run 3000
+@magnet row 13 5 0 26
+@run 3000
+@magnet row 15 3 0 33
+@run 3000
+@magnet row 17 1 0 0
+@run 3000
+@magnet row 19 4 0 7
+@run 3000
+@magnet row 21 2 0 14
+@run 3000
+@magnet row 23 5 0 21
+@run 3000
+@magnet row 25 3 0 28
+@run 3000
+@magnet row 5 1 0 35
+@run 3000
+@magnet row 7 4 0 2
+@run 3000
+@magnet row 9 2 0 9
+@run 3000
+@magnet row 11 5 0 16
+@run 3000
+@magnet row 13 3 0 23
+@run 3000
+@magnet row 15 1 0 30
+@run 3000
+@magnet row 17 4 0 37
+@run 3000
+@magnet row 19 2 0 4
+@run 3000
+@magnet row 21 5 0 11
+@run 3000
+@magnet row 23 3 0 18
+@run 3000
+@magnet row 25 1 0 25
+@run 3000
+@magnet row 5 4 0 32
+@run 3000
+@magnet row 7 2 0 39
+@run 3000
+@magnet row 9 5 0 6
+@run 3000
+@magnet row 11 3 0 13
+@run 3000
+@magnet row 13 1 0 20
+@run 3000
+@magnet row 15 4 0 27
+@run 3000
+@magnet row 17 2 0 34
+@run 3000
+@magnet row 19 5 0 1
+@run 3000
+@magnet row 21 3 0 8
+@run 3000
+@magnet row 23 1 0 15
+@run 3000
+@magnet row 25 4 0 22
+@run 3000
+@magnet row 5 2 0 29
+@run 3000
+@magnet row 7 5 0 36
+@run 3000
+@magnet row 9 3 0 3
+@run 3000
+@magnet row 11 1 0 10
+@run 3000
+@magnet row 13 4 0 17
+@run 3000
+@magnet row 15 2 0 24
+@run 3000
+@magnet row 17 5 0 31
+@run 3000
+@magnet row 19 3 0 38
+@run 3000
+@magnet row 21 1 0 5
+@run 3000
+@magnet row 23 4 0 12
+@run 3000
+@magnet row 25 2 0 19
+@run 3000
+@magnet row 5 5 0 26
+@run 3000
+@magnet row 7 3 0 33
+@run 3000
+:audit
+@expect "corrections applied since boot: 2"
+@seen "sensor 1's zero was off by 0.01"
+@seen "sensor 6's zero was off by 0.0000 -0.01"
+@magnet off
+@run 2000
