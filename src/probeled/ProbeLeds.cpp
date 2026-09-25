@@ -91,7 +91,8 @@ int ledLayoutV5Pixel( const LedLayout* layout, int i ) {
 
 // ---- rendering -------------------------------------------------------------
 
-const char* const probeLedSchemeNames[ PROBELED_SCHEME_COUNT ] = { "classic", "height", "sure", "amber", "cyan", "rainbow" };
+const char* const probeLedSchemeNames[ PROBELED_SCHEME_COUNT ] = { "classic", "height", "sure", "aim", "rainbow" };
+const char* const probeLedDataNames[ PROBELED_DATA_COUNT ] = { "none", "unsure", "height", "tilt", "speed" };
 
 void probeLedHue( float hueDeg, float brightness, uint8_t* r, uint8_t* g, uint8_t* b ) {
     while ( hueDeg < 0.0f )
@@ -163,6 +164,12 @@ void probeLedDefaultStyle( ProbeLedStyle* s ) {
     s->attackS = 0.02f;
     s->decayS = 0.12f;
     s->scheme = PROBELED_SCHEME_CLASSIC;
+    s->hueTurns = 0.667f; // two thirds of the wheel: red to blue (the height scheme as it was)
+    s->hueStartDeg = 0.0f;
+    s->colourByMm = 6.0f;
+    s->brightBy = PROBELED_DATA_SURE;
+    s->brightAmount = 0.5f; // a coin-toss row at half
+    s->sparkleBy = PROBELED_DATA_HEIGHT;
     s->fullPeak = true;
     s->bloom = 0.0f;
     s->sparkle = 0.0f;
@@ -245,10 +252,27 @@ static void splat( const LedLayout* layout, ProbeLedFrame* frame, float along, f
 }
 
 // How much of the scheme's colour the cursor shows at this height: none
-// (white) with the point on the board, all of it from PROBELED_COLOUR_BY_MM
-// up. The classic scheme has its own, longer ramp.
-static float colourByHeight( float heightMm ) {
-    return clamp01( ( heightMm - PROBELED_WHITE_BELOW_MM ) / ( PROBELED_COLOUR_BY_MM - PROBELED_WHITE_BELOW_MM ) );
+// (white) with the point on the board, all of it from the style's
+// colourByMm up. The classic scheme has its own, longer ramp.
+static float colourByHeight( const ProbeLedStyle* style, float heightMm ) {
+    float by = style->colourByMm > PROBELED_WHITE_BELOW_MM + 0.1f ? style->colourByMm : PROBELED_WHITE_BELOW_MM + 0.1f;
+    return clamp01( ( heightMm - PROBELED_WHITE_BELOW_MM ) / ( by - PROBELED_WHITE_BELOW_MM ) );
+}
+
+// One of the data a look can follow, 0 at its near end, 1 at its far end.
+static float dataOf( const ProbeLedStyle* style, const ProbeLedInput* in, int which ) {
+    switch ( which ) {
+    case PROBELED_DATA_SURE:
+        return 1.0f - clamp01( in->confidence );
+    case PROBELED_DATA_HEIGHT:
+        return clamp01( in->heightMm / style->liftFullMm );
+    case PROBELED_DATA_TILT:
+        return clamp01( in->tiltDeg / PROBELED_TILT_FULL_DEG );
+    case PROBELED_DATA_SPEED:
+        return clamp01( in->speedMmS / PROBELED_SPEED_FULL_MM_S );
+    default:
+        return 0.0f;
+    }
 }
 
 static void whiteTo( uint8_t* r, uint8_t* g, uint8_t* b, float amount ) {
@@ -260,31 +284,24 @@ static void whiteTo( uint8_t* r, uint8_t* g, uint8_t* b, float amount ) {
 // The cursor's colour under the scheme, for this frame's state: white on
 // the board in every scheme, the scheme's colour as the point lifts.
 static void schemeColour( const ProbeLedStyle* style, const ProbeLedInput* in, float timeS, uint8_t* r, uint8_t* g, uint8_t* b ) {
-    float lift = clamp01( in->heightMm / style->liftFullMm );
+    float wheel = style->hueTurns * 360.0f; // the wheel over the scheme's scale (probeLedHue wraps: over a turn is several rainbows)
     switch ( style->scheme ) {
     case PROBELED_SCHEME_HEIGHT:
-        probeLedHue( 240.0f * lift, 1.0f, r, g, b ); // red just off the board, blue up high
-        whiteTo( r, g, b, colourByHeight( in->heightMm ) );
+        probeLedHue( style->hueStartDeg + wheel * in->heightMm / style->liftFullMm, 1.0f, r, g, b );
+        whiteTo( r, g, b, colourByHeight( style, in->heightMm ) );
         break;
-    case PROBELED_SCHEME_CONFIDENCE:
-        probeLedHue( 120.0f * clamp01( in->confidence ), 1.0f, r, g, b ); // red unsure, green sure
-        whiteTo( r, g, b, colourByHeight( in->heightMm ) );
+    case PROBELED_SCHEME_SURE:
+        probeLedHue( style->hueStartDeg + wheel * clamp01( in->confidence ), 1.0f, r, g, b ); // the start of the wheel unsure, its end sure
+        whiteTo( r, g, b, colourByHeight( style, in->heightMm ) );
         break;
-    case PROBELED_SCHEME_AMBER:
-        *r = 255;
-        *g = 120;
-        *b = 30;
-        whiteTo( r, g, b, colourByHeight( in->heightMm ) );
-        break;
-    case PROBELED_SCHEME_CYAN:
-        *r = 0;
-        *g = 200;
-        *b = 255;
-        whiteTo( r, g, b, colourByHeight( in->heightMm ) );
+    case PROBELED_SCHEME_AIM:
+        // Which way the probe leans, round the wheel; white standing straight.
+        probeLedHue( style->hueStartDeg + style->hueTurns * in->aimDeg, 1.0f, r, g, b );
+        whiteTo( r, g, b, colourByHeight( style, in->heightMm ) * clamp01( in->tiltDeg / PROBELED_AIM_FULL_DEG ) );
         break;
     case PROBELED_SCHEME_RAINBOW:
-        probeLedHue( timeS * 90.0f, 1.0f, r, g, b ); // the per-LED spread is applied after the splats
-        whiteTo( r, g, b, colourByHeight( in->heightMm ) );
+        probeLedHue( style->hueStartDeg + timeS * 90.0f, 1.0f, r, g, b ); // the per-LED spread is applied after the splats
+        whiteTo( r, g, b, colourByHeight( style, in->heightMm ) );
         break;
     default: {
         // Classic: white on the board (and the same white plateau as the
@@ -409,8 +426,8 @@ void probeLedRender( const LedLayout* layout, const ProbeLedInput* in, const Pro
             peak *= 0.6f;
         } else {
             schemeColour( style, in, frame->timeS, &r, &g, &b );
-            // Sure = bright; a coin-toss row = half.
-            peak *= 0.5f + 0.5f * clamp01( in->confidence );
+            // Dimmed by the chosen data (unsure by default: a coin-toss row at half).
+            peak *= 1.0f - clamp01( style->brightAmount ) * dataOf( style, in, style->brightBy );
             if ( in->state == PROBELED_COASTING )
                 peak *= 0.7f;
         }
@@ -481,27 +498,29 @@ void probeLedRender( const LedLayout* layout, const ProbeLedInput* in, const Pro
         }
     }
 
-    // Rainbow: the hue runs along the board (30 degrees a row) and round
-    // with time; every lit LED gets its own - white on the board, like the
-    // other schemes. (Before the sparkles, which go over it.)
+    // Rainbow: the hue runs along the board (hueTurns of the wheel over its
+    // 30 rows) and round with time; every lit LED gets its own - white on
+    // the board, like the other schemes. (Before the sparkles, which go over it.)
     if ( style->scheme == PROBELED_SCHEME_RAINBOW && in->state != PROBELED_NONE && !asBrush ) {
-        float amount = colourByHeight( in->heightMm );
+        float amount = colourByHeight( style, in->heightMm );
+        float perRow = style->hueTurns * 360.0f / PROBELED_ROWS;
         for ( int i = 0; i < layout->count; i++ ) {
             if ( frame->target[ i ] <= 0.0f )
                 continue;
-            probeLedHue( frame->timeS * 90.0f + layout->along[ i ] * 30.0f + layout->acrossMm[ i ] * 4.0f, 1.0f, &frame->r[ i ], &frame->g[ i ], &frame->b[ i ] );
+            probeLedHue( style->hueStartDeg + frame->timeS * 90.0f + layout->along[ i ] * perRow + layout->acrossMm[ i ] * 4.0f, 1.0f, &frame->r[ i ], &frame->g[ i ], &frame->b[ i ] );
             whiteTo( &frame->r[ i ], &frame->g[ i ], &frame->b[ i ], amount );
         }
     }
 
     // Sparkle: any LED in the glow may flash this frame, the odds rising
-    // with the lever and with the height - the point on the board is a
-    // plain white dot with a few, lifted it is a soft glow full of them -
-    // white with a little of a random hue in it, so no two twinkle quite
-    // alike; the decay below turns each flash into a twinkle.
+    // with the lever and with the chosen data (the height by default: the
+    // point on the board is a plain white dot with a few, lifted it is a
+    // soft glow full of them) - white with a little of a random hue in it,
+    // so no two twinkle quite alike; the decay below turns each flash into
+    // a twinkle.
     if ( style->sparkle > 0.0f && in->state != PROBELED_NONE && !asBrush ) {
-        float byHeight = in->state == PROBELED_ROUGH ? 1.0f : PROBELED_SPARKLE_FLOOR + ( 1.0f - PROBELED_SPARKLE_FLOOR ) * clamp01( in->heightMm / style->liftFullMm );
-        uint32_t odds = (uint32_t)( style->sparkle * byHeight * 0.03f * 4294967296.0f );
+        float byData = in->state == PROBELED_ROUGH || style->sparkleBy == PROBELED_DATA_NONE ? 1.0f : PROBELED_SPARKLE_FLOOR + ( 1.0f - PROBELED_SPARKLE_FLOOR ) * dataOf( style, in, style->sparkleBy );
+        uint32_t odds = (uint32_t)( style->sparkle * byData * 0.03f * 4294967296.0f );
         for ( int i = 0; i < layout->count; i++ ) {
             if ( frame->target[ i ] < 0.02f )
                 continue;

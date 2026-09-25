@@ -23,7 +23,7 @@ ProbeLedService& ProbeLedService::getInstance( ) {
 static void onStream( Stream* out ) {
     probeLeds.streaming = !probeLeds.streaming;
     if ( probeLeds.streaming ) {
-        out->println( "cursor,state,along_rows,across_mm,sigma_rows,sigma_across_mm,confidence,height_mm,have_under,under_along,under_across" );
+        out->println( "cursor,state,along_rows,across_mm,sigma_rows,sigma_across_mm,confidence,height_mm,have_under,under_along,under_across,tilt_deg,aim_deg,speed_mm_s" );
     }
 }
 
@@ -268,8 +268,8 @@ void ProbeLedService::sendFrame( bool chainFree, bool topFree, int count ) {
 
 void ProbeLedService::printCursorLine( Stream* out ) const {
     char line[ 160 ];
-    snprintf( line, sizeof( line ), "cursor,%d,%.2f,%.2f,%.2f,%.2f,%.2f,%.1f,%d,%.2f,%.2f", (int)input.state, input.along, input.acrossMm, input.sigmaRows, input.sigmaAcrossMm,
-              input.confidence, input.heightMm, input.haveUnder ? 1 : 0, input.underAlong, input.underAcrossMm );
+    snprintf( line, sizeof( line ), "cursor,%d,%.2f,%.2f,%.2f,%.2f,%.2f,%.1f,%d,%.2f,%.2f,%.0f,%.0f,%.0f", (int)input.state, input.along, input.acrossMm, input.sigmaRows, input.sigmaAcrossMm,
+              input.confidence, input.heightMm, input.haveUnder ? 1 : 0, input.underAlong, input.underAcrossMm, input.tiltDeg, input.aimDeg, input.speedMmS ); // (the last three since 2026-09-25; a reader of the first ten is unchanged)
     out->println( line );
 }
 
@@ -303,6 +303,13 @@ ServiceStatus ProbeLedService::service( ) {
         in.heightMm = tip.z - magLocator.boardZ;
         if ( in.heightMm < 0.0f )
             in.heightMm = 0.0f;
+        // The lean (for the aim scheme and the tilt data) and the speed.
+        Vec3 shaft = track.enabled ? track.shaft : magLocator.fix.shaft;
+        in.tiltDeg = track.enabled ? track.tiltDeg : magLocator.fix.tiltDeg;
+        in.aimDeg = atan2f( shaft.y, shaft.x ) * ( 180.0f / (float)M_PI );
+        if ( in.aimDeg < 0.0f )
+            in.aimDeg += 360.0f;
+        in.speedMmS = track.enabled ? sqrtf( track.velocity.x * track.velocity.x + track.velocity.y * track.velocity.y + track.velocity.z * track.velocity.z ) : 0.0f;
         if ( track.enabled && track.reachMm > 0.5f ) {
             Vec3 under = { tip.x, tip.y, magLocator.boardZ };
             RowPlace u = rowGridPlace( &grid, under );

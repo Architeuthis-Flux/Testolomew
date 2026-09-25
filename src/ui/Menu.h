@@ -94,7 +94,9 @@ struct Menu {
     int stack[ MENU_MAX_DEPTH ]; // submenus entered, with the cursor to come back to
     int stackCursor[ MENU_MAX_DEPTH ];
     int depth;
-    int repeats; // repeats in a row on a number (the fast step)
+    int repeats;    // repeats in a row on a number (the fast step)
+    int lastPage;   // the page last used (a submenu's index; MENU_ROOT = none yet): the menu opens there again (menuResume)
+    int lastCursor; // ...and its cursor
 };
 
 void menuInit( Menu* m );
@@ -135,5 +137,12 @@ int menuKey( Menu* m, MenuKey key, bool repeat );
 
 // Back to the root page, cursor at the top.
 void menuHome( Menu* m );
+// At the root with a page remembered (the last one a key was used on, or
+// entered): back into it with its cursor as it was, the stack rebuilt from
+// its parents, so the menu opens where it was last used. Nothing otherwise.
+void menuResume( Menu* m );
+// Note the page and cursor in use (menuKey does; the shell's own steering
+// of the cursor does too).
+void menuRemember( Menu* m );
 
 #endif // MENU_H

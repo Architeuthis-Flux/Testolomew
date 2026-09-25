@@ -27,7 +27,7 @@ void Ui::begin( const UiApp* apps, int appCount, int firstApp, int settingsCell 
     shell.menuRows = UI_MENU_ROWS;
     consoleAddVerb( "screen", "", "what the screen shows, as text: app, panes, menu page and items, the modules' state", CONSOLE_READS, onScreenVerb );
     consoleAddVerb( "log", "[n]", "the last n lines of the log (20)", CONSOLE_READS, onLogVerb );
-    consoleAddVerb( "ui", "open|menu|close|back|enter|up|down|left|right|go <label>", "drive the screen: Home, Settings, the panes", CONSOLE_CHANGES, onUiVerb );
+    consoleAddVerb( "ui", "open|menu|root|close|back|enter|hold|up|down|left|right|go <label>", "drive the screen: Home, Settings (menu: where it was last used; root: its top page), the panes (hold: the select held - a value tweaked over the app)", CONSOLE_CHANGES, onUiVerb );
 }
 
 void Ui::runAction( int index ) {
@@ -278,6 +278,31 @@ void Ui::drawResult( GFXcanvas16* canvas ) {
     fastText( canvas, x0 + 4, y0 + h - 10, 1, UI_COLOR_DIM, scroll > 0 ? "up/down: scroll (older)  B: back" : "up/down: scroll  B: back" );
 }
 
+// A value tweaked over the app: one line along the bottom - the item's label
+// and its value - and the hint under it. The menu beneath is not drawn.
+void Ui::drawTweak( GFXcanvas16* canvas ) {
+    Menu& menu = shell.menu;
+    const int h = UI_LINE_H + 16;
+    const int x0 = 4, y0 = LCD_HEIGHT - h - 4, w = LCD_WIDTH - 8;
+    fastFillRect( canvas, x0, y0, w, h, UI_COLOR_PANEL );
+    fastRect( canvas, x0, y0, w, h, UI_COLOR_SELECTED );
+    int index = menuCursorItem( &menu );
+    if ( index >= 0 ) {
+        char value[ 24 ] = "", text[ 48 ];
+        uiMenuItemValue( &menu, index, value, sizeof( value ) );
+        const int columns = ( w - 8 ) / UI_CHAR_W;
+        int valueChars = (int)strlen( value );
+        int labelChars = columns - valueChars - ( valueChars > 0 ? 1 : 0 );
+        if ( labelChars < 4 )
+            labelChars = 4;
+        snprintf( text, sizeof( text ), "%.*s", labelChars, menu.items[ index ].label );
+        fastText( canvas, x0 + 4, y0 + 3, UI_TEXT, UI_COLOR_SELECTED, text );
+        if ( value[ 0 ] )
+            fastText( canvas, x0 + w - 4 - UI_CHAR_W * valueChars, y0 + 3, UI_TEXT, UI_COLOR_TEXT, value );
+    }
+    fastText( canvas, x0 + 4, y0 + h - 10, 1, UI_COLOR_DIM, "left/right: change  up/down: next  B: menu" );
+}
+
 void Ui::draw( GFXcanvas16* canvas ) {
     if ( uiShellTop( &shell ) == PANE_HOME ) {
         drawHome( canvas ); // opaque: nothing underneath is drawn
@@ -291,7 +316,12 @@ void Ui::draw( GFXcanvas16* canvas ) {
     for ( int d = 0; d < shell.depth; d++ ) {
         switch ( shell.stack[ d ] ) {
         case PANE_MENU:
+            if ( d + 1 < shell.depth && shell.stack[ d + 1 ] == PANE_TWEAK )
+                break; // hidden under the tweak: the app shows
             drawMenu( canvas );
+            break;
+        case PANE_TWEAK:
+            drawTweak( canvas );
             break;
         case PANE_CONFIRM:
             drawConfirm( canvas );
@@ -307,7 +337,7 @@ void Ui::draw( GFXcanvas16* canvas ) {
 
 // ---- :screen, :log, :ui ------------------------------------------------------------
 
-static const char* const paneNames[ 5 ] = { "app", "home", "menu", "confirm", "result" };
+static const char* const paneNames[ 6 ] = { "app", "home", "menu", "confirm", "result", "tweak" };
 
 void Ui::printScreen( Stream* out ) {
     char line[ 120 ];
@@ -350,6 +380,13 @@ void Ui::printScreen( Stream* out ) {
                 snprintf( line, sizeof( line ), "%c %-24s %s", k == menu.cursor ? '>' : ' ', menu.items[ index ].label, value );
                 out->println( line );
             }
+        } else if ( shell.stack[ d ] == PANE_TWEAK ) {
+            int index = menuCursorItem( &shell.menu );
+            char value[ 24 ] = "";
+            if ( index >= 0 )
+                uiMenuItemValue( &shell.menu, index, value, sizeof( value ) );
+            snprintf( line, sizeof( line ), "tweak: %s %s", index >= 0 ? shell.menu.items[ index ].label : "?", value );
+            out->println( line );
         } else if ( shell.stack[ d ] == PANE_CONFIRM ) {
             snprintf( line, sizeof( line ), "confirm: %s", shell.confirmItem >= 0 ? shell.menu.items[ shell.confirmItem ].label : "?" );
             out->println( line );
@@ -436,7 +473,7 @@ static void shellTap( InputControl c, bool holdIt ) {
 
 static void onUiVerb( int argc, char** argv, Stream* out ) {
     if ( argc < 2 ) {
-        consoleErr( out, "usage: :ui open|menu|close|back|enter|up|down|left|right|go <label>" );
+        consoleErr( out, "usage: :ui open|menu|root|close|back|enter|hold|up|down|left|right|go <label>" );
         return;
     }
     const char* what = argv[ 1 ];
@@ -447,6 +484,12 @@ static void onUiVerb( int argc, char** argv, Stream* out ) {
     } else if ( strcmp( what, "menu" ) == 0 ) {
         uiShellOpenMenu( s );
         consoleOk( out, "menu" );
+    } else if ( strcmp( what, "root" ) == 0 ) {
+        uiShellOpenMenuRoot( s );
+        consoleOk( out, "root" );
+    } else if ( strcmp( what, "hold" ) == 0 ) {
+        shellTap( IN_NAV_PRESS, true );
+        consoleOk( out, "hold" );
     } else if ( strcmp( what, "close" ) == 0 ) {
         uiShellCloseAll( s );
         consoleOk( out, "closed" );
@@ -507,6 +550,6 @@ static void onUiVerb( int argc, char** argv, Stream* out ) {
             consoleErr( out, "go works on Home or a menu page (:ui open, :ui menu)" );
         }
     } else {
-        consoleErr( out, "usage: :ui open|menu|close|back|enter|up|down|left|right|go <label>" );
+        consoleErr( out, "usage: :ui open|menu|root|close|back|enter|hold|up|down|left|right|go <label>" );
     }
 }

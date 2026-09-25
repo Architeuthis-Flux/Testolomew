@@ -400,7 +400,7 @@ void MagLocator::begin( ) {
 
 Vec3 MagLocator::pointerOf( Vec3 tip, Vec3 shaft ) const {
     float reach = 0.0f;
-    return magTrackPointer( boardZ, MAGTRACK_MAX_REACH_MM, tip, shaft, &reach ); // the one geometry, the tracker's cursor included
+    return magTrackPointer( boardZ, track.maxReachMm, tip, shaft, &reach ); // the one geometry, the tracker's cursor included (the menu's reach; the define until 2026-09-25, so the raw pointer ignored it)
 }
 
 // Does the new baseline have a magnet in it? See MAGLOC_BASELINE_* in the header.

@@ -7,6 +7,8 @@ void menuInit( Menu* m ) {
     m->cursor = 0;
     m->depth = 0;
     m->repeats = 0;
+    m->lastPage = MENU_ROOT;
+    m->lastCursor = 0;
 }
 
 static int add( Menu* m, MenuItem item ) {
@@ -211,6 +213,44 @@ void menuHome( Menu* m ) {
     m->repeats = 0;
 }
 
+void menuRemember( Menu* m ) {
+    if ( m->depth > 0 && m->current != MENU_ROOT ) {
+        m->lastPage = m->current;
+        m->lastCursor = m->cursor;
+    }
+}
+
+void menuResume( Menu* m ) {
+    if ( m->depth != 0 || m->lastPage < 0 || m->lastPage >= m->count )
+        return;
+    // The pages from the root down to it (the deepest first).
+    int chain[ MENU_MAX_DEPTH ];
+    int n = 0;
+    for ( int p = m->lastPage; p != MENU_ROOT && n < MENU_MAX_DEPTH; p = m->items[ p ].parent )
+        chain[ n++ ] = p;
+    m->current = MENU_ROOT;
+    for ( int k = n - 1; k >= 0; k-- ) {
+        int page = chain[ k ];
+        int cursor = 0, seen = 0; // where the parent's cursor sits: on this page's item
+        for ( int i = 0; i < m->count; i++ ) {
+            if ( m->items[ i ].parent != m->current )
+                continue;
+            if ( i == page ) {
+                cursor = seen;
+                break;
+            }
+            seen++;
+        }
+        m->stack[ m->depth ] = m->current;
+        m->stackCursor[ m->depth ] = cursor;
+        m->depth++;
+        m->current = page;
+    }
+    int visible = menuVisibleCount( m );
+    m->cursor = m->lastCursor < visible ? m->lastCursor : ( visible > 0 ? visible - 1 : 0 );
+    m->repeats = 0;
+}
+
 static float clampf( float v, float lo, float hi ) {
     return v < lo ? lo : ( v > hi ? hi : v );
 }
@@ -225,6 +265,7 @@ int menuKey( Menu* m, MenuKey key, bool repeat ) {
     if ( !repeat && key != MENUKEY_LEFT && key != MENUKEY_RIGHT ) {
         m->repeats = 0;
     }
+    menuRemember( m ); // the page a key is used on is the one to come back to
     int visible = menuVisibleCount( m );
     if ( visible == 0 ) {
         if ( key == MENUKEY_BACK ) {
@@ -289,6 +330,7 @@ int menuKey( Menu* m, MenuKey key, bool repeat ) {
                 m->depth++;
                 m->current = index;
                 m->cursor = 0;
+                menuRemember( m );
             }
             return -1;
         case MENU_ACTION:

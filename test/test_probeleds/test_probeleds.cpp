@@ -262,6 +262,7 @@ void test_looks( void ) {
     style.touchRing = false;
 
     // Every scheme: white with the point on the board, its own colour lifted.
+    in.tiltDeg = 30.0f; // (the aim scheme's colour is the lean's: straight up it is white)
     for ( int scheme = 0; scheme < PROBELED_SCHEME_COUNT; scheme++ ) {
         style.scheme = scheme;
         in.heightMm = 0.5f;
@@ -277,6 +278,148 @@ void test_looks( void ) {
     }
     in.heightMm = 0.5f;
     style.scheme = PROBELED_SCHEME_CLASSIC;
+}
+
+// The colours (2026-09-25): every scheme uses the whole wheel in its own
+// way, and the mapping is the style's - how many turns of the wheel over
+// the scale, where it starts, the height the scale runs to, and the height
+// by which the colour is all in (white on the board below it).
+void test_hue_scale_turns_and_start( void ) {
+    TEST_ASSERT_EQUAL( 5, PROBELED_SCHEME_COUNT ); // classic, height, sure, aim, rainbow: the single-colour ones are gone
+    TEST_ASSERT_EQUAL_STRING( "aim", probeLedSchemeNames[ PROBELED_SCHEME_AIM ] );
+    style.scheme = PROBELED_SCHEME_HEIGHT;
+    style.liftFullMm = 20.0f;
+    style.colourByMm = 6.0f;
+    ProbeLedInput in = at( 14.0f, 6.35f, 0.3f, 0.9f );
+    in.heightMm = 10.0f; // halfway up the scale
+    style.hueTurns = 1.0f;
+    style.hueStartDeg = 0.0f;
+    probeLedRender( &v6, &in, &style, 0.02f, &frame );
+    int b = brightest( &frame );
+    TEST_ASSERT_TRUE( frame.r[ b ] < 10 && frame.g[ b ] == 255 && frame.b[ b ] == 255 ); // 180 degrees: cyan
+    style.hueStartDeg = 120.0f;
+    probeLedRender( &v6, &in, &style, 0.02f, &frame );
+    b = brightest( &frame );
+    TEST_ASSERT_TRUE( frame.r[ b ] == 255 && frame.g[ b ] < 10 && frame.b[ b ] == 255 ); // 300: magenta
+    style.hueStartDeg = 0.0f;
+    style.hueTurns = 2.0f; // two rainbows over the scale: halfway is a whole turn round, red again
+    probeLedRender( &v6, &in, &style, 0.02f, &frame );
+    b = brightest( &frame );
+    TEST_ASSERT_TRUE( frame.r[ b ] == 255 && frame.g[ b ] < 10 && frame.b[ b ] < 10 );
+    style.hueTurns = 0.25f; // a quarter of the wheel as a gradient: halfway is 45 degrees, orange
+    probeLedRender( &v6, &in, &style, 0.02f, &frame );
+    b = brightest( &frame );
+    TEST_ASSERT_TRUE( frame.r[ b ] == 255 && frame.g[ b ] > 150 && frame.g[ b ] < 220 && frame.b[ b ] < 10 );
+    // The colour is all in from colourByMm up; on the board it is white.
+    style.colourByMm = 12.0f;
+    probeLedRender( &v6, &in, &style, 0.02f, &frame ); // 10 mm: most of the way from 1.5 to 12
+    b = brightest( &frame );
+    TEST_ASSERT_TRUE( frame.b[ b ] > 40 && frame.b[ b ] < 120 ); // some white still in it
+    in.heightMm = 0.5f;
+    probeLedRender( &v6, &in, &style, 0.02f, &frame );
+    b = brightest( &frame );
+    TEST_ASSERT_TRUE( frame.r[ b ] >= 250 && frame.g[ b ] >= 250 && frame.b[ b ] >= 250 );
+    // Sure: the same wheel over how sure the row is.
+    style.scheme = PROBELED_SCHEME_SURE;
+    style.colourByMm = 6.0f;
+    style.hueTurns = 1.0f;
+    in.heightMm = 20.0f;
+    in.confidence = 0.5f;
+    probeLedRender( &v6, &in, &style, 0.02f, &frame );
+    b = brightest( &frame );
+    TEST_ASSERT_TRUE( frame.r[ b ] < 10 && frame.g[ b ] == 255 && frame.b[ b ] == 255 );
+    // Rainbow: the turns run along the board - two rows a whole turn apart read the same.
+    style.scheme = PROBELED_SCHEME_RAINBOW;
+    style.hueTurns = 1.0f; // one turn over the 30 rows
+    ProbeLedInput wide = at( 15.0f, 6.35f, 3.0f, 7.0f );
+    wide.heightMm = 20.0f;
+    style.fullPeak = false;
+    probeLedRender( &v6, &wide, &style, 0.02f, &frame );
+    int a = find( &v6, 10, 3 ), c = find( &v6, 20, 3 );
+    TEST_ASSERT_TRUE( frame.target[ a ] > 0.0f && frame.target[ c ] > 0.0f );
+    TEST_ASSERT_TRUE( abs( (int)frame.r[ a ] - (int)frame.r[ c ] ) > 60 || abs( (int)frame.g[ a ] - (int)frame.g[ c ] ) > 60 ); // ten rows apart: a third of a turn
+}
+
+// The aim scheme: the hue is the direction the probe leans, white when it
+// stands straight, all colour from PROBELED_AIM_FULL_DEG of lean.
+void test_aim_scheme_colours_by_the_lean( void ) {
+    style.scheme = PROBELED_SCHEME_AIM;
+    style.hueTurns = 1.0f;
+    style.hueStartDeg = 0.0f;
+    ProbeLedInput in = at( 14.0f, 6.35f, 0.3f, 0.9f );
+    in.heightMm = 20.0f;
+    in.tiltDeg = 0.0f;
+    probeLedRender( &v6, &in, &style, 0.02f, &frame );
+    int b = brightest( &frame );
+    TEST_ASSERT_TRUE( frame.r[ b ] >= 250 && frame.g[ b ] >= 250 && frame.b[ b ] >= 250 ); // straight up: white
+    in.tiltDeg = 45.0f;
+    in.aimDeg = 0.0f;
+    probeLedRender( &v6, &in, &style, 0.02f, &frame );
+    b = brightest( &frame );
+    TEST_ASSERT_TRUE( frame.r[ b ] == 255 && frame.g[ b ] < 60 && frame.b[ b ] < 60 ); // leaning along +x: red
+    in.aimDeg = 120.0f;
+    probeLedRender( &v6, &in, &style, 0.02f, &frame );
+    b = brightest( &frame );
+    TEST_ASSERT_TRUE( frame.g[ b ] == 255 && frame.r[ b ] < 60 && frame.b[ b ] < 60 ); // a third round: green
+}
+
+// What dims the cursor, and by how much, is the style's: unsure (the old
+// rule, a coin-toss row at half), height, tilt, speed, or nothing.
+void test_brightness_follows_the_chosen_data( void ) {
+    ProbeLedInput in = at( 14.0f, 6.35f, 0.3f, 0.9f );
+    in.confidence = 0.0f;
+    probeLedRender( &v6, &in, &style, 0.02f, &frame ); // the default: by unsure, half
+    TEST_ASSERT_FLOAT_WITHIN( 0.02f, 0.5f * style.peak, frame.target[ brightest( &frame ) ] );
+    style.brightAmount = 1.0f;
+    probeLedRender( &v6, &in, &style, 0.02f, &frame );
+    TEST_ASSERT_TRUE( frame.target[ brightest( &frame ) ] < 0.02f ); // a toss-up: dark
+    in.confidence = 1.0f;
+    probeLedRender( &v6, &in, &style, 0.02f, &frame );
+    TEST_ASSERT_FLOAT_WITHIN( 0.02f, style.peak, frame.target[ brightest( &frame ) ] );
+    style.brightBy = PROBELED_DATA_NONE;
+    in.confidence = 0.0f;
+    probeLedRender( &v6, &in, &style, 0.02f, &frame );
+    TEST_ASSERT_FLOAT_WITHIN( 0.02f, style.peak, frame.target[ brightest( &frame ) ] ); // nothing dims it
+    style.brightBy = PROBELED_DATA_TILT;
+    style.brightAmount = 0.5f;
+    in.tiltDeg = 60.0f; // the far end of the tilt scale
+    probeLedRender( &v6, &in, &style, 0.02f, &frame );
+    TEST_ASSERT_FLOAT_WITHIN( 0.02f, 0.5f * style.peak, frame.target[ brightest( &frame ) ] );
+    style.brightBy = PROBELED_DATA_HEIGHT;
+    style.brightAmount = 1.0f;
+    in.heightMm = style.liftFullMm * 0.5f;
+    probeLedRender( &v6, &in, &style, 0.02f, &frame );
+    TEST_ASSERT_FLOAT_WITHIN( 0.02f, 0.5f * style.peak, frame.target[ brightest( &frame ) ] );
+    style.brightBy = PROBELED_DATA_SPEED;
+    in.heightMm = 0.0f;
+    in.speedMmS = 400.0f; // past the scale's end: all of the amount
+    probeLedRender( &v6, &in, &style, 0.02f, &frame );
+    TEST_ASSERT_TRUE( frame.target[ brightest( &frame ) ] < 0.02f );
+}
+
+// ...and what the sparkle's density follows: by height (the default: few
+// on the board, all of it lifted), or nothing (the lever alone, the same
+// on the board).
+void test_sparkle_density_follows_the_chosen_data( void ) {
+    style.sparkle = 1.0f;
+    style.sparkleBy = PROBELED_DATA_NONE;
+    ProbeLedInput wide = at( 14.0f, 6.35f, 1.0f, 2.5f );
+    int centre = find( &v6, 14, 3 );
+    int lifted = 0, onBoard = 0;
+    wide.heightMm = 30.0f;
+    for ( int n = 0; n < 50; n++ ) {
+        probeLedRender( &v6, &wide, &style, 0.02f, &frame );
+        for ( int i = 0; i < frame.count; i++ )
+            lifted += i != centre && frame.target[ i ] >= 0.99f * style.peak;
+    }
+    wide.heightMm = 0.0f;
+    for ( int n = 0; n < 50; n++ ) {
+        probeLedRender( &v6, &wide, &style, 0.02f, &frame );
+        for ( int i = 0; i < frame.count; i++ )
+            onBoard += i != centre && frame.target[ i ] >= 0.99f * style.peak;
+    }
+    printf( "  sparkle by nothing: %d twinkles lifted, %d on the board\n", lifted, onBoard );
+    TEST_ASSERT_TRUE( lifted > 5 && onBoard * 2 > lifted ); // about as many
 }
 
 void test_far_probe_glows_purple( void ) {
@@ -342,6 +485,10 @@ int main( int argc, char** argv ) {
     RUN_TEST( test_vague_fix_is_wide_and_dim_with_the_same_light );
     RUN_TEST( test_vague_fix_at_full_peak_fades_with_width );
     RUN_TEST( test_looks );
+    RUN_TEST( test_hue_scale_turns_and_start );
+    RUN_TEST( test_aim_scheme_colours_by_the_lean );
+    RUN_TEST( test_brightness_follows_the_chosen_data );
+    RUN_TEST( test_sparkle_density_follows_the_chosen_data );
     RUN_TEST( test_far_probe_glows_purple );
     RUN_TEST( test_pointed_tail_marks_the_point );
     RUN_TEST( test_leds_fade_rather_than_snap );

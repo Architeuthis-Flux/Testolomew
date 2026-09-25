@@ -31,6 +31,17 @@ enum UiAppId {
 
 extern UiApp apps[ APP_COUNT ];
 
+// The View's look (the colours page): the magnet bar's poles - shown or a
+// plain bar, its half length, the north and south hues - and how long the
+// sensors' field arrows are drawn (0 = not at all; 1 = as they were).
+struct ViewStyle {
+    bool poles;
+    float poleMm;
+    float northHueDeg, southHueDeg;
+    float fieldArrows;
+};
+extern ViewStyle viewStyle;
+
 void appsBegin( );
 // The Display's drawFn: the UI's frame, when there is something new.
 bool appsDrawFrame( GFXcanvas16* canvas, uint32_t nowMs );

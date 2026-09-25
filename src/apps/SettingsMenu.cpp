@@ -30,7 +30,7 @@ static int commandsAdded = 0;
 
 // Console commands that have a Settings item of their own, or that change
 // the app underneath: not listed on the commands page (they stay on the console).
-static const char hiddenCommands[] = "evyBNrgu";
+static const char hiddenCommands[] = "evyBNrgukKzolmbpXsRChWn"; // (2026-09-25: the tools and play pages' own commands too, which were listed twice)
 
 // ---- info lines --------------------------------------------------------------------
 
@@ -185,40 +185,51 @@ void settingsMenuBuild( Menu* m ) {
     menu = m;
     menuInit( m );
 
-    int tracker = menuAddSubmenu( m, MENU_ROOT, "tracker" );
-    menuAddInfo( m, tracker, "state", trackInfo );
-    menuAddInfo( m, tracker, "fix", fixInfo );
-    menuAddToggleAccessor( m, tracker, "tracker on", getTrackerOn, setTrackerOn );
-    menuAddNumber( m, tracker, "floor", &magLocator.track.sigmaFloorMm, 0.1f, 3.0f, 0.1f, "mm" );
-    menuAddNumber( m, tracker, "gate", &magLocator.track.gate, 2.0f, 10.0f, 0.5f, "sd" );
-    menuAddNumber( m, tracker, "presence", &magLocator.presentMt, 0.02f, 0.20f, 0.01f, "mT" );
-    menuAddNumber( m, tracker, "fit chi", &magLocator.fitMaxChi, 1.0f, 6.0f, 0.5f, "" );
-    menuAddNumber( m, tracker, "far hold", &magLocator.track.roughHoldS, 0.5f, 10.0f, 0.5f, "s" );
-    int fitLoad = menuAddToggle( m, tracker, "fit load", &magLocator.steadyFit ); // steady: the same work every frame (the supply shows bursts)
+    // One page for everything continuous about the probe's pose - the
+    // tracker, the cursor, the smoothing (2026-09-25: three pages until
+    // then; Kevin: "one menu item that contains all the tracker, cursor,
+    // smoothing options"). The order: what the cursor is, then the levers
+    // from the most felt (accel, rest jitter) to the least, then the fit's.
+    int tracking = menuAddSubmenu( m, MENU_ROOT, "tracking" );
+    menuAddInfo( m, tracking, "state", trackInfo );
+    menuAddInfo( m, tracking, "fix", fixInfo );
+    menuAddToggleAccessor( m, tracking, "tracker on", getTrackerOn, setTrackerOn );
+    menuAddChoiceAccessor( m, tracking, "cursor", getCursorMode, setCursorMode, cursorModeNames, 2 );
+    menuAddNumber( m, tracking, "surface", &magLocator.boardZ, 0.0f, 60.0f, 0.5f, "mm" );
+    menuAddNumber( m, tracking, "tip", &magLocator.tipOffsetMm, 0.0f, 60.0f, 0.5f, "mm" );
+    menuAddNumber( m, tracking, "reach", &magLocator.track.maxReachMm, 5.0f, 40.0f, 2.5f, "mm" ); // (5-100 until 2026-09-25: past 40 it never engages - the reach is the drop x tan 70 deg at most)
+    // The smoothing, the levers that are felt first (tools/hostsim/pencil.cpp,
+    // 2026-09-25: the ranges are where the pencil measured a change):
+    // accel sets the Kalman's rest jitter against its lag (0.075 mm at 500
+    // to 0.5 at 20000 in the bench-like world, 40 to 20 ms), rest jitter
+    // the field EMA's (0: three times the jitter; 2: half, +10 ms), the
+    // betas how fast the 1-Euro filters open with speed (their whole
+    // effect is under 0.5; at 1 they were flat), the Hz where they sit at
+    // rest - which only shows with the beta low, since the rest jitter's
+    // own speed opens the cutoff by beta x 2-5 mm/s.
+    menuAddNumber( m, tracking, "accel", &magLocator.track.accelSigma, 250.0f, 20000.0f, 250.0f, "" );
+    menuAddNumber( m, tracking, "rest jitter", &magLocator.speedJitterK, 0.0f, 3.0f, 0.1f, "" );
+    menuAddNumber( m, tracking, "view Hz", &magLocator.track.viewMinCutoff, 0.1f, 5.0f, 0.1f, "" );
+    menuAddNumber( m, tracking, "view beta", &magLocator.track.viewBeta, 0.0f, 0.5f, 0.01f, "" );
+    menuAddNumber( m, tracking, "cursor Hz", &magLocator.track.oneEuroMinCutoff, 0.1f, 5.0f, 0.1f, "" );
+    menuAddNumber( m, tracking, "cursor beta", &magLocator.track.oneEuroBeta, 0.0f, 0.5f, 0.01f, "" );
+    menuAddNumber( m, tracking, "shaft Hz", &magLocator.track.shaftMinCutoff, 0.1f, 5.0f, 0.1f, "" );
+    menuAddNumber( m, tracking, "shaft beta", &magLocator.track.shaftBeta, 0.0f, 10.0f, 0.25f, "" );
+    menuAddNumber( m, tracking, "floor", &magLocator.track.sigmaFloorMm, 0.1f, 3.0f, 0.1f, "mm" );
+    menuAddNumber( m, tracking, "gate", &magLocator.track.gate, 2.0f, 8.0f, 0.5f, "sd" ); // (to 10 until 2026-09-25: the drop line is 11.3, past 8 the soft zone is nothing)
+    menuAddNumber( m, tracking, "presence", &magLocator.presentMt, 0.04f, 0.20f, 0.01f, "mT" ); // (from 0.02 until 2026-09-25: under the TMAGs' plain level, 0.04, presence needs two of them plainly anyway - the lever did nothing there with the MMC out)
+    menuAddNumber( m, tracking, "fit chi", &magLocator.fitMaxChi, 1.0f, 6.0f, 0.5f, "" );
+    menuAddNumber( m, tracking, "far hold", &magLocator.track.roughHoldS, 0.5f, 10.0f, 0.5f, "s" );
+    int fitLoad = menuAddToggle( m, tracking, "fit load", &magLocator.steadyFit ); // steady: the same work every frame (the supply shows bursts)
     menuSetToggleText( m, fitLoad, "steady", "burst" );
-    menuAddNumber( m, tracker, "fit iters", &magLocator.steadyIterations, 2.0f, 16.0f, 1.0f, "" ); // ...how much, a frame (~0.85 ms each)
-
-    int smoothing = menuAddSubmenu( m, MENU_ROOT, "smoothing" );
-    menuAddNumber( m, smoothing, "view Hz", &magLocator.track.viewMinCutoff, 0.2f, 10.0f, 0.1f, "" );
-    menuAddNumber( m, smoothing, "view beta", &magLocator.track.viewBeta, 0.0f, 1.0f, 0.01f, "" );
-    menuAddNumber( m, smoothing, "cursor Hz", &magLocator.track.oneEuroMinCutoff, 0.2f, 10.0f, 0.1f, "" );
-    menuAddNumber( m, smoothing, "cursor beta", &magLocator.track.oneEuroBeta, 0.0f, 1.0f, 0.01f, "" );
-    menuAddNumber( m, smoothing, "shaft Hz", &magLocator.track.shaftMinCutoff, 0.2f, 10.0f, 0.1f, "" );
-    menuAddNumber( m, smoothing, "shaft beta", &magLocator.track.shaftBeta, 0.0f, 20.0f, 0.5f, "" );
-    menuAddNumber( m, smoothing, "camera", &viewCamera.tauS, 0.02f, 2.0f, 0.02f, "s" );
-    menuAddNumber( m, smoothing, "POV turn", &viewCamera.povTurnTauS, 0.02f, 3.0f, 0.05f, "s" );
-    menuAddNumber( m, smoothing, "POV move", &viewCamera.povMoveTauS, 0.02f, 3.0f, 0.05f, "s" );
-    menuAddNumber( m, smoothing, "accel", &magLocator.track.accelSigma, 500.0f, 20000.0f, 500.0f, "" );
-
-    int cursor = menuAddSubmenu( m, MENU_ROOT, "cursor" );
-    menuAddChoiceAccessor( m, cursor, "cursor", getCursorMode, setCursorMode, cursorModeNames, 2 );
-    menuAddNumber( m, cursor, "surface", &magLocator.boardZ, 0.0f, 60.0f, 0.5f, "mm" );
-    menuAddNumber( m, cursor, "tip", &magLocator.tipOffsetMm, 0.0f, 60.0f, 0.5f, "mm" );
-    menuAddNumber( m, cursor, "reach", &magLocator.track.maxReachMm, 5.0f, 100.0f, 5.0f, "mm" );
+    menuAddNumber( m, tracking, "fit iters", &magLocator.steadyIterations, 2.0f, 16.0f, 1.0f, "" ); // ...how much, a frame (~0.85 ms each); read only under steady
 
     int camera = menuAddSubmenu( m, MENU_ROOT, "camera" );
     menuAddChoiceAccessor( m, camera, "mode", getCameraMode, setCameraMode, cameraModeNames, CAMERA_MODE_COUNT );
     menuAddAction( m, camera, "reset view", 0, runResetView, false );
+    menuAddNumber( m, camera, "glide", &viewCamera.tauS, 0.02f, 2.0f, 0.02f, "s" ); // (the smoothing page's "camera" until 2026-09-25)
+    menuAddNumber( m, camera, "POV turn", &viewCamera.povTurnTauS, 0.02f, 3.0f, 0.05f, "s" );
+    menuAddNumber( m, camera, "POV move", &viewCamera.povMoveTauS, 0.02f, 3.0f, 0.05f, "s" );
 
 #if MODULE_PROBE_LEDS
     int leds = menuAddSubmenu( m, MENU_ROOT, "LEDs" );
@@ -231,7 +242,6 @@ void settingsMenuBuild( Menu* m ) {
     menuAddNumber( m, leds, "bright", &probeLeds.style.peak, 0.05f, 1.0f, 0.05f, "" );
     menuAddNumber( m, leds, "strip", &probeLeds.stripBrightness, 0.02f, 1.0f, 0.02f, "" );
     menuAddNumber( m, leds, "budget mA", &probeLeds.stripMaxMa, 100.0f, PROBELED_STRIP_HARD_MAX_MA, 100.0f, "" ); // the ceiling is the most it can be
-    menuAddChoice( m, leds, "colours", &probeLeds.style.scheme, probeLedSchemeNames, PROBELED_SCHEME_COUNT );
     menuAddToggle( m, leds, "full peak", &probeLeds.style.fullPeak );
     menuAddNumber( m, leds, "bloom", &probeLeds.style.bloom, 0.0f, 1.0f, 0.1f, "" );
     menuAddNumber( m, leds, "sparkle", &probeLeds.style.sparkle, 0.0f, 1.0f, 0.1f, "" );
@@ -239,17 +249,53 @@ void settingsMenuBuild( Menu* m ) {
     menuAddNumber( m, leds, "fade", &probeLeds.style.decayS, 0.05f, 2.0f, 0.05f, "s" );
     menuAddToggle( m, leds, "touch ring", &probeLeds.style.touchRing );
     menuAddToggle( m, leds, "V5 stream", &probeLeds.streaming );
-#endif
 
+    // The colours (2026-09-25): the scheme (what drives the hue), how the
+    // wheel is mapped onto it, what dims the cursor and what raises the
+    // sparkle (ProbeLeds.h), and the View's poles and field arrows (Apps.h).
+    int colours = menuAddSubmenu( m, MENU_ROOT, "colours" );
+    menuAddChoice( m, colours, "scheme", &probeLeds.style.scheme, probeLedSchemeNames, PROBELED_SCHEME_COUNT );
+    menuAddNumber( m, colours, "turns", &probeLeds.style.hueTurns, 0.1f, 4.0f, 0.05f, "" ); // of the wheel over the scale: under 1 a chunk of the spectrum, over 1 several rainbows
+    menuAddNumber( m, colours, "hue start", &probeLeds.style.hueStartDeg, 0.0f, 355.0f, 5.0f, "deg" );
+    menuAddNumber( m, colours, "height scale", &probeLeds.style.liftFullMm, 5.0f, 60.0f, 1.0f, "mm" );
+    menuAddNumber( m, colours, "colour from", &probeLeds.style.colourByMm, 2.0f, 30.0f, 0.5f, "mm" ); // white on the board below 1.5 mm, all the colour from here up
+    menuAddChoice( m, colours, "bright by", &probeLeds.style.brightBy, probeLedDataNames, PROBELED_DATA_COUNT );
+    menuAddNumber( m, colours, "bright amount", &probeLeds.style.brightAmount, 0.0f, 1.0f, 0.05f, "" );
+    menuAddChoice( m, colours, "sparkle by", &probeLeds.style.sparkleBy, probeLedDataNames, PROBELED_DATA_COUNT );
+#else
+    int colours = menuAddSubmenu( m, MENU_ROOT, "colours" );
+#endif
+    menuAddToggle( m, colours, "poles", &viewStyle.poles ); // the View's magnet bar: north and south coloured, or a plain bar
+    menuAddNumber( m, colours, "pole size", &viewStyle.poleMm, 1.0f, 15.0f, 0.5f, "mm" );
+    menuAddNumber( m, colours, "north hue", &viewStyle.northHueDeg, 0.0f, 355.0f, 5.0f, "deg" );
+    menuAddNumber( m, colours, "south hue", &viewStyle.southHueDeg, 0.0f, 355.0f, 5.0f, "deg" );
+    menuAddNumber( m, colours, "field arrows", &viewStyle.fieldArrows, 0.0f, 1.0f, 0.1f, "" ); // the sensors' arrows in the View: their length, 0 = none
+
+    // The one-shot things: the magnet (k, K, z, o, l), the sensors and the
+    // machine (m, b, p, X, s), the rows (r, c, R, C, h).
+    int tools = menuAddSubmenu( m, MENU_ROOT, "tools" );
+    menuAddInfo( m, tools, "strength", magnetInfo );
+    menuAddAction( m, tools, "learn strength", 'k', runConsoleKey, false );
+    menuAddAction( m, tools, "forget strength", 'K', runConsoleKey, true );
+    menuAddAction( m, tools, "re-zero (away!)", 'z', runConsoleKey, true );
+    menuAddAction( m, tools, "orientation check", 'o', runConsoleKey, false );
+    menuAddAction( m, tools, "latest fix", 'l', runConsoleKey, false );
+    menuAddInfo( m, tools, "sensors", sensorsInfo );
+    menuAddToggle( m, tools, "use MMC", &magArray.useMmc ); // the MMC56x3 in the fit or ignored (MAG_USE_MMC_AT_BOOT: off)
+    menuAddAction( m, tools, "array status", 'm', runConsoleKey, false );
+    menuAddAction( m, tools, "bus check", 'b', runConsoleKey, false );
+    menuAddAction( m, tools, "power-cycle", 'p', runConsoleKey, true );
+    menuAddAction( m, tools, "service table", 'X', runConsoleKey, false );
+#if MODULE_SETTINGS
+    menuAddAction( m, tools, "saved settings", 's', runConsoleKey, false );
+#endif
 #if MODULE_ROW_COUNT
-    // The row counter's tools: what r, c, R, C and h do on the console.
-    int rows = menuAddSubmenu( m, MENU_ROOT, "rows" );
-    menuAddToggleAccessor( m, rows, "row mode", getRowMode, setRowMode );
-    menuAddInfo( m, rows, "row", rowInfo );
-    menuAddAction( m, rows, "calibrate 12 taps", APP_CALIBRATE, runOpenApp, false );
-    menuAddNumberAction( m, rows, "anchor at row", 'R', runConsoleKeyWithNumber, 1.0f, 60.0f, 1.0f, 1.0f );
-    menuAddAction( m, rows, "forget anchors", 'C', runConsoleKey, true );
-    menuAddAction( m, rows, "hold-still test", 'h', runConsoleKey, false );
+    menuAddToggleAccessor( m, tools, "row mode", getRowMode, setRowMode );
+    menuAddInfo( m, tools, "row", rowInfo );
+    menuAddAction( m, tools, "calibrate 12 taps", APP_CALIBRATE, runOpenApp, false );
+    menuAddNumberAction( m, tools, "anchor at row", 'R', runConsoleKeyWithNumber, 1.0f, 60.0f, 1.0f, 1.0f );
+    menuAddAction( m, tools, "forget anchors", 'C', runConsoleKey, true );
+    menuAddAction( m, tools, "hold-still test", 'h', runConsoleKey, false );
 #endif
 
 #if MODULE_PLAY
@@ -275,27 +321,6 @@ void settingsMenuBuild( Menu* m ) {
     menuAddNumber( m, controls, "joy menu off", &input.joyMenuOff, 0.05f, 0.9f, 0.05f, "" ); // ...and over inside this (kept under 'at')
     int joystick = menuAddToggle( m, controls, "joystick", &ui.shell.absoluteJoystick ); // absolute: the stick's position is the cursor on Home and the menu pages
     menuSetToggleText( m, joystick, "absolute", "relative" );
-
-    // The magnet: k, K, z, o, l.
-    int magnet = menuAddSubmenu( m, MENU_ROOT, "magnet" );
-    menuAddInfo( m, magnet, "strength", magnetInfo );
-    menuAddAction( m, magnet, "learn strength", 'k', runConsoleKey, false );
-    menuAddAction( m, magnet, "forget strength", 'K', runConsoleKey, true );
-    menuAddAction( m, magnet, "re-zero (away!)", 'z', runConsoleKey, true );
-    menuAddAction( m, magnet, "orientation check", 'o', runConsoleKey, false );
-    menuAddAction( m, magnet, "latest fix", 'l', runConsoleKey, false );
-
-    // The sensors and the machine: m, b, p, X, s.
-    int sensors = menuAddSubmenu( m, MENU_ROOT, "sensors" );
-    menuAddInfo( m, sensors, "sensors", sensorsInfo );
-    menuAddToggle( m, sensors, "use MMC", &magArray.useMmc ); // the MMC56x3 in the fit or ignored (MAG_USE_MMC_AT_BOOT: off)
-    menuAddAction( m, sensors, "array status", 'm', runConsoleKey, false );
-    menuAddAction( m, sensors, "bus check", 'b', runConsoleKey, false );
-    menuAddAction( m, sensors, "power-cycle", 'p', runConsoleKey, true );
-    menuAddAction( m, sensors, "service table", 'X', runConsoleKey, false );
-#if MODULE_SETTINGS
-    menuAddAction( m, sensors, "saved settings", 's', runConsoleKey, false );
-#endif
 
     // Every console command, as it is (the ones registered after this menu
     // is built are added by settingsMenuAddNewCommands()).

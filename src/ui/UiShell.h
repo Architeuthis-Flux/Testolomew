@@ -13,12 +13,24 @@
 //                   B hold: Home
 //   Home            up/down/left/right move, a press (or A), on its way down,
 //                   selects; B closes
+//   Home            (opens with the cursor on Settings, the centre cell)
 //   Settings page   up/down move, LEFT/RIGHT CHANGE THE VALUE IN PLACE, a
-//                   press enters / runs / flips / cycles, B backs a page (at
-//                   the root: closes), B hold closes everything and opens Home
-//   Confirm         a press or A: yes; B: no
+//                   press enters / runs / flips / cycles, a press HELD on a
+//                   toggle, a number or a choice tweaks it (below), B backs
+//                   a page (at the root: closes), B hold closes everything
+//                   (the page is kept: the menu opens again where it was
+//                   last used, even after B backed it out to the root)
+//   Tweak           the menu hidden, the app showing, the item's label and
+//                   value along the bottom: left/right change it, up/down
+//                   move to the neighbouring items, the joystick is the
+//                   app's (it orbits the scene being looked at); a press or
+//                   B: the menu again; B hold: everything closes. (The
+//                   press that started the hold already flipped a toggle or
+//                   cycled a choice: the hold takes that back.)
+//   Confirm         a press or A: yes; B: no; B hold: everything closes
 //   Result          up/down scroll; a press, A or B dismiss
-//   20 s idle       overlays close (cursors and the page remembered)
+//   20 s idle       overlays close (cursors and the page remembered) - not
+//                   a tweak, which is deliberate and ends on B
 // A and B never reach an app.
 //
 // The leak fix: when a pane closes or the app changes while a control is
@@ -50,7 +62,8 @@ enum PaneKind {
     PANE_HOME,
     PANE_MENU,
     PANE_CONFIRM,
-    PANE_RESULT
+    PANE_RESULT,
+    PANE_TWEAK // a menu value edited over the app (the menu beneath it is not drawn)
 };
 
 struct UiShell {
@@ -65,6 +78,7 @@ struct UiShell {
     HomeGrid home;
     Menu menu;
     int confirmItem; // the ACTION the Confirm pane asks about
+    int selectPressItem; // the menu item a select was pressed on (-1 none): its hold tweaks that item, not what the press led to
     char resultTitle[ UISHELL_RESULT_TITLE ];
     int resultScroll; // lines back from the newest
     int resultLines;  // how many lines the result has
@@ -104,7 +118,8 @@ void uiShellMenuWindow( UiShell* s );
 
 void uiShellSelectApp( UiShell* s, int app ); // swaps the base pane and closes the overlays
 void uiShellOpenHome( UiShell* s );
-void uiShellOpenMenu( UiShell* s );
+void uiShellOpenMenu( UiShell* s );     // where it was last used (menuResume)
+void uiShellOpenMenuRoot( UiShell* s ); // at the root page
 void uiShellShowResult( UiShell* s, const char* title, int lines, int visible ); // over whatever is open
 void uiShellCloseAll( UiShell* s );
 PaneKind uiShellTop( const UiShell* s );

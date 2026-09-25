@@ -270,18 +270,24 @@ static void tick( float x, float y ) {
     uiShellTick( &shell, t, 0.01f, x, y, x, y, heldNow ); // the raw stick as the shaped one, for these
 }
 
-void test_shell_home_selects_apps_and_remembers( void ) {
+void test_shell_home_opens_on_settings_and_selects_apps( void ) {
     shellSetUp( );
     TEST_ASSERT_EQUAL( 1, fakes[ 0 ].enters );
     TEST_ASSERT_EQUAL( PANE_APP, uiShellTop( &shell ) );
-    tap( IN_BTN_A ); // Home, cursor on the current app
+    tap( IN_BTN_A ); // Home, cursor on Settings (the centre cell), whatever app is up
     TEST_ASSERT_EQUAL( PANE_HOME, uiShellTop( &shell ) );
-    TEST_ASSERT_EQUAL( 0, shell.home.cursor );
-    send( IN_NAV_LEFT, IN_PRESS ); // wraps within the row: to its last cell
-    send( IN_NAV_LEFT, IN_RELEASE );
+    TEST_ASSERT_EQUAL( 1, shell.home.cursor );
+    send( IN_NAV_RIGHT, IN_PRESS ); // LEDs
+    send( IN_NAV_RIGHT, IN_RELEASE );
     TEST_ASSERT_EQUAL( 2, shell.home.cursor );
+    send( IN_NAV_RIGHT, IN_PRESS ); // wraps within the row: to its first cell
+    send( IN_NAV_RIGHT, IN_RELEASE );
+    TEST_ASSERT_EQUAL( 0, shell.home.cursor );
     send( IN_NAV_UP, IN_PRESS ); // clamps: one row only
     send( IN_NAV_UP, IN_RELEASE );
+    TEST_ASSERT_EQUAL( 0, shell.home.cursor );
+    send( IN_NAV_LEFT, IN_PRESS ); // wraps the other way
+    send( IN_NAV_LEFT, IN_RELEASE );
     TEST_ASSERT_EQUAL( 2, shell.home.cursor );
     tap( IN_NAV_PRESS ); // the LEDs app
     TEST_ASSERT_EQUAL( PANE_APP, uiShellTop( &shell ) );
@@ -292,16 +298,14 @@ void test_shell_home_selects_apps_and_remembers( void ) {
     tap( IN_BTN_B ); // B: the previous app
     TEST_ASSERT_EQUAL( 0, shell.app );
     TEST_ASSERT_EQUAL( 1, shell.previousApp );
-    tap( IN_BTN_A ); // Home again: cursor on View; B closes it
-    TEST_ASSERT_EQUAL( 0, shell.home.cursor );
+    tap( IN_BTN_A ); // Home again: Settings; B closes it
+    TEST_ASSERT_EQUAL( 1, shell.home.cursor );
     send( IN_NAV_RIGHT, IN_PRESS );
     send( IN_NAV_RIGHT, IN_RELEASE );
     tap( IN_BTN_B );
     TEST_ASSERT_EQUAL( PANE_APP, uiShellTop( &shell ) );
-    tap( IN_BTN_A ); // reopened: the cursor is back on the current app, not where it was left
-    TEST_ASSERT_EQUAL( 0, shell.home.cursor );
-    send( IN_NAV_RIGHT, IN_PRESS );
-    send( IN_NAV_RIGHT, IN_RELEASE );
+    tap( IN_BTN_A ); // reopened: Settings again, not where it was left
+    TEST_ASSERT_EQUAL( 1, shell.home.cursor );
     tap( IN_NAV_PRESS ); // the Settings cell: the menu in Home's place
     TEST_ASSERT_EQUAL( PANE_MENU, uiShellTop( &shell ) );
     TEST_ASSERT_EQUAL( 1, shell.depth );
@@ -351,22 +355,136 @@ void test_shell_swallows_a_held_control_across_a_focus_change( void ) {
     TEST_ASSERT_EQUAL( 1, fakes[ 0 ].events );
     TEST_ASSERT_EQUAL( IN_NAV_LEFT, fakes[ 0 ].last.control );
     send( IN_NAV_LEFT, IN_RELEASE );
-    // B held from two panes deep: everything closes, Home opens, and B's
-    // own release is swallowed - it does not close Home.
+    // B held from two panes deep: everything closes (the app alone, not
+    // Home: a setting is tweaked, the picture looked at, the menu opened
+    // again where it was), and B's own release is swallowed - it does not
+    // go on to the previous app.
     hold( IN_BTN_A );
     tap( IN_NAV_PRESS );
     TEST_ASSERT_EQUAL_STRING( "tracker", menuTitle( &shell.menu ) );
     send( IN_BTN_B, IN_PRESS );
     send( IN_BTN_B, IN_HOLD );
-    TEST_ASSERT_EQUAL( PANE_HOME, uiShellTop( &shell ) );
-    TEST_ASSERT_EQUAL( 1, shell.depth );
-    send( IN_BTN_B, IN_RELEASE );
-    TEST_ASSERT_EQUAL( PANE_HOME, uiShellTop( &shell ) );
-    tap( IN_BTN_B );
     TEST_ASSERT_EQUAL( PANE_APP, uiShellTop( &shell ) );
-    // The menu remembered nothing of the page it was on? It keeps it: the
-    // next open is where it was.
+    TEST_ASSERT_EQUAL( 0, shell.depth );
+    TEST_ASSERT_TRUE( shell.swallow[ IN_BTN_B ] );
+    send( IN_BTN_B, IN_RELEASE );
+    TEST_ASSERT_EQUAL( PANE_APP, uiShellTop( &shell ) );
+    TEST_ASSERT_EQUAL( 0, shell.app );
+    TEST_ASSERT_EQUAL( 2, fakes[ 0 ].events ); // (the press and its release above)
+    // The menu keeps its page: the next open is where it was.
+    hold( IN_BTN_A );
+    TEST_ASSERT_EQUAL( PANE_MENU, uiShellTop( &shell ) );
     TEST_ASSERT_EQUAL_STRING( "tracker", menuTitle( &shell.menu ) );
+}
+
+// The menu opens where it was last used, even after B backed it out to the
+// root and closed it: a page entered is remembered, with its cursor, and
+// the root is one B away.
+void test_shell_menu_reopens_at_the_last_page( void ) {
+    shellSetUp( );
+    hold( IN_BTN_A );
+    TEST_ASSERT_EQUAL_STRING( "menu", menuTitle( &shell.menu ) ); // nothing visited yet: the root
+    tap( IN_NAV_PRESS ); // into tracker
+    send( IN_NAV_DOWN, IN_PRESS ); // floor
+    send( IN_NAV_DOWN, IN_RELEASE );
+    tap( IN_BTN_B ); // the root...
+    TEST_ASSERT_EQUAL_STRING( "menu", menuTitle( &shell.menu ) );
+    tap( IN_BTN_B ); // ...closed
+    TEST_ASSERT_EQUAL( PANE_APP, uiShellTop( &shell ) );
+    hold( IN_BTN_A ); // reopened: the tracker page, the cursor on floor
+    TEST_ASSERT_EQUAL( PANE_MENU, uiShellTop( &shell ) );
+    TEST_ASSERT_EQUAL_STRING( "tracker", menuTitle( &shell.menu ) );
+    TEST_ASSERT_EQUAL( 1, shell.menu.cursor );
+    TEST_ASSERT_EQUAL( 1, shell.menu.depth );
+    tap( IN_BTN_B ); // the root is one press away, its cursor on the page just left
+    TEST_ASSERT_EQUAL( PANE_MENU, uiShellTop( &shell ) );
+    TEST_ASSERT_EQUAL_STRING( "menu", menuTitle( &shell.menu ) );
+    TEST_ASSERT_EQUAL( 0, shell.menu.cursor );
+    tap( IN_BTN_B );
+    tap( IN_BTN_A ); // from Home's Settings cell too
+    send( IN_NAV_RIGHT, IN_PRESS );
+    send( IN_NAV_RIGHT, IN_RELEASE );
+    send( IN_NAV_LEFT, IN_PRESS );
+    send( IN_NAV_LEFT, IN_RELEASE );
+    TEST_ASSERT_EQUAL( 1, shell.home.cursor );
+    tap( IN_NAV_PRESS );
+    TEST_ASSERT_EQUAL( PANE_MENU, uiShellTop( &shell ) );
+    TEST_ASSERT_EQUAL_STRING( "tracker", menuTitle( &shell.menu ) );
+}
+
+// A select held on a value item: the menu hides and the value is changed
+// over the app with left/right (up/down: the neighbouring items), the value
+// shown along the bottom; a press or B brings the menu back, B held closes
+// everything. The press that started the hold has already acted on a
+// toggle or a choice: the hold takes that back. A hold that follows a press
+// which entered a page is nothing.
+void test_shell_tweak_edits_a_value_over_the_app( void ) {
+    shellSetUp( );
+    hold( IN_BTN_A );
+    tap( IN_NAV_PRESS ); // tracker: [tracker on] [floor]
+    send( IN_NAV_DOWN, IN_PRESS );
+    send( IN_NAV_DOWN, IN_RELEASE );
+    number = 10.0f;
+    send( IN_NAV_PRESS, IN_PRESS ); // a press on a number: nothing
+    TEST_ASSERT_FLOAT_WITHIN( 0.01f, 10.0f, number );
+    TEST_ASSERT_EQUAL( PANE_MENU, uiShellTop( &shell ) );
+    send( IN_NAV_PRESS, IN_HOLD ); // held: the value over the app
+    TEST_ASSERT_EQUAL( PANE_TWEAK, uiShellTop( &shell ) );
+    TEST_ASSERT_EQUAL( 2, shell.depth );
+    TEST_ASSERT_FLOAT_WITHIN( 0.01f, 10.0f, number );
+    send( IN_NAV_PRESS, IN_RELEASE );
+    TEST_ASSERT_EQUAL( PANE_TWEAK, uiShellTop( &shell ) );
+    send( IN_NAV_RIGHT, IN_PRESS );
+    send( IN_NAV_RIGHT, IN_RELEASE );
+    TEST_ASSERT_FLOAT_WITHIN( 0.01f, 10.5f, number );
+    // The joystick is the app's while the value is tweaked (it orbits the
+    // scene being looked at): its four-way is no menu key here.
+    send( IN_JOY_RIGHT, IN_PRESS );
+    send( IN_JOY_RIGHT, IN_RELEASE );
+    TEST_ASSERT_FLOAT_WITHIN( 0.01f, 10.5f, number );
+    tick( 0.0f, 0.0f ); // centred once...
+    tick( 0.5f, 0.0f ); // ...then the app's
+    TEST_ASSERT_FLOAT_WITHIN( 0.01f, 0.5f, fakes[ 0 ].lastJoyX );
+    send( IN_NAV_UP, IN_PRESS ); // the neighbouring item
+    send( IN_NAV_UP, IN_RELEASE );
+    TEST_ASSERT_EQUAL( 0, shell.menu.cursor );
+    flag = false;
+    send( IN_NAV_RIGHT, IN_PRESS );
+    send( IN_NAV_RIGHT, IN_RELEASE );
+    TEST_ASSERT_TRUE( flag );
+    tap( IN_BTN_B ); // the menu again, where the cursor is
+    TEST_ASSERT_EQUAL( PANE_MENU, uiShellTop( &shell ) );
+    TEST_ASSERT_EQUAL( 0, shell.menu.cursor );
+    // A hold on a toggle: the press flipped it, the hold takes that back.
+    send( IN_NAV_PRESS, IN_PRESS );
+    TEST_ASSERT_FALSE( flag );
+    send( IN_NAV_PRESS, IN_HOLD );
+    TEST_ASSERT_TRUE( flag );
+    TEST_ASSERT_EQUAL( PANE_TWEAK, uiShellTop( &shell ) );
+    send( IN_NAV_PRESS, IN_RELEASE );
+    tap( IN_NAV_PRESS ); // a press: the menu again
+    TEST_ASSERT_EQUAL( PANE_MENU, uiShellTop( &shell ) );
+    send( IN_NAV_PRESS, IN_PRESS );
+    send( IN_NAV_PRESS, IN_HOLD );
+    TEST_ASSERT_EQUAL( PANE_TWEAK, uiShellTop( &shell ) );
+    send( IN_NAV_PRESS, IN_RELEASE );
+    send( IN_BTN_B, IN_PRESS ); // B held: everything closes
+    send( IN_BTN_B, IN_HOLD );
+    send( IN_BTN_B, IN_RELEASE );
+    TEST_ASSERT_EQUAL( PANE_APP, uiShellTop( &shell ) );
+    TEST_ASSERT_EQUAL( 0, fakes[ 0 ].events );
+    // A press that entered a page, then held: no tweak, and the page's
+    // first item is not touched.
+    hold( IN_BTN_A );
+    tap( IN_BTN_B ); // the root, cursor on tracker
+    TEST_ASSERT_EQUAL_STRING( "menu", menuTitle( &shell.menu ) );
+    bool was = flag;
+    send( IN_NAV_PRESS, IN_PRESS );
+    TEST_ASSERT_EQUAL_STRING( "tracker", menuTitle( &shell.menu ) );
+    send( IN_NAV_PRESS, IN_HOLD );
+    send( IN_NAV_PRESS, IN_RELEASE );
+    TEST_ASSERT_EQUAL( PANE_MENU, uiShellTop( &shell ) );
+    TEST_ASSERT_EQUAL( was, flag );
 }
 
 void test_shell_confirm_and_result( void ) {
@@ -468,14 +586,14 @@ void test_shell_timeout_and_joystick( void ) {
     tick( 0.5f, 0.0f );
     TEST_ASSERT_FLOAT_WITHIN( 0.001f, 0.5f, fakes[ 0 ].lastJoyX );
     // 20 s idle: the overlays close, cursors kept.
-    tap( IN_BTN_A );
+    tap( IN_BTN_A ); // (on Settings, cell 1)
     send( IN_NAV_RIGHT, IN_PRESS );
     send( IN_NAV_RIGHT, IN_RELEASE );
-    TEST_ASSERT_EQUAL( 1, shell.home.cursor );
+    TEST_ASSERT_EQUAL( 2, shell.home.cursor );
     t += UISHELL_IDLE_MS;
     tick( 0.0f, 0.0f );
     TEST_ASSERT_EQUAL( PANE_APP, uiShellTop( &shell ) );
-    TEST_ASSERT_EQUAL( 1, shell.home.cursor );
+    TEST_ASSERT_EQUAL( 2, shell.home.cursor );
     // A swallowed control whose release the ring lost: healed from the raw state.
     hold( IN_BTN_A );
     send( IN_NAV_LEFT, IN_PRESS );
@@ -565,9 +683,11 @@ int main( int argc, char** argv ) {
     RUN_TEST( test_menu_edits_in_place );
     RUN_TEST( test_menu_accessor_set_once_with_the_flipped_value );
     RUN_TEST( test_menu_returns_actions_with_their_argument );
-    RUN_TEST( test_shell_home_selects_apps_and_remembers );
+    RUN_TEST( test_shell_home_opens_on_settings_and_selects_apps );
     RUN_TEST( test_shell_a_and_b_never_reach_an_app );
     RUN_TEST( test_shell_swallows_a_held_control_across_a_focus_change );
+    RUN_TEST( test_shell_menu_reopens_at_the_last_page );
+    RUN_TEST( test_shell_tweak_edits_a_value_over_the_app );
     RUN_TEST( test_shell_confirm_and_result );
     RUN_TEST( test_shell_timeout_and_joystick );
     RUN_TEST( test_shell_absolute_joystick );

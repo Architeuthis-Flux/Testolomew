@@ -81,6 +81,7 @@ class Ui : public Service {
     void drawMenu( GFXcanvas16* canvas );
     void drawConfirm( GFXcanvas16* canvas );
     void drawResult( GFXcanvas16* canvas );
+    void drawTweak( GFXcanvas16* canvas );
 };
 
 extern Ui& ui;

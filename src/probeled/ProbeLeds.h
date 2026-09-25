@@ -27,11 +27,18 @@
 // filter has already removed the jitter. A longer decay ("fade") is a
 // longer comet.
 //
-// Looks, each a lever in the style and in the menu's LEDs page: a colour
-// SCHEME (classic white-on-the-board / blue-in-the-air; a rainbow by
-// height; confidence green-to-red; amber; cyan; a rainbow that runs along
-// the board with time - and in every one of them the cursor is WHITE with
-// the point on the board, taking the scheme's colour as it lifts), FULL PEAK (the brightest LED is always the peak,
+// Looks, each a lever in the style and in the menu's LEDs and colours
+// pages: a colour SCHEME - what drives the hue: classic (white on the
+// board, blue in the air), height, how sure the row is, the direction the
+// probe leans (aim), or a rainbow along the board with time - with the
+// whole wheel mapped the style's way (hueTurns turns of it over the scale,
+// from hueStartDeg; under a turn a chunk of the spectrum as a gradient,
+// over it several rainbows; the height scale liftFullMm) and, in every
+// scheme, the cursor WHITE with the point on the board, all the scheme's
+// colour from colourByMm up. What DIMS the cursor (brightBy, by
+// brightAmount at the data's far end) and what raises the SPARKLE's density
+// (sparkleBy) are chosen from the same data: how unsure the row is, the
+// height, the tilt, the speed, or nothing. FULL PEAK (the brightest LED is always the peak,
 // whatever the bell's width - otherwise the total light is held and a wide
 // bell is a dim one), BLOOM (a wide soft halo round the cursor), SPARKLE
 // (twinkles inside the glow, near-white with a random tint each, few with
@@ -127,21 +134,39 @@ struct ProbeLedInput {
     float heightMm;                 // the point's height above the surface (0 = touching)
     bool haveUnder;                 // the point is somewhere else than the cursor (pointed mode, lifted)
     float underAlong, underAcrossMm;
+    float tiltDeg;  // the probe's lean from vertical (0 = straight up)...
+    float aimDeg;   // ...and which way it leans, degrees round the board (0 = +x, along the rows)
+    float speedMmS; // how fast the magnet is moving
 };
 
 enum ProbeLedScheme {
-    PROBELED_SCHEME_CLASSIC,    // white on the board, blue lifted (touch/lift colours below), purple from afar
-    PROBELED_SCHEME_HEIGHT,     // hue by height: red on the board through green to blue at liftFullMm
-    PROBELED_SCHEME_CONFIDENCE, // green when the row is sure, through yellow to red when it is a toss-up
-    PROBELED_SCHEME_AMBER,
-    PROBELED_SCHEME_CYAN,
-    PROBELED_SCHEME_RAINBOW, // hue runs along the board and round with time
+    PROBELED_SCHEME_CLASSIC, // white on the board, blue lifted (touch/lift colours below), purple from afar
+    PROBELED_SCHEME_HEIGHT,  // hue by height: hueTurns of the wheel from the board to liftFullMm
+    PROBELED_SCHEME_SURE,    // hue by how sure the row is: the wheel from a toss-up to certain
+    PROBELED_SCHEME_AIM,     // hue by which way the probe leans (a turn of the wheel is the compass), white standing straight, all colour from PROBELED_AIM_FULL_DEG of lean
+    PROBELED_SCHEME_RAINBOW, // hue runs along the board (hueTurns over its 30 rows) and round with time
     PROBELED_SCHEME_COUNT
 };
 extern const char* const probeLedSchemeNames[ PROBELED_SCHEME_COUNT ];
 
-#define PROBELED_WHITE_BELOW_MM 1.5f // the cursor is white with the point this close to the board, in every scheme...
-#define PROBELED_COLOUR_BY_MM 6.0f   // ...and all the scheme's colour from this height up (classic keeps its own 15 mm ramp)
+// The data a look can follow (brightBy, sparkleBy), each 0 at its near end
+// and 1 at its far end: how unsure the row is (1 = a toss-up), the height
+// (1 at liftFullMm), the tilt (1 at PROBELED_TILT_FULL_DEG), the speed (1 at
+// PROBELED_SPEED_FULL_MM_S), or nothing (always 0).
+enum ProbeLedData {
+    PROBELED_DATA_NONE,
+    PROBELED_DATA_SURE,
+    PROBELED_DATA_HEIGHT,
+    PROBELED_DATA_TILT,
+    PROBELED_DATA_SPEED,
+    PROBELED_DATA_COUNT
+};
+extern const char* const probeLedDataNames[ PROBELED_DATA_COUNT ];
+#define PROBELED_TILT_FULL_DEG 60.0f
+#define PROBELED_SPEED_FULL_MM_S 200.0f
+#define PROBELED_AIM_FULL_DEG 30.0f // the aim scheme's colour is all in at this much lean
+
+#define PROBELED_WHITE_BELOW_MM 1.5f // the cursor is white with the point this close to the board, in every scheme (all the scheme's colour from the style's colourByMm up; classic keeps its own ramp to liftFullMm)
 #define PROBELED_SPARKLE_TINT 0.25f  // a sparkle is white with this much of a random hue in it
 #define PROBELED_SPARKLE_FLOOR 0.1f  // the sparkle density on the board, as a fraction of the lever; all of it at liftFullMm
 #define PROBELED_PULSE_PERIOD_S 1.5f
@@ -175,10 +200,16 @@ struct ProbeLedStyle {
     float peak;                     // brightest any LED gets, 0..1
     float minSigmaRows;             // the bell is never narrower than this (one hole lights, neighbours faint)
     float minSigmaAcrossMm;
-    float liftFullMm;      // height at which the colour is all "lift"
+    float liftFullMm;      // the height scale: where the height's wheel ends (and classic's colour is all "lift"), mm
     float attackS, decayS; // per-LED smoothing time constants
     // The looks.
-    int scheme;     // ProbeLedScheme
+    int scheme;         // ProbeLedScheme
+    float hueTurns;     // turns of the wheel over the scheme's scale (under 1 a chunk of the spectrum, over 1 several rainbows)
+    float hueStartDeg;  // where the wheel starts (0 red, 120 green, 240 blue)
+    float colourByMm;   // the scheme's colour is all in from this height (white on the board below PROBELED_WHITE_BELOW_MM)
+    int brightBy;       // ProbeLedData: what dims the cursor...
+    float brightAmount; // ...by this much at the data's far end (0.5 by unsure: a toss-up row at half)
+    int sparkleBy;      // ProbeLedData: what raises the sparkle's density from PROBELED_SPARKLE_FLOOR of the lever to all of it (nothing: all of it always)
     bool fullPeak;  // the brightest LED is always `peak`; else the bell keeps its total light and widens dimmer
     float bloom;    // 0..1, a wide soft halo round the cursor
     float sparkle;  // 0..1, white twinkles in the glow

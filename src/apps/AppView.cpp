@@ -28,6 +28,7 @@
 #include "FastDraw.h"
 #include "MagArray.h"
 #include "MagLocator.h"
+#include "ProbeLeds.h" // probeLedHue: the poles' colours from their hues
 #include "UiLayout.h"
 #include "config.h"
 #include "Input.h"
@@ -71,6 +72,7 @@
 #define VIEW_TRAIL_PERIOD_MS 40 // a trail point this often, ~2 s of history
 
 Camera viewCamera;
+ViewStyle viewStyle = { true, MAGNET_HALF_LENGTH_MM, 3.0f, 225.0f, 1.0f }; // the colours page: the poles shown, the bar half length, the hues of COLOR_NORTH / COLOR_SOUTH as they were, the field arrows at full
 
 static GFXcanvas16* canvas = nullptr; // the frame being drawn
 // The projection's copy of the camera, taken each frame.
@@ -298,14 +300,18 @@ static void drawSensors( ) {
         if ( magnitude < 0.05f ) {
             continue;
         }
-        // 0.05 mT -> 1.5 mm, 5 mT -> 10 mm, 80 mT -> 16 mm
-        float length = 5.0f * log10f( 1.0f + magnitude / 0.05f );
+        // 0.05 mT -> 1.5 mm, 5 mT -> 10 mm, 80 mT -> 16 mm, times the colours page's "field arrows" (0: none)
+        if ( viewStyle.fieldArrows <= 0.0f )
+            continue;
+        float length = viewStyle.fieldArrows * 5.0f * log10f( 1.0f + magnitude / 0.05f );
         float k = length / magnitude;
         line3d( p, { p.x + k * b.x, p.y + k * b.y, p.z + k * b.z }, COLOR_FIELD );
     }
 }
 
-// A magnet as a bar along `axis`: north half red, south half blue. `flipped` = its north pole is at the -axis end.
+// A magnet as a bar along `axis`: north half in the north hue, south half in
+// the south hue (the colours page; red and blue to start with), three pixels
+// thick; with the poles off, a thin plain bar. `flipped` = its north pole is at the -axis end.
 static void drawMagnetBar( Vec3 centre, Vec3 axis, bool flipped, float halfLengthMm ) {
     float h = flipped ? -halfLengthMm : halfLengthMm;
     Vec3 north = { centre.x + h * axis.x, centre.y + h * axis.y, centre.z + h * axis.z };
@@ -314,11 +320,21 @@ static void drawMagnetBar( Vec3 centre, Vec3 axis, bool flipped, float halfLengt
     if ( !project( centre, &cx, &cy ) || !project( north, &nx, &ny ) || !project( south, &sx, &sy ) ) {
         return;
     }
+    if ( !viewStyle.poles ) {
+        fastLine( canvas, nx, ny, sx, sy, COLOR_TEXT_DIM );
+        canvas->drawCircle( cx, cy, 2, COLOR_TEXT );
+        return;
+    }
+    uint8_t r, g, b;
+    probeLedHue( viewStyle.northHueDeg, 1.0f, &r, &g, &b );
+    uint16_t northColour = RGB565( r, g, b );
+    probeLedHue( viewStyle.southHueDeg, 1.0f, &r, &g, &b );
+    uint16_t southColour = RGB565( r, g, b );
     for ( int d = -1; d <= 1; d++ ) {
-        fastLine( canvas, cx + d, cy, nx + d, ny, COLOR_NORTH );
-        fastLine( canvas, cx, cy + d, nx, ny + d, COLOR_NORTH );
-        fastLine( canvas, cx + d, cy, sx + d, sy, COLOR_SOUTH );
-        fastLine( canvas, cx, cy + d, sx, sy + d, COLOR_SOUTH );
+        fastLine( canvas, cx + d, cy, nx + d, ny, northColour );
+        fastLine( canvas, cx, cy + d, nx, ny + d, northColour );
+        fastLine( canvas, cx + d, cy, sx + d, sy, southColour );
+        fastLine( canvas, cx, cy + d, sx, sy + d, southColour );
     }
     canvas->drawCircle( cx, cy, halfLengthMm > 3.0f ? 4 : 2, COLOR_TEXT );
 }
@@ -396,7 +412,7 @@ static void drawMagnet( ) {
         Vec3 sth = { m.x - MAGNET_HALF_LENGTH_MM * axis.x, m.y - MAGNET_HALF_LENGTH_MM * axis.y, m.z - MAGNET_HALF_LENGTH_MM * axis.z };
         line3d( n, sth, COLOR_TEXT_DIM );
     } else {
-        drawMagnetBar( m, fix.axis, false, MAGNET_HALF_LENGTH_MM );
+        drawMagnetBar( m, fix.axis, false, viewStyle.poleMm );
     }
 
     // The probe's point, down the shaft from the magnet.

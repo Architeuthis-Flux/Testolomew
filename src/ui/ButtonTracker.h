@@ -29,7 +29,7 @@
 #define BUTTON_REPEAT_MS 80        // then this often
 #define BUTTON_REPEAT_FAST_MS 40   // ...and this often after
 #define BUTTON_REPEAT_FAST_AFTER 20 // this many repeats
-#define BUTTON_HOLD_MS 500
+#define BUTTON_HOLD_MS 600 // (500 until 2026-09-25: Kevin's "holding the back button for 0.6 seconds")
 #define BUTTON_LONG_HOLD_MS 1500
 
 struct ButtonTracker {

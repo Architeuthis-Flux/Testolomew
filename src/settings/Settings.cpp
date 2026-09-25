@@ -31,7 +31,7 @@ static void onReset( Stream* out ) {
 
 // Items that are modes rather than settings: not saved, so the board boots
 // the same way every time (row mode on, the console quiet).
-static const char* const unsaved[] = { "rows/row mode", "LEDs/V5 stream", "LEDs/chain on", "play/mode" };
+static const char* const unsaved[] = { "tools/row mode", "LEDs/V5 stream", "LEDs/chain on", "play/mode" };
 
 static bool isUnsaved( const char* key ) {
     for ( unsigned k = 0; k < sizeof( unsaved ) / sizeof( unsaved[ 0 ] ); k++ ) {
@@ -281,7 +281,7 @@ int SettingsService::apply( const char* text ) {
                 }
 #endif
             } else if ( menu != nullptr ) {
-                if ( oldTuning && ( strncmp( line, "tracker/", 8 ) == 0 || strncmp( line, "smoothing/", 10 ) == 0 || strncmp( line, "play/touch", 10 ) == 0 ) ) {
+                if ( oldTuning && ( strncmp( line, "tracking/", 9 ) == 0 || strncmp( line, "tracker/", 8 ) == 0 || strncmp( line, "smoothing/", 10 ) == 0 || strncmp( line, "play/touch", 10 ) == 0 ) ) {
                     if ( end == nullptr )
                         break;
                     line = end + 1;

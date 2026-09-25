@@ -12,7 +12,7 @@ Written 2026-09-19 (midday) as the hand-over for a new chat, after the night of 
 
 ## 2. Home, the apps and the Settings menu
 
-The screen is one of nine things from the **Home** grid (button A): **View** (the 3D scene), **LEDs** (the breadboard's LEDs as the cursor lights them), **Terminal** (the console's log, 40 x 28), **Draw** (the paint app: going to it starts painting, leaving stops), **Settings** (the centre cell: the pages below, over the app), **Target** (the target game, likewise), **Rows** (the counted row, large, with how sure), **Calibrate** (the twelve taps; leaving cancels), **Info** (the build, the sensors, the frame rate, the service table). The probe, the LEDs and the paint go on underneath whatever is open.
+The screen is one of nine things from the **Home** grid (button A): **View** (the 3D scene), **LEDs** (the breadboard's LEDs as the cursor lights them), **Terminal** (the console's log, 40 x 28), **Draw** (the paint app: going to it starts painting, leaving stops), **Settings** (the centre cell, where Home opens (2026-09-25): the pages below, over the app), **Target** (the target game, likewise), **Rows** (the counted row, large, with how sure), **Calibrate** (the twelve taps; leaving cancels), **Info** (the build, the sensors, the frame rate, the service table). The probe, the LEDs and the paint go on underneath whatever is open.
 
 The controls mean the same everywhere (the shell, `src/ui/UiShell.cpp`, is the one owner of them):
 
@@ -24,51 +24,47 @@ The controls mean the same everywhere (the shell, `src/ui/UiShell.cpp`, is the o
 | nav press / joystick press (on the way down) | the app's own | select | enter the page / run the action / flip / cycle | yes / dismiss |
 | **A** click (press, in the panes) | Home | select | select | yes / dismiss |
 | **A** hold | Settings | - | - | - |
+| nav press / joystick press / **A** HELD (0.6 s) on a toggle, a number or a choice | - | - | **tweak it over the app** (2026-09-25): the menu hides, the app shows, the item's label and value run along the bottom; left/right change it, up/down move to the neighbouring items, the joystick is the app's (it orbits the View); a press or B brings the menu back on that item, B held closes everything. The press that started the hold already flipped a toggle or cycled a choice: the hold takes that back | - |
 | **B** click | the previous app, else Home | close | back a page (the parent's cursor kept); at the root: close | no / dismiss |
-| **B** hold | Home | - | close everything, Home | cancel, Home |
-| 20 s idle | - | close (cursor kept) | close (page and cursor kept) | cancel |
+| **B** hold (0.6 s) | Home | - | close everything, the page kept (Home until 2026-09-25) | cancel, close everything |
+| 20 s idle | - | close (cursor kept) | close (page and cursor kept); a tweak stays until B | cancel |
+
+The menu opens where it was last used (2026-09-25): the page a key was last used on or entered, with its cursor, even after B backed it out to the root and closed it - so a setting can be tweaked, looked at with the menu closed (B held), and tweaked again with one press; the root is one B away. `:ui root` opens it at the top page.
 
 A and B never reach an app. A control still held when a pane closes (a nav-left held while B backs out of the menu) is swallowed until it is released, so it never goes on into the app underneath; the joystick is the app's again only once it has been centred. An action run from a Settings page (a console command) shows its output in a **Result** panel over the page - the app underneath never changes - and the destructive ones (`reset settings`, `forget anchors`, `forget strength`, `re-zero`, `power-cycle`) ask first. There is no edit mode: what is shown is what is set, and the settings module writes it two seconds after it stops changing.
 
-From the console the same is driven with `:ui open|menu|close|back|enter|up|down|left|right|go <label>`, `:key <control> [tap|down|up|hold]` and `:joy`; `:screen` prints the app, the panes, the menu page with its items and values, and the probe/play/camera state; `:screen:ascii` and `tools/screendump.py` show the picture.
+From the console the same is driven with `:ui open|menu|root|close|back|enter|hold|up|down|left|right|go <label>` (`menu`: where it was last used; `root`: the top page; `hold`: the select held, a value tweaked over the app), `:key <control> [tap|down|up|hold]` and `:joy`; `:screen` prints the app, the panes, the menu page with its items and values, and the probe/play/camera state; `:screen:ascii` and `tools/screendump.py` show the picture.
 
 The pages, item by item. Items marked *(saved)* persist; *(mode)* does not. Every label is the settings module's key, so it stays as it is.
 
-### tracker
+### tracking
+One page for everything continuous about the probe's pose (2026-09-25; the tracker, smoothing and cursor pages until then - their saved values fell back to the defaults with the move, the keys being page/label): what the cursor is, then the smoothing from the most felt lever to the least, then the fit's acceptance and load.
+
 | item | what it does | default |
 |---|---|---|
 | state / fix | info: the track's state and the raw fix | - |
 | tracker on | the Kalman tracker between the fits and everything else; off = raw fixes (for comparing) | on |
-| floor | `sigmaFloorMm` - the array's systematic error added to every fix's error bar (mm); the tracker's gate and weights use it | 0.4 |
-| gate | fixes further than this many sigmas from the track are dropped (a glitch) rather than followed | 4.0 |
-| presence | `presentMt` - the strongest smoothed reading (mT) above which a magnet is "there"; hysteresis to half of it | 0.04 |
-| far hold | how long a ROUGH track (the far glow) outlives its last rough fix (s) | 1.0 |
-| fit chi | `fitMaxChi` - the fit's acceptance: the rms of its residuals over each sensor's own expected error (its noise as smoothed, its zero's doubt, the model's 6 % share); about 1 is a fit as good as the readings. Loosen it at the bench if real fixes fail it (the fix line prints the chi) | 2.0 |
-| fit load | `burst`: the fit costs what it costs - a few ms a frame while tracking, and a cold start (the lattice, its refinement, up to seven seeds) as slices 25 ms apart while hunting. `steady`: exactly `fit iters` refinement iterations every frame with a magnet present, converged or not, the cold start resumed a slice a frame - the same work every 10 ms, so the V5F's supply current does not swing. On the nanoCH32H417 the LCD backlight hangs on the same LDO and showed the bursts (2026-09-20); steady was Kevin's idea | burst |
-| fit iters | the steady load's budget, iterations a frame (~0.85 ms each on the CH32H417). `pencil.cpp steady N` measures it: at 2 the tracking error, lag and rest jitter are the same as burst's to the last digit; at 1 it drops 0.1 % of frames and adds 0.01 mm. What a small budget does cost is the first fix after the probe arrives: the cold start's refinement runs 2 iterations a frame (up to 15 frames), and its seeds, when needed, 6 frames each. More than 2 only makes the pulse the supply shows bigger | 2 |
-
-### smoothing
-| item | what it does | default |
-|---|---|---|
-| view Hz / view beta | the 1-Euro filter on what the 3D SCENE draws of the magnet: cutoff at rest (Hz), and how fast it opens with speed | 1.5 / 0.5 |
-| cursor Hz / cursor beta | the same for the LED cursor / pointer | 1.0 / 0.5 |
-| shaft Hz / shaft beta | the same for the shaft direction (the angle the pointer projects along) | 1.0 / 10 |
-| camera | the camera's glide time constant (s) for every change of view | 0.18 |
-| POV turn / POV move | in POV mode, how slowly the direction follows the shaft and the position the point (s) | 0.6 / 0.3 |
-| accel | the tracker's process noise (mm/s²): how jerky a hand may be. 3000 lagged 20 ms; 10000 lags 10 | 10000 |
-
-All of these were set on the bench (`tools/hostsim/pencil.cpp`): a hand writing at 50-250 mm/s through the real locator and tracker, scored on lag and rest jitter.
-
-### cursor
-| item | what it does | default |
-|---|---|---|
 | cursor | `under` = straight under the tip; `aim` = where the tip points on the surface, down the shaft | aim |
 | surface | `boardZ` - the breadboard's surface height above the sensors (mm). **Also learned**: when the point bottoms out at the same height three seconds running, below the setting, the setting comes down to it (never up). `S` sets it by hand | 17.5 (compile-time); learned ~10.8 on the bench |
 | tip | `tipOffsetMm` - the magnet's centre this far up the shaft from the point (mm); `t` on the console | 0 |
-| reach | the pointer never reaches further from the tip than this (mm) | 40 |
+| reach | the pointer never reaches further from the tip than this (mm); 5-40 (to 100 until 2026-09-25: the reach is the drop x tan 70 deg at most, so past 40 it never engaged; and the raw pointer - the LEDs with the tracker off - now honours it too, it read the define) | 40 |
+| accel | the tracker's process noise (mm/s²): how jerky a hand may be - **the lever that sets rest jitter against lag**, and its effect is logarithmic: in the bench-like pencil the track's rest jitter is 0.075 mm at 500, 0.16 at 3000, 0.28 at 10000, 0.50 at 20000, for 40 / 20 / 20 / 20 ms of lag; 500 also halves a far hover's error. 250-20000 in 250s | 10000 |
+| rest jitter | `speedJitterK` (compile-time `MAGLOC_SPEED_JITTER_K` until 2026-09-25) - how much of the fit's own error bar is taken out of the speed the field smoothing follows: 0 lets the field EMA open at rest (three times the jitter), 2 halves it for +10 ms of lag. The bench feels this one and accel before any 1-Euro lever | 0.4 |
+| view Hz / view beta | the 1-Euro filter on what the 3D SCENE draws of the magnet: the cutoff at rest (Hz), and how fast it opens with speed (beta, per mm/s). The whole of beta's effect is under 0.5 (0: 120 ms of lag; 0.05: 40; 0.2: 30; 0.5: 20; at 1 it was flat, so the range ends at 0.5 now) and the Hz only shows with the beta low: the rest jitter's own speed, 2-5 mm/s, opens the cutoff by beta times that. Hz 0.1-5 | 1.5 / 0.5 |
+| cursor Hz / cursor beta | the same for the LED cursor / pointer (x and y; the height is the Kalman's alone) | 1.0 / 0.5 |
+| shaft Hz / shaft beta | the same for the shaft direction (the angle the pointer projects along): beta's effect is under 3 (0: 5.2 deg turning; 1: 2.7; 3: 2.2; 10: 1.9), 0-10 in quarters | 1.0 / 10 |
+| floor | `sigmaFloorMm` - the array's systematic error added to every fix's error bar (mm); the tracker's gate and weights use it, and the glow's width | 0.4 |
+| gate | fixes further than this many sigmas from the track count for less (Huber); the drop line is 11.3 (compile-time), so 2-8 (to 10 until 2026-09-25: past 8 the soft zone was nothing) | 4.0 |
+| presence | `presentMt` - the strongest smoothed reading (mT) above which a magnet is "there"; hysteresis to three quarters / half. 0.04-0.20 (from 0.02 until 2026-09-25: under the TMAGs' plain level presence needs two of them at 0.04 anyway, and the lever did nothing there with the MMC out) | 0.04 |
+| far hold | how long a ROUGH track (the far glow) outlives its last rough fix (s) | 1.0 |
+| fit chi | `fitMaxChi` - the fit's acceptance: the rms of its residuals over each sensor's own expected error (its noise as smoothed, its zero's doubt, the model's 6 % share); about 1 is a fit as good as the readings. Loosen it at the bench if real fixes fail it (the fix line prints the chi) | 2.0 |
+| fit load | `burst`: the fit costs what it costs - a few ms a frame while tracking, and a cold start (the lattice, its refinement, up to seven seeds) as slices 25 ms apart while hunting. `steady`: exactly `fit iters` refinement iterations every frame with a magnet present, converged or not, the cold start resumed a slice a frame - the same work every 10 ms, so the V5F's supply current does not swing. On the nanoCH32H417 the LCD backlight hangs on the same LDO and showed the bursts (2026-09-20); steady was Kevin's idea | burst |
+| fit iters | the steady load's budget, iterations a frame (~0.85 ms each on the CH32H417); read only under `steady`. `pencil.cpp steady N` measures it: at 2 the tracking error, lag and rest jitter are the same as burst's to the last digit; at 1 it drops 0.1 % of frames and adds 0.01 mm. What a small budget does cost is the first fix after the probe arrives: the cold start's refinement runs 2 iterations a frame (up to 15 frames), and its seeds, when needed, 6 frames each. More than 2 only makes the pulse the supply shows bigger | 2 |
+
+The smoothing defaults were set on the bench (`tools/hostsim/pencil.cpp`): a hand writing at 50-250 mm/s through the real locator and tracker, scored on lag and rest jitter; the ranges above are where the pencil measured a change (2026-09-25: "they don't seem to change the outcome much" - the flat parts are gone, and accel and rest jitter, the levers that are felt, are first).
 
 ### camera
-`mode` fixed / sway / spin / top / follow / POV (also `v`), `reset view`. In the View app the joystick orbits the scene and zooms with its press held; the nav stick pans; the nav press clicked steps the camera mode and held resets the view; the joystick's press clicked resets the view, held goes home in the fixed mode.
+`mode` fixed / sway / spin / top / follow / POV (also `v`), `reset view`, `glide` (the camera's time constant for every change of view, s; 0.18), `POV turn` / `POV move` (in POV mode, how slowly the direction follows the shaft and the position the point, s; 0.6 / 0.3). In the View app the joystick orbits the scene and zooms with its press held; the nav stick pans; the nav press clicked steps the camera mode and held resets the view; the joystick's press clicked resets the view, held goes home in the fixed mode.
 
 ### LEDs
 | item | what it does | default |
@@ -77,17 +73,35 @@ All of these were set on the bench (`tools/hostsim/pencil.cpp`): a hand writing 
 | chain on *(mode)* | the V5 chain streaming (`N`); `test chain` runs a dot up it (`n`, which also prints the timing and the power line) | on |
 | bright | `style.peak` - the cursor's peak level | 1.0 |
 | strip | `stripBrightness` - a lever on everything sent to the chain | 1.0 |
-| budget mA | the per-frame current budget: a frame that would draw more (12 mA per colour channel at full, an assumption) is dimmed whole, every LED by the same factor; never above the compile-time ceiling `PROBELED_STRIP_HARD_MAX_MA` = 2000 | 1000 |
-| colours | classic / height / sure / amber / cyan / rainbow - the cursor's colour scheme; every scheme is white with the point on the board (below 1.5 mm) and takes its colour from 6 mm up | classic |
+| budget mA | the per-frame current budget: a frame that would draw more (12 mA per colour channel at full, an assumption) is dimmed whole, every LED by the same factor; never above the compile-time ceiling `PROBELED_STRIP_HARD_MAX_MA` = 800 | 600 |
 | full peak | the widest bell still keeps one LED at the peak (up to twice the narrowest width; wider, the peak fades with the width - see §4) | on |
 | bloom | a halo three times as wide as the cursor at 0.3 x this | 0 |
-| sparkle | random near-white flashes in the glow, more when lifted (density follows height) | 0 |
+| sparkle | random near-white flashes in the glow; what the density follows is the colours page's `sparkle by` (the height by default: few on the board, all of it lifted) | 0 |
 | pulse | breathing of the peak | 0 |
 | fade | `decayS` - how long a lit LED takes to go dark (s); the attack is 20 ms | 0.12 |
 | touch ring | a ring runs out from the point when it lands, and again at every new hole it slides to while down | off |
 | V5 stream *(mode)* | the cursor as CSV on the console for a V5 to follow (`L`) | off |
 
-### rows
+### colours
+The cursor's colours (2026-09-25; `src/probeled/ProbeLeds.h`): every scheme uses the whole wheel in its own way (the single-colour amber and cyan are gone), and the mapping is set here.
+
+| item | what it does | default |
+|---|---|---|
+| scheme | what drives the hue: `classic` (white on the board, blue in the air), `height` (the wheel from the board to the height scale), `sure` (the wheel from a toss-up row to a certain one), `aim` (the direction the probe leans is the hue - a turn of the wheel is the compass - white standing straight, all colour from 30 deg of lean), `rainbow` (the wheel along the board's rows, turning with time). Every scheme is white with the point on the board (below 1.5 mm) and takes its colour from `colour from` up | classic |
+| turns | turns of the wheel over the scheme's scale: under 1 a chunk of the spectrum as a gradient (0.25 = a quarter of it), 1 the whole spectrum once, over 1 several rainbows | 0.667 (red to blue) |
+| hue start | where the wheel starts (0 red, 120 green, 240 blue) | 0 |
+| height scale | the height (mm) the height scheme's wheel runs to, and classic's colour is all "lift" (`liftFullMm`; the sparkle's and the brightness's height data end there too) | 15 |
+| colour from | the height (mm) from which the scheme's colour is all in (white on the board below 1.5 mm, blended between) | 6 |
+| bright by / bright amount | what DIMS the cursor - `unsure` (how far the row is from certain), `height`, `tilt` (60 deg is the far end), `speed` (200 mm/s), or `none` - and by how much at the data's far end. The default is the rule as it was: a coin-toss row at half | unsure / 0.5 |
+| sparkle by | what raises the sparkle's density from a tenth of the lever to all of it: `height` (as it was: few on the board, many lifted), `unsure`, `tilt`, `speed`, or `none` (the lever alone, the same everywhere) | height |
+| poles | the View's magnet bar: its north and south halves coloured, or a thin plain bar (the bar was 3 px of red and blue, fixed; Kevin: "a bit intense now that I'm using a stronger magnet") | on |
+| pole size | the bar's half length (mm) | 5 |
+| north hue / south hue | the two halves' hues (degrees round the wheel) | 3 (red) / 225 (blue) |
+| field arrows | the sensors' field arrows in the View: their length as a fraction of what it was (0 = none). Their length grows with the field (logarithmically), so a stronger magnet draws longer ones | 1.0 |
+
+### tools
+The one-shot things (2026-09-25; the magnet, sensors and rows pages until then), in that order: the magnet - `strength` info, `learn strength` (`k`: hold the fit to this magnet's strength), `forget strength` (`K`), `re-zero (away!)` (`z`: the probe well clear of the board), `orientation check` (`o`), `latest fix` (`l`); the sensors - `sensors` info, `use MMC` *(saved)*, `array status` (`m`), `bus check` (`b`), `power-cycle` (`p`), `service table` (`X`), `saved settings` (`s`); the rows, below.
+
 `row mode` *(mode)* (`r`; on at boot) - which breadboard row the probe is over, on the LCD (the View and Rows apps) and console; `row` info; `calibrate 12 taps` (opens the Calibrate app; `c` on the console); `anchor at row` (the row stepped in place with left/right, then the press: `R<row>` with the probe in that row's hole next to the channel); `forget anchors` (`C`, asks first); `hold-still test` (`h`). A tap or a hold now lets a second go by while the hand settles, then measures two seconds. The grid the board boots with is `ROWCOUNT_GRID_AT_BOOT` (the 2026-09-17 calibration); the breadboard has moved since - it reads ~1.7 rows off at row 20 and puts a touching tip in the channel near the centre line - **anchoring is still to do**: `R20` in row 20's channel-side hole, `R50` likewise.
 
 ### play
@@ -121,11 +135,8 @@ How the stick and the buttons are read (`src/ui/StickDpad.h`, `src/ui/ButtonTrac
 
 The contacts settle 10 ms before any of this; nothing is debounced twice. `j` prints the numbers in force. A press selects on its way DOWN in Home, the menu and the dialogs (the release-based click felt like nothing happening).
 
-### magnet, sensors
-`strength` info, `learn strength` (`k`: hold the fit to this magnet's strength), `forget strength` (`K`), `re-zero (away!)` (`z`: the probe well clear of the board), `orientation check` (`o`), `latest fix` (`l`). `sensors` info, `array status` (`m`), `bus check` (`b`), `power-cycle` (`p`), `service table` (`X`), `saved settings` (`s`).
-
 ### root
-`commands` (every console command as a menu action, but for `e v y B N r g u`, which have an item of their own or change the app), `reset settings` (asks first; the modes - row mode, the chain - are left as they are).
+`tracking`, `camera`, `LEDs`, `colours`, `tools`, `play`, `controls`, `commands` (every console command as a menu action, but for the ones with an item of their own on the pages above or that change the app: `e v y B N r g u k K z o l m b p X s R C h W n`), `reset settings` (asks first; the modes - row mode, the chain - are left as they are).
 
 ## 3. Console commands not on a page
 

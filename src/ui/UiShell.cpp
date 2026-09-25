@@ -25,6 +25,7 @@ void uiShellInit( UiShell* s, const UiApp* apps, int appCount, int firstApp, int
     homeInit( &s->home, appCount + 1 );
     menuInit( &s->menu );
     s->confirmItem = -1;
+    s->selectPressItem = -1;
     s->resultTitle[ 0 ] = '\0';
     s->resultScroll = s->resultLines = s->resultVisible = 0;
     for ( int c = 0; c < IN_CONTROL_COUNT; c++ ) {
@@ -107,14 +108,23 @@ void uiShellSelectApp( UiShell* s, int app ) {
 void uiShellOpenHome( UiShell* s ) {
     if ( uiShellTop( s ) == PANE_HOME )
         return;
-    s->home.cursor = s->app >= 0 ? homeCellOfApp( s, s->app ) : 0;
+    s->home.cursor = s->settingsCell; // the centre: Settings (2026-09-25; the current app's cell until then)
     push( s, PANE_HOME );
 }
 
 void uiShellOpenMenu( UiShell* s ) {
     if ( uiShellTop( s ) == PANE_MENU )
         return;
+    menuResume( &s->menu );
     push( s, PANE_MENU );
+}
+
+void uiShellOpenMenuRoot( UiShell* s ) {
+    menuHome( &s->menu );
+    if ( uiShellTop( s ) != PANE_MENU )
+        push( s, PANE_MENU );
+    else
+        noteChange( s );
 }
 
 void uiShellShowResult( UiShell* s, const char* title, int lines, int visible ) {
@@ -129,10 +139,27 @@ void uiShellShowResult( UiShell* s, const char* title, int lines, int visible ) 
         noteChange( s );
 }
 
-// B held anywhere above the app: everything closes and Home opens.
-static void homeFromAnywhere( UiShell* s ) {
-    uiShellCloseAll( s );
-    uiShellOpenHome( s );
+// A select held on a value item of the menu page: the value is tweaked
+// over the app. The press that started the hold has already acted on a
+// toggle or a choice (a press selects on its way down): that is taken back.
+// A hold whose press led elsewhere (into a page, an action) is nothing.
+static void openTweak( UiShell* s ) {
+    int index = menuCursorItem( &s->menu );
+    if ( index < 0 || index != s->selectPressItem )
+        return;
+    switch ( s->menu.items[ index ].kind ) {
+    case MENU_TOGGLE:
+        menuToggleSet( &s->menu, index, !menuToggleGet( &s->menu, index ) );
+        break;
+    case MENU_CHOICE:
+        menuChoiceSet( &s->menu, index, menuChoiceGet( &s->menu, index ) - 1 );
+        break;
+    case MENU_NUMBER:
+        break;
+    default:
+        return;
+    }
+    push( s, PANE_TWEAK );
 }
 
 static bool isDirection( InputControl c ) {
@@ -246,14 +273,33 @@ int uiShellEvent( UiShell* s, InputEvent e, uint32_t nowMs ) {
         if ( isDirection( c ) && press ) {
             return menuAction( s, menuKey( &s->menu, directionKey( c ), repeat ) );
         }
-        if ( isSelect( c ) && e.kind == IN_PRESS ) {
-            return menuAction( s, menuKey( &s->menu, MENUKEY_ENTER, false ) );
+        if ( isSelect( c ) ) {
+            if ( e.kind == IN_PRESS ) {
+                s->selectPressItem = menuCursorItem( &s->menu );
+                return menuAction( s, menuKey( &s->menu, MENUKEY_ENTER, false ) );
+            }
+            if ( e.kind == IN_HOLD )
+                openTweak( s );
+            return -1;
         }
         if ( c == IN_BTN_B ) {
             if ( e.kind == IN_CLICK )
                 return menuAction( s, menuKey( &s->menu, MENUKEY_BACK, false ) );
             if ( e.kind == IN_HOLD )
-                homeFromAnywhere( s );
+                uiShellCloseAll( s ); // the page kept: the next open is here again
+        }
+        return -1;
+    case PANE_TWEAK:
+        if ( isJoystickDirection( c ) )
+            return -1; // the stick is the app's here
+        if ( isDirection( c ) && press ) {
+            menuKey( &s->menu, directionKey( c ), repeat ); // a direction never returns an action
+            return -1;
+        }
+        if ( ( isSelect( c ) && e.kind == IN_PRESS ) || ( c == IN_BTN_B && e.kind == IN_CLICK ) ) {
+            pop( s ); // the menu again, on this item
+        } else if ( c == IN_BTN_B && e.kind == IN_HOLD ) {
+            uiShellCloseAll( s );
         }
         return -1;
     case PANE_CONFIRM:
@@ -268,8 +314,7 @@ int uiShellEvent( UiShell* s, InputEvent e, uint32_t nowMs ) {
                 s->confirmItem = -1;
                 pop( s ); // no
             } else if ( e.kind == IN_HOLD ) {
-                s->confirmItem = -1;
-                homeFromAnywhere( s );
+                uiShellCloseAll( s );
             }
         }
         return -1;
@@ -286,7 +331,7 @@ int uiShellEvent( UiShell* s, InputEvent e, uint32_t nowMs ) {
         } else if ( ( isSelect( c ) && e.kind == IN_PRESS ) || ( c == IN_BTN_B && e.kind == IN_CLICK ) ) {
             pop( s );
         } else if ( c == IN_BTN_B && e.kind == IN_HOLD ) {
-            homeFromAnywhere( s );
+            uiShellCloseAll( s );
         }
         return -1;
     }
@@ -371,6 +416,7 @@ static void steerAbsolute( UiShell* s, float x, float y ) {
         int cursor = s->menuScrollTop + r;
         if ( cursor != s->menu.cursor ) {
             s->menu.cursor = cursor;
+            menuRemember( &s->menu );
             s->generation++;
         }
     }
@@ -386,8 +432,10 @@ void uiShellTick( UiShell* s, uint32_t nowMs, float dtS, float joyX, float joyY,
             }
         }
     }
-    // Left alone: the overlays close, remembering where they were.
-    if ( s->depth > 0 && s->lastInputMs != 0 && nowMs - s->lastInputMs >= UISHELL_IDLE_MS ) {
+    // Left alone: the overlays close, remembering where they were (a tweak
+    // is deliberate - a value changed while the picture is watched - and
+    // stays until B).
+    if ( s->depth > 0 && uiShellTop( s ) != PANE_TWEAK && s->lastInputMs != 0 && nowMs - s->lastInputMs >= UISHELL_IDLE_MS ) {
         uiShellCloseAll( s );
         s->lastInputMs = nowMs == 0 ? 1 : nowMs;
     }
@@ -401,7 +449,7 @@ void uiShellTick( UiShell* s, uint32_t nowMs, float dtS, float joyX, float joyY,
     bool centred = joyX == 0.0f && joyY == 0.0f;
     if ( !s->joyArmed && centred )
         s->joyArmed = true;
-    bool stickIsApps = s->depth == 0 && s->joyArmed;
+    bool stickIsApps = ( s->depth == 0 || uiShellTop( s ) == PANE_TWEAK ) && s->joyArmed;
     const UiApp* app = uiShellApp( s );
     if ( app != nullptr && app->tick != nullptr ) {
         app->tick( dtS, stickIsApps ? joyX : 0.0f, stickIsApps ? joyY : 0.0f );

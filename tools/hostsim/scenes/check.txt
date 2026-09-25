@@ -54,22 +54,23 @@
 :log 3
 @expect "log{"
 
-# Home: A opens it with the cursor on the current app; the apps by name;
-# the joystick steers it at a quarter of its travel.
+# Home: A opens it with the cursor on Settings (the centre cell; the current
+# app's until 2026-09-25); the apps by name; the joystick steers it at a
+# quarter of its travel.
 :key a
 @expect "ok{key a tap}"
 @run 300
 :screen
 @expect "panes: home"
-@expect "home: cursor 0 View"
+@expect "home: cursor 4 Settings"
 :joy 0 -0.3 300
 @run 500
 :screen
-@expect "home: cursor 3 Draw"
+@expect "home: cursor 7 Calibrate"
 :joy 0 0.3 300
 @run 500
 :screen
-@expect "home: cursor 0 View"
+@expect "home: cursor 4 Settings"
 :ui go leds
 @expect "ok{go LEDs}"
 :screen
@@ -91,10 +92,10 @@
 :screen
 @expect "panes: menu"
 @expect "menu: / cursor 1/"
-:ui go tracker
-@expect "ok{go tracker}"
+:ui go tracking
+@expect "ok{go tracking}"
 :screen
-@expect "menu: /tracker cursor 1/"
+@expect "menu: /tracking cursor 1/"
 @expect "> state"
 :ui down
 :ui down
@@ -109,11 +110,49 @@
 :ui down
 :ui right
 :screen
-@expect "> floor                    0.5mm"
+@expect "> cursor                   under"
 :ui left
+:screen
+@expect "> cursor                   aim"
 :ui back
 :key b
 @run 300
+:screen
+@expect "panes: -"
+
+# The menu opens where it was last used (2026-09-25): the tracking page,
+# its cursor where it was left. B held (0.6 s) closes everything and keeps
+# the page. A select HELD on a value tweaks it over the app: the menu is
+# hidden, the label and value run along the bottom, left/right change it,
+# a press or B brings the menu back on that item; :ui root is the top page.
+:ui menu
+:screen
+@expect "panes: menu"
+@expect "menu: /tracking cursor 4/"
+:key b hold
+@run 900
+:screen
+@expect "panes: -"
+:ui menu
+:screen
+@expect "menu: /tracking cursor 4/"
+:ui down
+:ui hold
+:screen
+@expect "panes: menu tweak"
+@expect "tweak: surface 17.5mm"
+:ui right
+:screen
+@expect "tweak: surface 18.0mm"
+:ui left
+:ui back
+:screen
+@expect "panes: menu"
+@expect "> surface                  17.5mm"
+:ui root
+:screen
+@expect "menu: / cursor 1/"
+:ui close
 :screen
 @expect "panes: -"
 
@@ -124,6 +163,8 @@
 :key a
 @run 300
 :ui go settings
+:ui back
+# (the menu opened on the tracking page, where it was: back to the root, so one B closes it)
 :key left down
 @run 300
 :key b
@@ -145,9 +186,9 @@
 
 # An action from a page: its output in a Result panel over the page, the
 # app underneath unchanged; B dismisses it, the page is still there.
-:ui menu
-:ui go magnet
-@expect "ok{go magnet}"
+:ui root
+:ui go tools
+@expect "ok{go tools}"
 :ui go latest
 @expect "ok{go latest fix}"
 :screen
@@ -157,7 +198,7 @@
 :ui back
 :screen
 @expect "panes: menu"
-@expect "menu: /magnet"
+@expect "menu: /tools"
 # A destructive one asks first; B says no.
 :ui go forget
 @expect "ok{go forget strength}"
@@ -193,11 +234,11 @@
 
 # The other apps, by name from Home: Rows shows the counted row; Target
 # starts the game; Calibrate starts the twelve taps and leaving cancels
-# them; Info is text; the Home grid has nine cells with Settings eighth.
+# them; Info is text; the Home grid has nine cells with Settings fifth.
 :key a
 @run 300
 :screen
-@expect "home: cursor 0 View"
+@expect "home: cursor 4 Settings"
 :ui go rows
 @expect "ok{go Rows}"
 :screen
@@ -234,13 +275,13 @@
 @expect "ok{go Settings}"
 :screen
 @expect "panes: menu"
-@expect "menu: /magnet"
-# (the menu remembers the page it was left on: back to the root first)
+@expect "menu: /tools"
+# (the menu opens on the page it was last used on: back to the root first)
 :ui back
 :screen
 @expect "menu: / cursor"
-:ui go rows
-@expect "ok{go rows}"
+:ui go tools
+@expect "ok{go tools}"
 :ui go calibrate
 @expect "ok{go calibrate 12 taps}"
 @run 300
@@ -284,7 +325,7 @@
 @expect "home: cursor 6 Rows"
 @run 400
 :ui go settings
-:ui go controls
+# (opens on the controls page, where it was)
 :ui go joystick
 :screen
 @expect "> joystick                 relative"
@@ -324,14 +365,17 @@ Z
 S23\r
 @run 4000
 s
-@expect "cursor/surface=23"
+@expect "tracking/surface=23"
 @expect "controls/direction ms="
-@expect "tracker/floor="
-@expect "tracker/tracker on="
-@expect "smoothing/view Hz="
-@expect "cursor/cursor="
+@expect "tracking/floor="
+@expect "tracking/tracker on="
+@expect "tracking/view Hz="
+@expect "tracking/cursor="
 @expect "camera/mode="
+@expect "camera/glide="
 @expect "LEDs/layout="
+@expect "colours/scheme="
+@expect "colours/north hue="
 @expect "play/hue="
 
 # The real fit on simulated fields: a magnet in row 20 lands on row 20.
