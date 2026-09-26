@@ -29,8 +29,9 @@
 //                   (the page is kept: the menu opens again where it was
 //                   last used, even after B backed it out to the root)
 //   Tweak           the menu hidden, the app showing, the item's label and
-//                   value along the bottom: left/right change it, up/down
-//                   move to the neighbouring items, the joystick is the
+//                   value along the bottom: UP/DOWN change it (up = more),
+//                   LEFT/RIGHT move to the neighbouring items (the axes the
+//                   other way round from the page), the joystick is the
 //                   app's (it orbits the scene being looked at); a press or
 //                   B: the menu again; B hold: everything closes.
 //   Confirm         a press or A: yes; B: no; B hold: everything closes

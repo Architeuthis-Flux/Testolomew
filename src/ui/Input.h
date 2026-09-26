@@ -50,7 +50,7 @@
 #define INPUT_PERIOD_US 5000
 #define INPUT_DEBOUNCE_MS BUTTON_DEBOUNCE_MS
 #define INPUT_HOLD_MS BUTTON_HOLD_MS
-#define INPUT_JOY_DEAD 0.04f  // the inner dead zone: this much of the travel round the centre is nothing (a scaled radial one: no step at its edge)
+#define INPUT_JOY_DEAD 0.10f  // the inner dead zone: this much of the travel round the centre is nothing (a scaled radial one: no step at its edge); the menu's "joy dead" (0.04 until 2026-09-25: Kevin, "increase the default deadzone")
 #define INPUT_JOY_CENTRE_WITHIN 0.3f // the centre follows a stick that sits still this close to it...
 #define INPUT_JOY_CENTRE_STILL_MS 1500 // ...for this long (a hand holding a direction is not still that long at that little)
 #define INPUT_JOY_CENTRE_TAU_S 4.0f    // ...with this time constant
@@ -142,6 +142,7 @@ class Input : public Service {
     float navPushGuardMs = INPUT_NAV_DIRECTION_WITH_PUSH_MS;
     float joyMenuAt = STICK_DPAD_ON;
     float joyMenuOff = STICK_DPAD_OFF;
+    float joyDead = INPUT_JOY_DEAD; // the analog stick's inner dead zone, a fraction of its travel
 
     // Console `j`: everything as read, for checking the wiring; `J`: what the
     // nav stick's contacts did lately.

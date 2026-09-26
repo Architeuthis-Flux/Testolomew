@@ -316,9 +316,18 @@ int uiShellEvent( UiShell* s, InputEvent e, uint32_t nowMs ) {
         if ( isJoystickDirection( c ) )
             return -1; // the stick is the app's here
         if ( isDirection( c ) && press ) {
-            if ( isUpDown( c ) && !cursorStep( s, e, nowMs ) )
-                return -1;
-            menuKey( &s->menu, directionKey( c ), repeat ); // a direction never returns an action
+            // The axes the other way round from the page (Kevin, 2026-09-25):
+            // up/down change the value (up = more), left/right step to the
+            // neighbouring items - at the cursor's pace; the value runs at
+            // the raw repeat.
+            MenuKey k = directionKey( c );
+            if ( k == MENUKEY_LEFT || k == MENUKEY_RIGHT ) {
+                if ( !cursorStep( s, e, nowMs ) )
+                    return -1;
+                menuKey( &s->menu, k == MENUKEY_LEFT ? MENUKEY_UP : MENUKEY_DOWN, repeat );
+            } else {
+                menuKey( &s->menu, k == MENUKEY_UP ? MENUKEY_RIGHT : MENUKEY_LEFT, repeat ); // a direction never returns an action
+            }
             return -1;
         }
         if ( ( isSelect( c ) && e.kind == IN_PRESS ) || ( c == IN_BTN_B && e.kind == IN_CLICK ) ) {

@@ -300,7 +300,7 @@ void Ui::drawTweak( GFXcanvas16* canvas ) {
         if ( value[ 0 ] )
             fastText( canvas, x0 + w - 4 - UI_CHAR_W * valueChars, y0 + 3, UI_TEXT, UI_COLOR_TEXT, value );
     }
-    fastText( canvas, x0 + 4, y0 + h - 10, 1, UI_COLOR_DIM, "left/right: change  up/down: next  B: menu" );
+    fastText( canvas, x0 + 4, y0 + h - 10, 1, UI_COLOR_DIM, "up/down: change  left/right: next  B: menu" );
 }
 
 void Ui::draw( GFXcanvas16* canvas ) {

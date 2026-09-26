@@ -216,7 +216,7 @@ void Input::printInputs( Stream* out ) const {
     char line[ 200 ];
     if ( joystickFitted ) {
         snprintf( line, sizeof( line ), "joystick raw x %d y %d of %.0f (centre followed to %.0f %.0f)  ->  linear x %+.2f y %+.2f, expo x %+.2f y %+.2f (dead zone %.0f %%, full at %.0f %%)  press %s (pin %s, %s)",
-                  analogRead( PIN_JOY_X ), analogRead( PIN_JOY_Y ), joyFullScale, joyCentreX, joyCentreY, joyRawX, joyRawY, joyX, joyY, INPUT_JOY_DEAD * 100.0f, INPUT_JOY_OUTER * 100.0f,
+                  analogRead( PIN_JOY_X ), analogRead( PIN_JOY_Y ), joyFullScale, joyCentreX, joyCentreY, joyRawX, joyRawY, joyX, joyY, joyDead * 100.0f, INPUT_JOY_OUTER * 100.0f,
                   trackers[ IN_JOY_PRESS ].down ? "DOWN" : "up", pinDown( IN_JOY_PRESS ) ? "reads pressed" : "reads released", sources[ IN_JOY_PRESS ].activeLow ? "active low" : "active high" );
     } else {
         snprintf( line, sizeof( line ), "joystick not fitted (PIN_JOY_X/Y are -1); typed: x %+.2f y %+.2f", joyX, joyY );
@@ -238,7 +238,7 @@ void Input::printInputs( Stream* out ) const {
         // the conversions, not the hand.
         Input* self = const_cast<Input*>( this );
         snprintf( line, sizeof( line ), "joystick ADC spread since the last j: x %d..%d (%d counts), y %d..%d (%d counts) over %lu samples; %.1f %% of travel is %d counts", joyMinX, joyMaxX,
-                  joyMaxX - joyMinX, joyMinY, joyMaxY, joyMaxY - joyMinY, (unsigned long)joySamples, 100.0f * INPUT_JOY_DEAD, (int)( INPUT_JOY_DEAD * 0.5f * joyFullScale ) );
+                  joyMaxX - joyMinX, joyMinY, joyMaxY, joyMaxY - joyMinY, (unsigned long)joySamples, 100.0f * joyDead, (int)( joyDead * 0.5f * joyFullScale ) );
         out->println( line );
         self->joyMinX = self->joyMinY = 4095;
         self->joyMaxX = self->joyMaxY = 0;
@@ -355,13 +355,17 @@ bool Input::takeKey( char c ) {
 // there is no step at the dead zone's edge and no snap to the axes), into
 // the linear pair; the expo pair squares the magnitude (fine control near
 // the centre for the camera) and keeps the direction.
-static void shapeStick( float x, float y, float* linearX, float* linearY, float* expoX, float* expoY ) {
+static void shapeStick( float x, float y, float dead, float* linearX, float* linearY, float* expoX, float* expoY ) {
+    if ( dead < 0.0f )
+        dead = 0.0f;
+    if ( dead > INPUT_JOY_OUTER - 0.05f )
+        dead = INPUT_JOY_OUTER - 0.05f;
     float mag = sqrtf( x * x + y * y );
-    if ( mag < INPUT_JOY_DEAD || mag <= 0.0f ) {
+    if ( mag < dead || mag <= 0.0f ) {
         *linearX = *linearY = *expoX = *expoY = 0.0f;
         return;
     }
-    float s = ( mag - INPUT_JOY_DEAD ) / ( INPUT_JOY_OUTER - INPUT_JOY_DEAD );
+    float s = ( mag - dead ) / ( INPUT_JOY_OUTER - dead );
     if ( s > 1.0f )
         s = 1.0f;
     float ux = x / mag, uy = y / mag;
@@ -542,7 +546,7 @@ ServiceStatus Input::service( ) {
             x = -x;
         if ( JOY_Y_REVERSED )
             y = -y;
-        shapeStick( x, y, &joyRawX, &joyRawY, &joyX, &joyY );
+        shapeStick( x, y, joyDead, &joyRawX, &joyRawY, &joyX, &joyY );
     } else {
         joyX = joyY = joyRawX = joyRawY = 0.0f;
     }

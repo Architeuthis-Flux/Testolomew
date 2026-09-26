@@ -434,24 +434,50 @@ void test_shell_tweak_edits_a_value_over_the_app( void ) {
     TEST_ASSERT_FLOAT_WITHIN( 0.01f, 10.0f, number );
     send( IN_NAV_PRESS, IN_RELEASE );
     TEST_ASSERT_EQUAL( PANE_TWEAK, uiShellTop( &shell ) );
-    send( IN_NAV_RIGHT, IN_PRESS );
-    send( IN_NAV_RIGHT, IN_RELEASE );
+    // The axes are the other way round from the page (Kevin, 2026-09-25):
+    // up/down change the value, left/right step to the neighbouring items.
+    send( IN_NAV_UP, IN_PRESS );
+    send( IN_NAV_UP, IN_RELEASE );
+    TEST_ASSERT_FLOAT_WITHIN( 0.01f, 10.5f, number );
+    send( IN_NAV_DOWN, IN_PRESS );
+    send( IN_NAV_DOWN, IN_RELEASE );
+    TEST_ASSERT_FLOAT_WITHIN( 0.01f, 10.0f, number );
+    send( IN_NAV_UP, IN_PRESS );
+    send( IN_NAV_UP, IN_RELEASE );
     TEST_ASSERT_FLOAT_WITHIN( 0.01f, 10.5f, number );
     // The joystick is the app's while the value is tweaked (it orbits the
     // scene being looked at): its four-way is no menu key here.
-    send( IN_JOY_RIGHT, IN_PRESS );
-    send( IN_JOY_RIGHT, IN_RELEASE );
+    send( IN_JOY_UP, IN_PRESS );
+    send( IN_JOY_UP, IN_RELEASE );
     TEST_ASSERT_FLOAT_WITHIN( 0.01f, 10.5f, number );
     tick( 0.0f, 0.0f ); // centred once...
     tick( 0.5f, 0.0f ); // ...then the app's
     TEST_ASSERT_FLOAT_WITHIN( 0.01f, 0.5f, fakes[ 0 ].lastJoyX );
-    send( IN_NAV_UP, IN_PRESS ); // the neighbouring item
-    send( IN_NAV_UP, IN_RELEASE );
+    send( IN_NAV_LEFT, IN_PRESS ); // the neighbouring item
+    send( IN_NAV_LEFT, IN_RELEASE );
     TEST_ASSERT_EQUAL( 0, shell.menu.cursor );
+    TEST_ASSERT_FLOAT_WITHIN( 0.01f, 10.5f, number ); // (left changed nothing)
     flag = false;
-    send( IN_NAV_RIGHT, IN_PRESS );
-    send( IN_NAV_RIGHT, IN_RELEASE );
+    send( IN_NAV_UP, IN_PRESS );
+    send( IN_NAV_UP, IN_RELEASE );
     TEST_ASSERT_TRUE( flag );
+    // A held left/right walks the items at the cursor's pace; a held
+    // up/down runs the value at the raw repeat.
+    uint32_t t0 = t;
+    uiShellEvent( &shell, { IN_NAV_RIGHT, IN_PRESS }, t0 ); // floor
+    TEST_ASSERT_EQUAL( 1, shell.menu.cursor );
+    uiShellEvent( &shell, { IN_NAV_RIGHT, IN_REPEAT }, t0 + 80 ); // too soon: stays
+    TEST_ASSERT_EQUAL( 1, shell.menu.cursor );
+    uiShellEvent( &shell, { IN_NAV_RIGHT, IN_RELEASE }, t0 + 100 );
+    uiShellEvent( &shell, { IN_NAV_UP, IN_PRESS }, t0 + 200 );
+    uiShellEvent( &shell, { IN_NAV_UP, IN_REPEAT }, t0 + 600 );
+    uiShellEvent( &shell, { IN_NAV_UP, IN_REPEAT }, t0 + 680 );
+    uiShellEvent( &shell, { IN_NAV_UP, IN_RELEASE }, t0 + 700 );
+    TEST_ASSERT_FLOAT_WITHIN( 0.01f, 12.0f, number );
+    t = t0 + 700;
+    send( IN_NAV_LEFT, IN_PRESS ); // back to the toggle for the rest
+    send( IN_NAV_LEFT, IN_RELEASE );
+    TEST_ASSERT_EQUAL( 0, shell.menu.cursor );
     tap( IN_BTN_B ); // the menu again, where the cursor is
     TEST_ASSERT_EQUAL( PANE_MENU, uiShellTop( &shell ) );
     TEST_ASSERT_EQUAL( 0, shell.menu.cursor );

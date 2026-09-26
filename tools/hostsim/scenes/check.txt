@@ -123,8 +123,9 @@
 # The menu opens where it was last used (2026-09-25): the tracking page,
 # its cursor where it was left. B held (0.6 s) closes everything and keeps
 # the page. A select HELD on a value tweaks it over the app: the menu is
-# hidden, the label and value run along the bottom, left/right change it,
-# a press or B brings the menu back on that item; :ui root is the top page.
+# hidden, the label and value run along the bottom, up/down change it
+# (left/right step through the items: the axes the other way round from the
+# page), a press or B brings the menu back on that item; :ui root is the top page.
 :ui menu
 :screen
 @expect "panes: menu"
@@ -141,9 +142,13 @@
 :screen
 @expect "panes: menu tweak"
 @expect "tweak: surface 17.5mm"
-:ui right
+:ui up
 :screen
 @expect "tweak: surface 18.0mm"
+:ui down
+:ui right
+:screen
+@expect "tweak: tip"
 :ui left
 :ui back
 :screen

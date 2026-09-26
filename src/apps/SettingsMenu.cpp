@@ -319,6 +319,7 @@ void settingsMenuBuild( Menu* m ) {
     menuAddNumber( m, controls, "push guard ms", &input.navPushGuardMs, 0.0f, 200.0f, 5.0f, "" );
     menuAddNumber( m, controls, "joy menu at", &input.joyMenuAt, 0.1f, 0.9f, 0.05f, "" );
     menuAddNumber( m, controls, "joy menu off", &input.joyMenuOff, 0.05f, 0.9f, 0.05f, "" ); // ...and over inside this (kept under 'at')
+    menuAddNumber( m, controls, "joy dead", &input.joyDead, 0.02f, 0.30f, 0.02f, "" ); // the analog stick's inner dead zone (2026-09-25)
     menuAddNumber( m, controls, "cursor repeat", &ui.shell.stepRepeatMs, 100.0f, 800.0f, 50.0f, "ms" ); // a held up/down (Home: any way) steps the cursor no faster than this (2026-09-25)
     int joystick = menuAddToggle( m, controls, "joystick", &ui.shell.absoluteJoystick ); // absolute: the stick's position is the cursor on Home and the menu pages
     menuSetToggleText( m, joystick, "absolute", "relative" );
