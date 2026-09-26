@@ -64,9 +64,9 @@ e
 :screen:png out/s12_menu_root.png
 \r
 @run 300
-:screen:png out/s13_menu_tracker.png
+:screen:png out/s13_menu_tracking.png
 `
-:ui go magnet
+:ui go tools
 :ui go latest
 @run 400
 :screen:png out/s14_result_after_l.png

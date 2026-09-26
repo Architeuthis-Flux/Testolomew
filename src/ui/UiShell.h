@@ -15,8 +15,13 @@
 //                   selects; B closes
 //   Home            (opens with the cursor on Settings, the centre cell)
 //   Settings page   up/down move, LEFT/RIGHT CHANGE THE VALUE IN PLACE, a
-//                   press enters / runs / flips / cycles, a press HELD on a
-//                   toggle, a number or a choice tweaks it (below), B backs
+//                   press enters a page or runs an action on its way down;
+//                   a toggle flips and a choice cycles on the CLICK (the
+//                   release of a short press), so a press HELD on a toggle,
+//                   a number or a choice tweaks it (below) without ever
+//                   touching it (an accessor's setter with side effects -
+//                   the tracker reset, the chain darkened - must not run
+//                   for a look at the value; the review, 2026-09-25), B backs
 //                   a page (at the root: closes), B hold closes everything
 //                   (the page is kept: the menu opens again where it was
 //                   last used, even after B backed it out to the root)
@@ -24,9 +29,7 @@
 //                   value along the bottom: left/right change it, up/down
 //                   move to the neighbouring items, the joystick is the
 //                   app's (it orbits the scene being looked at); a press or
-//                   B: the menu again; B hold: everything closes. (The
-//                   press that started the hold already flipped a toggle or
-//                   cycled a choice: the hold takes that back.)
+//                   B: the menu again; B hold: everything closes.
 //   Confirm         a press or A: yes; B: no; B hold: everything closes
 //   Result          up/down scroll; a press, A or B dismiss
 //   20 s idle       overlays close (cursors and the page remembered) - not

@@ -310,6 +310,20 @@ void test_hue_scale_turns_and_start( void ) {
     probeLedRender( &v6, &in, &style, 0.02f, &frame );
     b = brightest( &frame );
     TEST_ASSERT_TRUE( frame.r[ b ] == 255 && frame.g[ b ] > 150 && frame.g[ b ] < 220 && frame.b[ b ] < 10 );
+    // Above the scale the colour holds at the wheel's end (the review,
+    // 2026-09-25: unclamped, a probe 20-45 mm up cycled the wheel and read as
+    // any height on the scale).
+    style.hueTurns = 0.667f;
+    in.heightMm = 20.0f;
+    probeLedRender( &v6, &in, &style, 0.02f, &frame );
+    b = brightest( &frame );
+    uint8_t topR = frame.r[ b ], topG = frame.g[ b ], topB = frame.b[ b ];
+    in.heightMm = 45.0f;
+    probeLedRender( &v6, &in, &style, 0.02f, &frame );
+    b = brightest( &frame );
+    TEST_ASSERT_TRUE( abs( (int)frame.r[ b ] - (int)topR ) < 3 && abs( (int)frame.g[ b ] - (int)topG ) < 3 && abs( (int)frame.b[ b ] - (int)topB ) < 3 );
+    in.heightMm = 10.0f;
+    style.hueTurns = 0.25f;
     // The colour is all in from colourByMm up; on the board it is white.
     style.colourByMm = 12.0f;
     probeLedRender( &v6, &in, &style, 0.02f, &frame ); // 10 mm: most of the way from 1.5 to 12
@@ -361,6 +375,18 @@ void test_aim_scheme_colours_by_the_lean( void ) {
     probeLedRender( &v6, &in, &style, 0.02f, &frame );
     b = brightest( &frame );
     TEST_ASSERT_TRUE( frame.g[ b ] == 255 && frame.r[ b ] < 60 && frame.b[ b ] < 60 ); // a third round: green
+    // The compass is one turn of the wheel whatever the turns lever says: a
+    // lean a hair either side of +x is the same colour (the review,
+    // 2026-09-25: at 0.667 turns the hue jumped red/blue at the seam).
+    style.hueTurns = 0.667f;
+    in.aimDeg = 359.5f;
+    probeLedRender( &v6, &in, &style, 0.02f, &frame );
+    b = brightest( &frame );
+    uint8_t r0 = frame.r[ b ], g0 = frame.g[ b ], b0 = frame.b[ b ];
+    in.aimDeg = 0.5f;
+    probeLedRender( &v6, &in, &style, 0.02f, &frame );
+    b = brightest( &frame );
+    TEST_ASSERT_TRUE( abs( (int)frame.r[ b ] - (int)r0 ) < 8 && abs( (int)frame.g[ b ] - (int)g0 ) < 8 && abs( (int)frame.b[ b ] - (int)b0 ) < 8 );
 }
 
 // What dims the cursor, and by how much, is the style's: unsure (the old

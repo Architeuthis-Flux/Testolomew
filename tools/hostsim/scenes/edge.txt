@@ -52,7 +52,7 @@ l
 # residuals over every sensor's own error come to a chi of 1.4 against the
 # limit of 2.0 - a fix the zero audit gets to work from. (A worse sensor,
 # or a bench whose errors the simulator does not have, loosens the limit
-# from the tracker page: "fit chi".)
+# from the tracking page: "fit chi".)
 @gain 5 1.6
 @magnet row 15 3
 @run 3000
@@ -74,7 +74,7 @@ l
 # probe's field a minute later and the array was blind to it - observed with
 # the rule off), and the fix is back the moment the sensor reads right.
 # Held two minutes, then followed: a sensor wrong longer than that under a
-# resting probe takes the zeros with it, and the tracker page's "fit chi"
+# resting probe takes the zeros with it, and the tracking page's "fit chi"
 # is the bench's way out. (Two minutes of nothing first: the stale zeros of
 # the block above, half followed when its probe arrived, go out, and no fix
 # is within the far hold - a reading that was a fix lately keeps the far

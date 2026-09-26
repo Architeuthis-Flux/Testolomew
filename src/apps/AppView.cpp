@@ -408,8 +408,9 @@ static void drawMagnet( ) {
     // The magnet: a bar along its axis, north half red, south half blue,
     // three pixels thick. While coasting, a thin grey one.
     if ( coasting ) {
-        Vec3 n = { m.x + MAGNET_HALF_LENGTH_MM * axis.x, m.y + MAGNET_HALF_LENGTH_MM * axis.y, m.z + MAGNET_HALF_LENGTH_MM * axis.z };
-        Vec3 sth = { m.x - MAGNET_HALF_LENGTH_MM * axis.x, m.y - MAGNET_HALF_LENGTH_MM * axis.y, m.z - MAGNET_HALF_LENGTH_MM * axis.z };
+        float h = viewStyle.poleMm;
+        Vec3 n = { m.x + h * axis.x, m.y + h * axis.y, m.z + h * axis.z };
+        Vec3 sth = { m.x - h * axis.x, m.y - h * axis.y, m.z - h * axis.z };
         line3d( n, sth, COLOR_TEXT_DIM );
     } else {
         drawMagnetBar( m, fix.axis, false, viewStyle.poleMm );

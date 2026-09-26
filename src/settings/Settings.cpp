@@ -281,7 +281,13 @@ int SettingsService::apply( const char* text ) {
                 }
 #endif
             } else if ( menu != nullptr ) {
-                if ( oldTuning && ( strncmp( line, "tracking/", 9 ) == 0 || strncmp( line, "tracker/", 8 ) == 0 || strncmp( line, "smoothing/", 10 ) == 0 || strncmp( line, "play/touch", 10 ) == 0 ) ) {
+                // The tracking page's levers yield to an older tuning; its
+                // geometry (the surface the row calibration measured, the
+                // tip, the reach) and the cursor mode are not tuning and are
+                // kept (they came from the cursor page until 2026-09-25,
+                // which the skip never touched).
+                bool geometry = strncmp( line, "tracking/surface", 16 ) == 0 || strncmp( line, "tracking/tip", 12 ) == 0 || strncmp( line, "tracking/reach", 14 ) == 0 || strncmp( line, "tracking/cursor", 15 ) == 0;
+                if ( oldTuning && !geometry && ( strncmp( line, "tracking/", 9 ) == 0 || strncmp( line, "tracker/", 8 ) == 0 || strncmp( line, "smoothing/", 10 ) == 0 || strncmp( line, "play/touch", 10 ) == 0 ) ) {
                     if ( end == nullptr )
                         break;
                     line = end + 1;

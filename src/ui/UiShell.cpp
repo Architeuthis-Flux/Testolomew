@@ -139,26 +139,25 @@ void uiShellShowResult( UiShell* s, const char* title, int lines, int visible ) 
         noteChange( s );
 }
 
+// A toggle or a choice acts on the CLICK (the release of a short press),
+// not on the press like a page or an action, so that a press HELD on it
+// tweaks it without touching it: an accessor's setter with side effects
+// (the tracker reset, the chain darkened and re-lit) must not run for a
+// look at the value (the review, 2026-09-25).
+static bool actsOnClick( const UiShell* s, int index ) {
+    return index >= 0 && ( s->menu.items[ index ].kind == MENU_TOGGLE || s->menu.items[ index ].kind == MENU_CHOICE );
+}
+
 // A select held on a value item of the menu page: the value is tweaked
-// over the app. The press that started the hold has already acted on a
-// toggle or a choice (a press selects on its way down): that is taken back.
-// A hold whose press led elsewhere (into a page, an action) is nothing.
+// over the app. A hold whose press led elsewhere (into a page, an action)
+// is nothing.
 static void openTweak( UiShell* s ) {
     int index = menuCursorItem( &s->menu );
     if ( index < 0 || index != s->selectPressItem )
         return;
-    switch ( s->menu.items[ index ].kind ) {
-    case MENU_TOGGLE:
-        menuToggleSet( &s->menu, index, !menuToggleGet( &s->menu, index ) );
-        break;
-    case MENU_CHOICE:
-        menuChoiceSet( &s->menu, index, menuChoiceGet( &s->menu, index ) - 1 );
-        break;
-    case MENU_NUMBER:
-        break;
-    default:
+    MenuKind kind = s->menu.items[ index ].kind;
+    if ( kind != MENU_TOGGLE && kind != MENU_CHOICE && kind != MENU_NUMBER )
         return;
-    }
     push( s, PANE_TWEAK );
 }
 
@@ -276,8 +275,12 @@ int uiShellEvent( UiShell* s, InputEvent e, uint32_t nowMs ) {
         if ( isSelect( c ) ) {
             if ( e.kind == IN_PRESS ) {
                 s->selectPressItem = menuCursorItem( &s->menu );
+                if ( actsOnClick( s, s->selectPressItem ) )
+                    return -1; // a toggle, a choice: on the click (or held: the tweak)
                 return menuAction( s, menuKey( &s->menu, MENUKEY_ENTER, false ) );
             }
+            if ( e.kind == IN_CLICK && actsOnClick( s, menuCursorItem( &s->menu ) ) && menuCursorItem( &s->menu ) == s->selectPressItem )
+                return menuAction( s, menuKey( &s->menu, MENUKEY_ENTER, false ) );
             if ( e.kind == IN_HOLD )
                 openTweak( s );
             return -1;

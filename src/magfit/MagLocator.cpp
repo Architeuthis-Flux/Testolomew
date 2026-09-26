@@ -181,7 +181,7 @@ static void onTipSolve( Stream* out ) {
     if ( t < 0.0f )
         t = 0.0f;
     magLocator.tipOffsetMm = t;
-    snprintf( line, sizeof( line ), "tip offset %.1f mm from %d angles (the points then agree to %.2f mm rms about the hole at %.1f %.1f %.1f): in use, and saved as cursor/tip", t, n, rms, c.x, c.y, c.z );
+    snprintf( line, sizeof( line ), "tip offset %.1f mm from %d angles (the points then agree to %.2f mm rms about the hole at %.1f %.1f %.1f): in use, and saved as tracking/tip", t, n, rms, c.x, c.y, c.z );
     out->println( line );
     tipCalCount = 0;
 }

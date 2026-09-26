@@ -34,8 +34,10 @@
 // whole wheel mapped the style's way (hueTurns turns of it over the scale,
 // from hueStartDeg; under a turn a chunk of the spectrum as a gradient,
 // over it several rainbows; the height scale liftFullMm) and, in every
-// scheme, the cursor WHITE with the point on the board, all the scheme's
-// colour from colourByMm up. What DIMS the cursor (brightBy, by
+// scheme but classic, which keeps its own white-to-blue ramp over the
+// height scale and reads none of the wheel's levers, the cursor WHITE with
+// the point on the board and all the scheme's colour from colourByMm up.
+// What DIMS the cursor (brightBy, by
 // brightAmount at the data's far end) and what raises the SPARKLE's density
 // (sparkleBy) are chosen from the same data: how unsure the row is, the
 // height, the tilt, the speed, or nothing. FULL PEAK (the brightest LED is always the peak,
@@ -143,7 +145,7 @@ enum ProbeLedScheme {
     PROBELED_SCHEME_CLASSIC, // white on the board, blue lifted (touch/lift colours below), purple from afar
     PROBELED_SCHEME_HEIGHT,  // hue by height: hueTurns of the wheel from the board to liftFullMm
     PROBELED_SCHEME_SURE,    // hue by how sure the row is: the wheel from a toss-up to certain
-    PROBELED_SCHEME_AIM,     // hue by which way the probe leans (a turn of the wheel is the compass), white standing straight, all colour from PROBELED_AIM_FULL_DEG of lean
+    PROBELED_SCHEME_AIM,     // hue by which way the probe leans (one turn of the wheel is the compass, whatever hueTurns says), white standing straight, all colour from PROBELED_AIM_FULL_DEG of lean
     PROBELED_SCHEME_RAINBOW, // hue runs along the board (hueTurns over its 30 rows) and round with time
     PROBELED_SCHEME_COUNT
 };
@@ -204,7 +206,7 @@ struct ProbeLedStyle {
     float attackS, decayS; // per-LED smoothing time constants
     // The looks.
     int scheme;         // ProbeLedScheme
-    float hueTurns;     // turns of the wheel over the scheme's scale (under 1 a chunk of the spectrum, over 1 several rainbows)
+    float hueTurns;     // turns of the wheel over the scheme's scale - the height (held at the scale's end above it), the sureness, the board's rows (under 1 a chunk of the spectrum, over 1 several rainbows; not the aim's compass, not classic)
     float hueStartDeg;  // where the wheel starts (0 red, 120 green, 240 blue)
     float colourByMm;   // the scheme's colour is all in from this height (white on the board below PROBELED_WHITE_BELOW_MM)
     int brightBy;       // ProbeLedData: what dims the cursor...

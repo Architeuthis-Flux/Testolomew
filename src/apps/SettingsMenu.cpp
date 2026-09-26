@@ -197,22 +197,22 @@ void settingsMenuBuild( Menu* m ) {
     menuAddChoiceAccessor( m, tracking, "cursor", getCursorMode, setCursorMode, cursorModeNames, 2 );
     menuAddNumber( m, tracking, "surface", &magLocator.boardZ, 0.0f, 60.0f, 0.5f, "mm" );
     menuAddNumber( m, tracking, "tip", &magLocator.tipOffsetMm, 0.0f, 60.0f, 0.5f, "mm" );
-    menuAddNumber( m, tracking, "reach", &magLocator.track.maxReachMm, 5.0f, 40.0f, 2.5f, "mm" ); // (5-100 until 2026-09-25: past 40 it never engages - the reach is the drop x tan 70 deg at most)
+    menuAddNumber( m, tracking, "reach", &magLocator.track.maxReachMm, 5.0f, 60.0f, 2.5f, "mm" ); // (5-100 until 2026-09-25: the reach is the drop x tan 70 deg at most - 55 mm from a 20 mm hover - so 60 is the useful end)
     // The smoothing, the levers that are felt first (tools/hostsim/pencil.cpp,
     // 2026-09-25: the ranges are where the pencil measured a change):
     // accel sets the Kalman's rest jitter against its lag (0.075 mm at 500
     // to 0.5 at 20000 in the bench-like world, 40 to 20 ms), rest jitter
     // the field EMA's (0: three times the jitter; 2: half, +10 ms), the
-    // betas how fast the 1-Euro filters open with speed (their whole
-    // effect is under 0.5; at 1 they were flat), the Hz where they sit at
+    // betas how fast the 1-Euro filters open with speed (the lag's whole
+    // effect is under 0.5, the jitter's runs on to 2), the Hz where they sit at
     // rest - which only shows with the beta low, since the rest jitter's
     // own speed opens the cutoff by beta x 2-5 mm/s.
     menuAddNumber( m, tracking, "accel", &magLocator.track.accelSigma, 250.0f, 20000.0f, 250.0f, "" );
     menuAddNumber( m, tracking, "rest jitter", &magLocator.speedJitterK, 0.0f, 3.0f, 0.1f, "" );
     menuAddNumber( m, tracking, "view Hz", &magLocator.track.viewMinCutoff, 0.1f, 5.0f, 0.1f, "" );
-    menuAddNumber( m, tracking, "view beta", &magLocator.track.viewBeta, 0.0f, 0.5f, 0.01f, "" );
+    menuAddNumber( m, tracking, "view beta", &magLocator.track.viewBeta, 0.0f, 2.0f, 0.02f, "" );
     menuAddNumber( m, tracking, "cursor Hz", &magLocator.track.oneEuroMinCutoff, 0.1f, 5.0f, 0.1f, "" );
-    menuAddNumber( m, tracking, "cursor beta", &magLocator.track.oneEuroBeta, 0.0f, 0.5f, 0.01f, "" );
+    menuAddNumber( m, tracking, "cursor beta", &magLocator.track.oneEuroBeta, 0.0f, 2.0f, 0.02f, "" );
     menuAddNumber( m, tracking, "shaft Hz", &magLocator.track.shaftMinCutoff, 0.1f, 5.0f, 0.1f, "" );
     menuAddNumber( m, tracking, "shaft beta", &magLocator.track.shaftBeta, 0.0f, 10.0f, 0.25f, "" );
     menuAddNumber( m, tracking, "floor", &magLocator.track.sigmaFloorMm, 0.1f, 3.0f, 0.1f, "mm" );

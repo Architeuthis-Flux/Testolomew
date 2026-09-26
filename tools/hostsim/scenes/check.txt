@@ -152,6 +152,35 @@
 :ui root
 :screen
 @expect "menu: / cursor 1/"
+# ...and through the real button tracker (a 40 ms tap, a 700 ms hold): a
+# toggle flips on the tap's CLICK, and a hold on it tweaks it without
+# touching it (the review, 2026-09-25: the undo had run an accessor's
+# setter twice - the tracker reset for a look at the value).
+:ui go tracking
+:ui down
+:ui down
+:screen
+@expect "> tracker on               on"
+:key press tap
+@run 400
+:screen
+@expect "panes: menu"
+@expect "> tracker on               off"
+:key press hold
+@run 1200
+:screen
+@expect "panes: menu tweak"
+@expect "tweak: tracker on off"
+:key b tap
+@run 400
+:screen
+@expect "panes: menu"
+@expect "> tracker on               off"
+:key press tap
+@run 400
+:screen
+@expect "> tracker on               on"
+:ui root
 :ui close
 :screen
 @expect "panes: -"

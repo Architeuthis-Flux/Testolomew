@@ -287,7 +287,7 @@ static void schemeColour( const ProbeLedStyle* style, const ProbeLedInput* in, f
     float wheel = style->hueTurns * 360.0f; // the wheel over the scheme's scale (probeLedHue wraps: over a turn is several rainbows)
     switch ( style->scheme ) {
     case PROBELED_SCHEME_HEIGHT:
-        probeLedHue( style->hueStartDeg + wheel * in->heightMm / style->liftFullMm, 1.0f, r, g, b );
+        probeLedHue( style->hueStartDeg + wheel * clamp01( in->heightMm / style->liftFullMm ), 1.0f, r, g, b ); // above the scale the wheel's end holds (unclamped, a probe 20-45 mm up read as any height: the review, 2026-09-25)
         whiteTo( r, g, b, colourByHeight( style, in->heightMm ) );
         break;
     case PROBELED_SCHEME_SURE:
@@ -295,8 +295,11 @@ static void schemeColour( const ProbeLedStyle* style, const ProbeLedInput* in, f
         whiteTo( r, g, b, colourByHeight( style, in->heightMm ) );
         break;
     case PROBELED_SCHEME_AIM:
-        // Which way the probe leans, round the wheel; white standing straight.
-        probeLedHue( style->hueStartDeg + style->hueTurns * in->aimDeg, 1.0f, r, g, b );
+        // Which way the probe leans, once round the wheel (the turns lever
+        // does not apply: at anything but a whole turn the compass had a
+        // seam at +x, red one frame and blue the next as the lean's y
+        // jittered about zero); white standing straight.
+        probeLedHue( style->hueStartDeg + in->aimDeg, 1.0f, r, g, b );
         whiteTo( r, g, b, colourByHeight( style, in->heightMm ) * clamp01( in->tiltDeg / PROBELED_AIM_FULL_DEG ) );
         break;
     case PROBELED_SCHEME_RAINBOW:

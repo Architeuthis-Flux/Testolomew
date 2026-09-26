@@ -349,7 +349,7 @@ static void onLoadVerb( int argc, char** argv, Stream* out ) {
                 consoleOk( out, on ? "fit running" : "fit held (the frames flow; nothing is fitted, so no fix, no tracking)" );
             } else {
                 magLocator.steadyFit = argv[ 2 ][ 0 ] == 's';
-                consoleOk( out, magLocator.steadyFit ? "fit load steady: 'fit iters' iterations every frame (the tracker page, saved)" : "fit load burst: the natural caps, cold-start slices every 25 ms" );
+                consoleOk( out, magLocator.steadyFit ? "fit load steady: 'fit iters' iterations every frame (the tracking page, saved)" : "fit load burst: the natural caps, cold-start slices every 25 ms" );
             }
 #else
             consoleErr( out, "no locator in this build" );
