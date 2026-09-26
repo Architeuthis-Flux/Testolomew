@@ -66,6 +66,15 @@ e
 @run 300
 :screen:png out/s13_menu_tracking.png
 `
+:ui go colours
+@run 300
+:screen:png out/s13b_menu_colours.png
+:ui down
+:ui hold
+@run 300
+:screen:png out/s13c_tweak_colours.png
+:ui back
+`
 :ui go tools
 :ui go latest
 @run 400

@@ -198,11 +198,20 @@ void Ui::drawMenu( GFXcanvas16* canvas ) {
     const int x0 = 4, y0 = 4, w = LCD_WIDTH - 8;
     const int columns = ( w - 8 ) / charW; // characters across the panel
     int visible = menuVisibleCount( &menu );
-    int rows = visible < UI_MENU_ROWS ? visible : UI_MENU_ROWS;
-    int h = rowH + 2 + rows * rowH + 12;
+    // A page with a preview gives it some of its rows.
+    int previewRows = menuPreviewRows != nullptr ? menuPreviewRows( menuTitle( &menu ) ) : 0;
+    if ( previewRows > UI_MENU_ROWS - 3 )
+        previewRows = UI_MENU_ROWS - 3;
+    shell.menuRows = UI_MENU_ROWS - previewRows;
+    int rows = visible < shell.menuRows ? visible : shell.menuRows;
+    int previewH = previewRows > 0 ? previewRows * rowH + 4 : 0;
+    int h = rowH + 2 + rows * rowH + previewH + 12;
     fastFillRect( canvas, x0, y0, w, h, UI_COLOR_PANEL );
     fastRect( canvas, x0, y0, w, h, UI_COLOR_FRAME );
     fastText( canvas, x0 + 4, y0 + 3, T, UI_COLOR_FRAME, menuTitle( &menu ) );
+    if ( previewRows > 0 && menuPreview != nullptr ) {
+        menuPreview( canvas, menuTitle( &menu ), x0 + 4, y0 + rowH + 2 + rows * rowH + 2, w - 8, previewH - 4 );
+    }
 
     uiShellMenuWindow( &shell );
     int scrollTop = shell.menuScrollTop;
@@ -282,10 +291,19 @@ void Ui::drawResult( GFXcanvas16* canvas ) {
 // and its value - and the hint under it. The menu beneath is not drawn.
 void Ui::drawTweak( GFXcanvas16* canvas ) {
     Menu& menu = shell.menu;
-    const int h = UI_LINE_H + 16;
+    const int rowH = UI_LINE_H + 2;
+    // A page with a preview keeps it over the strip while its values are tweaked.
+    int previewRows = menuPreviewRows != nullptr ? menuPreviewRows( menuTitle( &menu ) ) : 0;
+    if ( previewRows > UI_MENU_ROWS - 3 )
+        previewRows = UI_MENU_ROWS - 3;
+    int previewH = previewRows > 0 ? previewRows * rowH + 4 : 0;
+    const int h = UI_LINE_H + 16 + previewH;
     const int x0 = 4, y0 = LCD_HEIGHT - h - 4, w = LCD_WIDTH - 8;
     fastFillRect( canvas, x0, y0, w, h, UI_COLOR_PANEL );
     fastRect( canvas, x0, y0, w, h, UI_COLOR_SELECTED );
+    if ( previewRows > 0 && menuPreview != nullptr ) {
+        menuPreview( canvas, menuTitle( &menu ), x0 + 4, y0 + 2, w - 8, previewH - 4 );
+    }
     int index = menuCursorItem( &menu );
     if ( index >= 0 ) {
         char value[ 24 ] = "", text[ 48 ];
@@ -296,9 +314,9 @@ void Ui::drawTweak( GFXcanvas16* canvas ) {
         if ( labelChars < 4 )
             labelChars = 4;
         snprintf( text, sizeof( text ), "%.*s", labelChars, menu.items[ index ].label );
-        fastText( canvas, x0 + 4, y0 + 3, UI_TEXT, UI_COLOR_SELECTED, text );
+        fastText( canvas, x0 + 4, y0 + previewH + 3, UI_TEXT, UI_COLOR_SELECTED, text );
         if ( value[ 0 ] )
-            fastText( canvas, x0 + w - 4 - UI_CHAR_W * valueChars, y0 + 3, UI_TEXT, UI_COLOR_TEXT, value );
+            fastText( canvas, x0 + w - 4 - UI_CHAR_W * valueChars, y0 + previewH + 3, UI_TEXT, UI_COLOR_TEXT, value );
     }
     fastText( canvas, x0 + 4, y0 + h - 10, 1, UI_COLOR_DIM, "up/down: change  left/right: next  B: menu" );
 }

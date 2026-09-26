@@ -83,7 +83,7 @@ The smoothing defaults were set on the bench (`tools/hostsim/pencil.cpp`): a han
 | V5 stream *(mode)* | the cursor as CSV on the console for a V5 to follow (`L`) | off |
 
 ### colours
-The cursor's colours (2026-09-25; `src/probeled/ProbeLeds.h`): every scheme uses the whole wheel in its own way (the single-colour amber and cyan are gone), and the mapping is set here.
+The cursor's colours (2026-09-25; `src/probeled/ProbeLeds.h`): every scheme uses the whole wheel in its own way (the single-colour amber and cyan are gone), and the mapping is set here. The page previews it under its items, and keeps the preview over the strip while a value is tweaked (`src/apps/ColourPreview.cpp`, 2026-09-26): the wheel as mapped (hue start, turns), the cursor's colour across the scheme's data (the height with its white plateau and the colour-from ramp; the sureness; the lean's compass; the rows), the dimming by the chosen data, and the tail's and the poles' colours.
 
 | item | what it does | default |
 |---|---|---|
@@ -94,6 +94,7 @@ The cursor's colours (2026-09-25; `src/probeled/ProbeLeds.h`): every scheme uses
 | colour from | the height (mm) from which a wheel scheme's colour is all in (white on the board below 1.5 mm, blended between; classic has its own ramp) | 6 |
 | bright by / bright amount | what DIMS the cursor - `unsure` (how far the row is from certain), `height`, `tilt` (60 deg is the far end), `speed` (200 mm/s), or `none` - and by how much at the data's far end. The default is the rule as it was: a coin-toss row at half | unsure / 0.5 |
 | sparkle by | what raises the sparkle's density from a tenth of the lever to all of it: `height` (as it was: few on the board, many lifted), `unsure`, `tilt`, `speed`, or `none` (the lever alone, the same everywhere) | height |
+| tail length / tail bright / tail hue | in pointed mode (the cursor where the probe aims) a tail runs from the cursor BACK toward the point for this fraction of the way, brightest at the cursor (this fraction of its peak) in the cursor's own colour, fading to this hue at its far end (2026-09-26: it ran the whole way from under the tip in a fixed amber, and was too long) | 0.5 / 0.5 / 25 (amber) |
 | poles | the View's magnet bar: its north and south halves coloured, or a thin plain bar (the bar was 3 px of red and blue, fixed; Kevin: "a bit intense now that I'm using a stronger magnet") | on |
 | pole size | the bar's half length (mm) | 5 |
 | north hue / south hue | the two halves' hues (degrees round the wheel) | 3 (red) / 225 (blue) |

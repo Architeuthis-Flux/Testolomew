@@ -14,8 +14,9 @@
 //                   previous app, else Home; B hold: Home
 //   Home            up/down/left/right move, press (or A) selects, B closes
 //   Settings        up/down move, left/right change the value in place, press
-//                   enters / runs / flips / cycles, B backs a page (closes at
-//                   the root), B hold closes everything and opens Home
+//                   enters / runs / flips / cycles, press held tweaks a value
+//                   over the app, B backs a page (closes at the root), B hold
+//                   closes everything (UiShell.h has the whole vocabulary)
 //   Confirm         press or A: yes; B: no
 //   Result          up/down scroll; press, A or B dismiss
 //   20 s idle       the overlays close
@@ -68,6 +69,11 @@ class Ui : public Service {
     // adds the modules' lines (the probe, the play state...).
     void printScreen( Stream* out );
     void ( *screenExtra )( Stream* out ) = nullptr;
+    // A page's preview (the modules': the colours page shows its mapping):
+    // how many of the menu's rows a page's preview takes (0 = none), and
+    // its drawing - under the page's items, and over a tweak's strip.
+    int ( *menuPreviewRows )( const char* page ) = nullptr;
+    void ( *menuPreview )( GFXcanvas16* canvas, const char* page, int x, int y, int w, int h ) = nullptr;
 
     UiShell shell;
 

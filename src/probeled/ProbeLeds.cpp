@@ -154,9 +154,9 @@ void probeLedDefaultStyle( ProbeLedStyle* s ) {
     s->roughR = 120;
     s->roughG = 40;
     s->roughB = 160; // purple haze from afar
-    s->tailR = 255;
-    s->tailG = 120;
-    s->tailB = 30; // amber: where the point is
+    s->tailHueDeg = 25.0f; // amber at the tail's far end
+    s->tailLength = 0.5f;  // halfway back toward the point
+    s->tailBright = 0.5f;
     s->peak = 1.0f;
     s->minSigmaRows = 0.33f;
     s->minSigmaAcrossMm = 0.9f;
@@ -318,6 +318,10 @@ static void schemeColour( const ProbeLedStyle* style, const ProbeLedInput* in, f
     }
 }
 
+void probeLedCursorColour( const ProbeLedStyle* style, const ProbeLedInput* in, float timeS, uint8_t* r, uint8_t* g, uint8_t* b ) {
+    schemeColour( style, in, timeS, r, g, b );
+}
+
 void probeLedPaintClear( ProbeLedPaint* paint ) {
     for ( int i = 0; i < PROBELED_MAX; i++ ) {
         paint->level[ i ] = 0.0f;
@@ -452,22 +456,28 @@ void probeLedRender( const LedLayout* layout, const ProbeLedInput* in, const Pro
                    style->minSigmaRows * wide, style->minSigmaAcrossMm * wide, PROBELED_MAX_SIGMA_ROWS * wide, PROBELED_MAX_SIGMA_ACROSS_MM * wide, r, g, b );
         }
 
-        // Where the point itself is, when that is somewhere else: a fainter
-        // mark there and a thin tail to the cursor.
-        if ( in->haveUnder && in->state != PROBELED_ROUGH ) {
-            float dAlong = in->along - in->underAlong, dAcross = in->acrossMm - in->underAcrossMm;
+        // Where the point itself is, when that is somewhere else: a tail from
+        // the cursor back toward it for tailLength of the way, brightest at
+        // the cursor (tailBright of its peak: a dim cursor gets a dim tail,
+        // never outshone) in the cursor's colour, fading to the tail hue at
+        // its far end.
+        if ( in->haveUnder && in->state != PROBELED_ROUGH && style->tailLength > 0.0f ) {
+            float dAlong = ( in->underAlong - in->along ) * style->tailLength, dAcross = ( in->underAcrossMm - in->acrossMm ) * style->tailLength;
             float length = sqrtf( dAlong * dAlong + dAcross * dAcross / ( PITCH_MM * PITCH_MM ) ); // in rows
-            // The tail follows the cursor's own brightness (a dim cursor gets
-            // a dim tail, never outshone) and stops a step short of it.
-            int steps = (int)( length * 2.0f );
+            int steps = (int)( length * 2.0f ) + 1;
             if ( steps > 12 )
                 steps = 12;
-            for ( int k = 0; k < steps; k++ ) {
-                float f = (float)k / steps;
-                float fade = 0.35f * ( 1.0f - 0.7f * f ); // brightest under the point, fading toward the cursor
-                splat( layout, frame, in->underAlong + f * dAlong, in->underAcrossMm + f * dAcross, style->minSigmaRows, style->minSigmaAcrossMm,
-                       peak * fade, 0.0f, 0.0f, style->minSigmaRows, style->minSigmaAcrossMm, PROBELED_MAX_SIGMA_ROWS, PROBELED_MAX_SIGMA_ACROSS_MM, style->tailR, style->tailG,
-                       style->tailB );
+            uint8_t tr, tg, tb;
+            probeLedHue( style->tailHueDeg, 1.0f, &tr, &tg, &tb );
+            for ( int k = 1; k < steps; k++ ) {
+                float f = (float)k / ( steps - 1 ); // 0 at the cursor, 1 at the far end
+                float fade = style->tailBright * ( 1.0f - 0.7f * f );
+                uint8_t sr = r, sg = g, sb = b;
+                blendColour( &sr, r, tr, f );
+                blendColour( &sg, g, tg, f );
+                blendColour( &sb, b, tb, f );
+                splat( layout, frame, in->along + f * dAlong, in->acrossMm + f * dAcross, style->minSigmaRows, style->minSigmaAcrossMm, peak * fade, 0.0f, 0.0f, style->minSigmaRows,
+                       style->minSigmaAcrossMm, PROBELED_MAX_SIGMA_ROWS, PROBELED_MAX_SIGMA_ACROSS_MM, sr, sg, sb );
             }
         }
     }

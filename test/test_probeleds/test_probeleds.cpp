@@ -469,20 +469,39 @@ void test_far_probe_glows_purple( void ) {
     TEST_ASSERT_FLOAT_WITHIN( 0.001f, 0.0f, total( &frame ) );
 }
 
-void test_pointed_tail_marks_the_point( void ) {
+// In pointed mode a tail runs from the cursor BACK toward the point for
+// tailLength of the way (Kevin, 2026-09-26: the pattern from the point to
+// where it aims was too long - now it hugs the pointing end), brightest at
+// the cursor in the cursor's own colour, fading to the tail hue at its far
+// end; with tailLength 1 it reaches the point itself.
+void test_pointed_tail_points_back_at_the_tip( void ) {
     ProbeLedInput in = at( 10.0f, 6.35f, 0.1f, 0.3f );
     in.heightMm = 12.0f;
     in.haveUnder = true;
-    in.underAlong = 14.0f; // the point is four rows away from where it aims
+    in.underAlong = 18.0f; // the point is eight rows away from where it aims
     in.underAcrossMm = 6.35f;
+    TEST_ASSERT_FLOAT_WITHIN( 0.01f, 0.5f, style.tailLength );
     probeLedRender( &v6, &in, &style, 1.0f, &frame );
-    int cursor = find( &v6, 10, 3 ), under = find( &v6, 14, 3 ), between = find( &v6, 12, 3 );
+    int cursor = find( &v6, 10, 3 ), near = find( &v6, 11, 3 ), mid = find( &v6, 13, 3 ), end = find( &v6, 14, 3 ), past = find( &v6, 15, 3 ), under = find( &v6, 18, 3 );
     TEST_ASSERT_TRUE( frame.target[ cursor ] > 0.5f );
-    TEST_ASSERT_TRUE( frame.target[ under ] > 0.2f && frame.target[ under ] < frame.target[ cursor ] );
-    TEST_ASSERT_TRUE( frame.target[ between ] > 0.05f );
-    TEST_ASSERT_EQUAL( style.tailR, frame.r[ under ] );
-    // Lifted 12 mm the cursor is mostly the "lift" colour.
+    TEST_ASSERT_TRUE( frame.target[ near ] > 0.1f && frame.target[ near ] < frame.target[ cursor ] ); // the tail's bright end, next to the cursor
+    TEST_ASSERT_TRUE( frame.target[ mid ] > 0.03f && frame.target[ mid ] < frame.target[ near ] );   // fading toward its far end...
+    TEST_ASSERT_TRUE( frame.target[ end ] > 0.03f );                                                  // ...halfway to the point
+    TEST_ASSERT_TRUE( frame.target[ past ] < 0.02f && frame.target[ under ] < 0.02f );                // beyond it, and the point itself: dark
+    // Lifted 12 mm the cursor is mostly the "lift" colour (classic: blue),
+    // the tail's near end takes it, and its far end is warmer (the tail hue, amber).
     TEST_ASSERT_TRUE( frame.b[ cursor ] > 200 && frame.r[ cursor ] < 120 );
+    TEST_ASSERT_TRUE( frame.b[ near ] > 150 );
+    TEST_ASSERT_TRUE( frame.r[ mid ] > frame.r[ near ] && frame.r[ mid ] > 180 );
+    // The whole way: the point is marked.
+    style.tailLength = 1.0f;
+    probeLedRender( &v6, &in, &style, 1.0f, &frame );
+    TEST_ASSERT_TRUE( frame.target[ under ] > 0.05f );
+    // Brighter: the tail's near end follows the lever.
+    style.tailLength = 0.5f;
+    style.tailBright = 1.0f;
+    probeLedRender( &v6, &in, &style, 1.0f, &frame );
+    TEST_ASSERT_TRUE( frame.target[ near ] > 0.5f );
 }
 
 void test_leds_fade_rather_than_snap( void ) {
@@ -516,7 +535,7 @@ int main( int argc, char** argv ) {
     RUN_TEST( test_brightness_follows_the_chosen_data );
     RUN_TEST( test_sparkle_density_follows_the_chosen_data );
     RUN_TEST( test_far_probe_glows_purple );
-    RUN_TEST( test_pointed_tail_marks_the_point );
+    RUN_TEST( test_pointed_tail_points_back_at_the_tip );
     RUN_TEST( test_leds_fade_rather_than_snap );
     return UNITY_END( );
 }

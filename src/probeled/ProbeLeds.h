@@ -18,9 +18,11 @@
 // wider bell is a dimmer one; confidence dims it further; the height above
 // the board tints it.
 //
-// A second, fainter mark shows where the probe's point is when the cursor is
-// where it POINTS rather than what it is over (a short tail from under the
-// tip to the cursor), so the two are never confused.
+// When the cursor is where the probe POINTS rather than what it is over, a
+// tail runs from the cursor back toward the point for tailLength of the
+// way - brightest at the cursor, in its colour, fading to the tail hue -
+// so the two are never confused (2026-09-26: it ran the whole way from
+// under the tip, and was too long).
 //
 // Per-LED smoothing (fast attack, slower decay) leaves a short comet's tail
 // behind a moving cursor and keeps the picture calm; the tracker's 1-Euro
@@ -198,7 +200,9 @@ struct ProbeLedStyle {
     uint8_t touchR, touchG, touchB; // cursor colour with the point on the board (classic scheme; white)
     uint8_t liftR, liftG, liftB;    // ...and lifted well above it (blended by height)
     uint8_t roughR, roughG, roughB; // the far-probe glow
-    uint8_t tailR, tailG, tailB;    // the mark under the point, in pointed mode
+    float tailHueDeg;               // the tail's colour at its far end, in pointed mode (its near end is the cursor's)
+    float tailLength;               // how far back toward the point the tail runs, as a fraction of the way (1 = to the point)
+    float tailBright;               // the tail's near end, as a fraction of the cursor's peak
     float peak;                     // brightest any LED gets, 0..1
     float minSigmaRows;             // the bell is never narrower than this (one hole lights, neighbours faint)
     float minSigmaAcrossMm;
@@ -239,6 +243,11 @@ struct ProbeLedFrame {
 
 // Hue (0..360) at full saturation to linear RGB.
 void probeLedHue( float hueDeg, float brightness, uint8_t* r, uint8_t* g, uint8_t* b );
+// The cursor's colour under the style's scheme for this input (its height,
+// confidence, lean; timeS for the rainbow) - white on the board, the
+// scheme's colour as it lifts. What the renderer paints the cursor with;
+// the colours page's preview runs it over the data.
+void probeLedCursorColour( const ProbeLedStyle* style, const ProbeLedInput* in, float timeS, uint8_t* r, uint8_t* g, uint8_t* b );
 
 void probeLedClear( ProbeLedFrame* frame, int count );
 

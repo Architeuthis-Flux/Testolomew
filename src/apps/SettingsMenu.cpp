@@ -4,6 +4,7 @@
 #include <string.h>
 
 #include "Apps.h"
+#include "ColourPreview.h"
 #include "Console.h"
 #include "Input.h"
 #include "MagArray.h"
@@ -252,7 +253,10 @@ void settingsMenuBuild( Menu* m ) {
 
     // The colours (2026-09-25): the scheme (what drives the hue), how the
     // wheel is mapped onto it, what dims the cursor and what raises the
-    // sparkle (ProbeLeds.h), and the View's poles and field arrows (Apps.h).
+    // sparkle (ProbeLeds.h), and the View's poles and field arrows (Apps.h);
+    // the page previews the mapping under its items (ColourPreview.h).
+    ui.menuPreviewRows = colourPreviewRows;
+    ui.menuPreview = colourPreviewDraw;
     int colours = menuAddSubmenu( m, MENU_ROOT, "colours" );
     menuAddChoice( m, colours, "scheme", &probeLeds.style.scheme, probeLedSchemeNames, PROBELED_SCHEME_COUNT );
     menuAddNumber( m, colours, "turns", &probeLeds.style.hueTurns, 0.1f, 4.0f, 0.05f, "" ); // of the wheel over the scale: under 1 a chunk of the spectrum, over 1 several rainbows
@@ -262,6 +266,9 @@ void settingsMenuBuild( Menu* m ) {
     menuAddChoice( m, colours, "bright by", &probeLeds.style.brightBy, probeLedDataNames, PROBELED_DATA_COUNT );
     menuAddNumber( m, colours, "bright amount", &probeLeds.style.brightAmount, 0.0f, 1.0f, 0.05f, "" );
     menuAddChoice( m, colours, "sparkle by", &probeLeds.style.sparkleBy, probeLedDataNames, PROBELED_DATA_COUNT );
+    menuAddNumber( m, colours, "tail length", &probeLeds.style.tailLength, 0.1f, 1.0f, 0.05f, "" ); // in pointed mode: how far back toward the point the tail runs (2026-09-26)
+    menuAddNumber( m, colours, "tail bright", &probeLeds.style.tailBright, 0.1f, 1.0f, 0.05f, "" );
+    menuAddNumber( m, colours, "tail hue", &probeLeds.style.tailHueDeg, 0.0f, 355.0f, 5.0f, "deg" );
 #else
     int colours = menuAddSubmenu( m, MENU_ROOT, "colours" );
 #endif
