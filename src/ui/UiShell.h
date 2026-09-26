@@ -109,7 +109,8 @@ struct UiShell {
     bool absoluteFrozen; // ...and it is on its way back: the cursor stays where it was pointed
     float stepRepeatMs;  // a held direction steps the cursor (Home: any way; a page or a tweak: up/down) no faster than this; left/right on a page keep the raw repeat, which is what makes a number run
     uint32_t lastStepMs; // when the cursor last stepped on a held direction
-    int menuRows;        // rows a menu page shows at once (the Ui says)
+    int menuRows;        // rows a menu page shows at once (the Ui says)...
+    int ( *pageRowsTaken )( const char* page ); // ...less what a page's preview takes (may be null; the modules': the colours page shows its mapping under its items) - uiShellPageRows
     int menuScrollTop;   // the first row shown (kept here so the stick and the drawing agree)
 };
 
@@ -125,6 +126,8 @@ int uiShellEvent( UiShell* s, InputEvent e, uint32_t nowMs );
 void uiShellTick( UiShell* s, uint32_t nowMs, float dtS, float joyX, float joyY, float joyRawX, float joyRawY, const bool* heldNow );
 // The menu page's window: menuScrollTop brought to where the cursor is.
 void uiShellMenuWindow( UiShell* s );
+// Rows the current page shows at once: menuRows less its preview's, never under three.
+int uiShellPageRows( const UiShell* s );
 
 void uiShellSelectApp( UiShell* s, int app ); // swaps the base pane and closes the overlays
 void uiShellOpenHome( UiShell* s );

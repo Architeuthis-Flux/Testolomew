@@ -198,12 +198,10 @@ void Ui::drawMenu( GFXcanvas16* canvas ) {
     const int x0 = 4, y0 = 4, w = LCD_WIDTH - 8;
     const int columns = ( w - 8 ) / charW; // characters across the panel
     int visible = menuVisibleCount( &menu );
-    // A page with a preview gives it some of its rows.
-    int previewRows = menuPreviewRows != nullptr ? menuPreviewRows( menuTitle( &menu ) ) : 0;
-    if ( previewRows > UI_MENU_ROWS - 3 )
-        previewRows = UI_MENU_ROWS - 3;
-    shell.menuRows = UI_MENU_ROWS - previewRows;
-    int rows = visible < shell.menuRows ? visible : shell.menuRows;
+    // A page with a preview gives it some of its rows (the shell knows how many: the stick steers by them too).
+    int pageRows = uiShellPageRows( &shell );
+    int previewRows = shell.menuRows - pageRows;
+    int rows = visible < pageRows ? visible : pageRows;
     int previewH = previewRows > 0 ? previewRows * rowH + 4 : 0;
     int h = rowH + 2 + rows * rowH + previewH + 12;
     fastFillRect( canvas, x0, y0, w, h, UI_COLOR_PANEL );
@@ -293,9 +291,7 @@ void Ui::drawTweak( GFXcanvas16* canvas ) {
     Menu& menu = shell.menu;
     const int rowH = UI_LINE_H + 2;
     // A page with a preview keeps it over the strip while its values are tweaked.
-    int previewRows = menuPreviewRows != nullptr ? menuPreviewRows( menuTitle( &menu ) ) : 0;
-    if ( previewRows > UI_MENU_ROWS - 3 )
-        previewRows = UI_MENU_ROWS - 3;
+    int previewRows = shell.menuRows - uiShellPageRows( &shell );
     int previewH = previewRows > 0 ? previewRows * rowH + 4 : 0;
     const int h = UI_LINE_H + 16 + previewH;
     const int x0 = 4, y0 = LCD_HEIGHT - h - 4, w = LCD_WIDTH - 8;

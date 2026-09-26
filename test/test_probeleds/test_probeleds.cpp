@@ -502,6 +502,26 @@ void test_pointed_tail_points_back_at_the_tip( void ) {
     style.tailBright = 1.0f;
     probeLedRender( &v6, &in, &style, 1.0f, &frame );
     TEST_ASSERT_TRUE( frame.target[ near ] > 0.5f );
+    // A wide, dim cursor (a coasting track's bar) keeps a dimmer tail: the
+    // tail follows what the cursor actually shows, not the peak lever
+    // (the review, 2026-09-26: the tail's near end outshone the cursor a
+    // row over, and the brightest LED sat toward the tip).
+    style.tailBright = 0.5f;
+    ProbeLedInput wide = in;
+    wide.sigmaRows = 2.5f;
+    wide.sigmaAcrossMm = 6.0f;
+    probeLedRender( &v6, &wide, &style, 1.0f, &frame );
+    TEST_ASSERT_TRUE( frame.target[ near ] < frame.target[ cursor ] );
+    TEST_ASSERT_EQUAL( cursor, brightest( &frame ) );
+    // A long tail is a line, not beads: with the point twenty rows away and
+    // the tail the whole way, every row of it is lit (the review: twelve
+    // steps over twenty rows left dark rows between the bells).
+    style.tailLength = 1.0f;
+    in.underAlong = 30.0f;
+    probeLedRender( &v6, &in, &style, 1.0f, &frame );
+    for ( int row = 11; row <= 29; row++ ) {
+        TEST_ASSERT_TRUE_MESSAGE( frame.target[ find( &v6, row, 3 ) ] > 0.03f, "a dark row in a long tail" );
+    }
 }
 
 void test_leds_fade_rather_than_snap( void ) {

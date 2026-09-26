@@ -40,6 +40,7 @@ void uiShellInit( UiShell* s, const UiApp* apps, int appCount, int firstApp, int
     s->stepRepeatMs = UISHELL_STEP_REPEAT_MS;
     s->lastStepMs = 0;
     s->menuRows = 9;
+    s->pageRowsTaken = nullptr;
     s->menuScrollTop = 0;
     if ( firstApp >= 0 && firstApp < appCount ) {
         s->app = firstApp;
@@ -372,9 +373,16 @@ int uiShellEvent( UiShell* s, InputEvent e, uint32_t nowMs ) {
     return -1;
 }
 
+int uiShellPageRows( const UiShell* s ) {
+    int taken = s->pageRowsTaken != nullptr ? s->pageRowsTaken( menuTitle( &s->menu ) ) : 0;
+    int rows = s->menuRows - ( taken > 0 ? taken : 0 );
+    return rows < 3 ? 3 : rows;
+}
+
 void uiShellMenuWindow( UiShell* s ) {
     int visible = menuVisibleCount( &s->menu );
-    int rows = visible < s->menuRows ? visible : s->menuRows;
+    int pageRows = uiShellPageRows( s );
+    int rows = visible < pageRows ? visible : pageRows;
     if ( s->menu.cursor < s->menuScrollTop )
         s->menuScrollTop = s->menu.cursor;
     if ( s->menu.cursor >= s->menuScrollTop + rows )
@@ -433,7 +441,8 @@ static void steerAbsolute( UiShell* s, float x, float y ) {
         if ( visible == 0 )
             return;
         uiShellMenuWindow( s );
-        int rows = visible < s->menuRows ? visible : s->menuRows;
+        int pageRows = uiShellPageRows( s );
+        int rows = visible < pageRows ? visible : pageRows;
         // Up is the top row: the stick's height over the rows on screen,
         // with a little slack before the cursor moves a row.
         float pos = ( 1.0f - y ) * 0.5f * rows; // 0 at the top .. rows at the bottom

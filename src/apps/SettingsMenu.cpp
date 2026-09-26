@@ -255,7 +255,7 @@ void settingsMenuBuild( Menu* m ) {
     // wheel is mapped onto it, what dims the cursor and what raises the
     // sparkle (ProbeLeds.h), and the View's poles and field arrows (Apps.h);
     // the page previews the mapping under its items (ColourPreview.h).
-    ui.menuPreviewRows = colourPreviewRows;
+    ui.shell.pageRowsTaken = colourPreviewRows; // the shell steers by the rows left (the absolute stick)
     ui.menuPreview = colourPreviewDraw;
     int colours = menuAddSubmenu( m, MENU_ROOT, "colours" );
     menuAddChoice( m, colours, "scheme", &probeLeds.style.scheme, probeLedSchemeNames, PROBELED_SCHEME_COUNT );

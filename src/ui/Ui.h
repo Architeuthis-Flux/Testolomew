@@ -69,10 +69,9 @@ class Ui : public Service {
     // adds the modules' lines (the probe, the play state...).
     void printScreen( Stream* out );
     void ( *screenExtra )( Stream* out ) = nullptr;
-    // A page's preview (the modules': the colours page shows its mapping):
-    // how many of the menu's rows a page's preview takes (0 = none), and
-    // its drawing - under the page's items, and over a tweak's strip.
-    int ( *menuPreviewRows )( const char* page ) = nullptr;
+    // A page's preview (the modules': the colours page shows its mapping),
+    // drawn under the page's items and over a tweak's strip, in the rows
+    // shell.pageRowsTaken says the page gives it.
     void ( *menuPreview )( GFXcanvas16* canvas, const char* page, int x, int y, int w, int h ) = nullptr;
 
     UiShell shell;

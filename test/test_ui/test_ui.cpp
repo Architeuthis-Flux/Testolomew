@@ -569,6 +569,39 @@ void test_shell_cursor_repeats_slowly( void ) {
     uiShellEvent( &shell, { IN_NAV_RIGHT, IN_RELEASE }, t0 + 500 );
 }
 
+// A page's preview takes some of its rows (the colours page's mapping under
+// its items): the shell knows through pageRowsTaken, so the absolute stick
+// lands on the last row SHOWN, not the ninth (the review, 2026-09-26: the
+// drawer set the row count a frame late, and a page entered with the stick
+// held down opened scrolled with its cursor off the bottom).
+static int rowsTakenOnLong( const char* page ) {
+    return page[ 0 ] == 'l' ? 3 : 0;
+}
+static float longValues[ 9 ];
+void test_shell_page_preview_rows_reach_the_stick( void ) {
+    shellSetUp( );
+    int page = menuAddSubmenu( &shell.menu, MENU_ROOT, "long" );
+    static const char* const names[ 9 ] = { "a", "b", "c", "d", "e", "f", "g", "h", "i" };
+    for ( int k = 0; k < 9; k++ )
+        menuAddNumber( &shell.menu, page, names[ k ], &longValues[ k ], 0.0f, 9.0f, 1.0f, "" );
+    shell.pageRowsTaken = rowsTakenOnLong;
+    shell.absoluteJoystick = true;
+    hold( IN_BTN_A );
+    TEST_ASSERT_EQUAL( 9, uiShellPageRows( &shell ) ); // the root: all nine
+    send( IN_NAV_DOWN, IN_PRESS ); // tracker, reset, latest, long
+    send( IN_NAV_DOWN, IN_RELEASE );
+    send( IN_NAV_DOWN, IN_PRESS );
+    send( IN_NAV_DOWN, IN_RELEASE );
+    send( IN_NAV_DOWN, IN_PRESS );
+    send( IN_NAV_DOWN, IN_RELEASE );
+    tap( IN_NAV_PRESS );
+    TEST_ASSERT_EQUAL_STRING( "long", menuTitle( &shell.menu ) );
+    TEST_ASSERT_EQUAL( 6, uiShellPageRows( &shell ) ); // three taken by the preview
+    tick( 0.0f, -1.0f ); // the stick fully down, the frame the page was entered
+    TEST_ASSERT_EQUAL( 5, shell.menu.cursor ); // the last row shown
+    TEST_ASSERT_EQUAL( 0, shell.menuScrollTop );
+}
+
 void test_shell_confirm_and_result( void ) {
     shellSetUp( );
     hold( IN_BTN_A );
@@ -771,6 +804,7 @@ int main( int argc, char** argv ) {
     RUN_TEST( test_shell_menu_reopens_at_the_last_page );
     RUN_TEST( test_shell_tweak_edits_a_value_over_the_app );
     RUN_TEST( test_shell_cursor_repeats_slowly );
+    RUN_TEST( test_shell_page_preview_rows_reach_the_stick );
     RUN_TEST( test_shell_confirm_and_result );
     RUN_TEST( test_shell_timeout_and_joystick );
     RUN_TEST( test_shell_absolute_joystick );

@@ -205,9 +205,10 @@ static void blendColour( uint8_t* c, uint8_t a, uint8_t b, float t ) {
 
 // A bell of the given widths centred on (along, across), with total light
 // held constant: the peak is scaled by (minimum area / area), so a bell twice
-// as wide is a quarter as bright.
-static void splat( const LedLayout* layout, ProbeLedFrame* frame, float along, float acrossMm, float sigmaRows, float sigmaAcrossMm, float peak, float floor, float least,
-                   float minSigmaRows, float minSigmaAcrossMm, float maxSigmaRows, float maxSigmaAcrossMm, uint8_t r, uint8_t g, uint8_t b ) {
+// as wide is a quarter as bright. Returns the amplitude it drew with (what
+// the bell's centre shows: the tail follows it).
+static float splat( const LedLayout* layout, ProbeLedFrame* frame, float along, float acrossMm, float sigmaRows, float sigmaAcrossMm, float peak, float floor, float least,
+                    float minSigmaRows, float minSigmaAcrossMm, float maxSigmaRows, float maxSigmaAcrossMm, uint8_t r, uint8_t g, uint8_t b ) {
     if ( sigmaRows < minSigmaRows )
         sigmaRows = minSigmaRows;
     if ( sigmaAcrossMm < minSigmaAcrossMm )
@@ -249,6 +250,7 @@ static void splat( const LedLayout* layout, ProbeLedFrame* frame, float along, f
         frame->g[ i ] = g;
         frame->b[ i ] = b;
     }
+    return amplitude;
 }
 
 // How much of the scheme's colour the cursor shows at this height: none
@@ -446,8 +448,8 @@ void probeLedRender( const LedLayout* layout, const ProbeLedInput* in, const Pro
         // a breadboard's 5 V rail (a V5 browned out on 2026-09-18), and it
         // is meant to be a faint "about here", not a floodlight.
         float floor = style->fullPeak && in->state != PROBELED_ROUGH ? peak : ( in->state == PROBELED_ROUGH ? 0.12f : 0.08f );
-        splat( layout, frame, in->along, in->acrossMm, in->sigmaRows, in->sigmaAcrossMm, peak, floor, in->state == PROBELED_ROUGH ? PROBELED_ROUGH_LEAST : 0.0f, style->minSigmaRows,
-               style->minSigmaAcrossMm, PROBELED_MAX_SIGMA_ROWS, PROBELED_MAX_SIGMA_ACROSS_MM, r, g, b );
+        float shown = splat( layout, frame, in->along, in->acrossMm, in->sigmaRows, in->sigmaAcrossMm, peak, floor, in->state == PROBELED_ROUGH ? PROBELED_ROUGH_LEAST : 0.0f,
+                             style->minSigmaRows, style->minSigmaAcrossMm, PROBELED_MAX_SIGMA_ROWS, PROBELED_MAX_SIGMA_ACROSS_MM, r, g, b );
         if ( style->bloom > 0.0f ) {
             // The halo: three times as wide, a fraction as bright, the same
             // colour; the max rule in splat() keeps it under the cursor.
@@ -458,20 +460,22 @@ void probeLedRender( const LedLayout* layout, const ProbeLedInput* in, const Pro
 
         // Where the point itself is, when that is somewhere else: a tail from
         // the cursor back toward it for tailLength of the way, brightest at
-        // the cursor (tailBright of its peak: a dim cursor gets a dim tail,
-        // never outshone) in the cursor's colour, fading to the tail hue at
-        // its far end.
+        // the cursor (tailBright of what the cursor's own bell shows - a
+        // dim or a wide cursor gets a dim tail, never outshone) in the
+        // cursor's colour, fading to the tail hue at its far end. A step
+        // every half row, so a long tail is a line (twelve steps over twenty
+        // rows were beads; the review, 2026-09-26).
         if ( in->haveUnder && in->state != PROBELED_ROUGH && style->tailLength > 0.0f ) {
             float dAlong = ( in->underAlong - in->along ) * style->tailLength, dAcross = ( in->underAcrossMm - in->acrossMm ) * style->tailLength;
             float length = sqrtf( dAlong * dAlong + dAcross * dAcross / ( PITCH_MM * PITCH_MM ) ); // in rows
             int steps = (int)( length * 2.0f ) + 1;
-            if ( steps > 12 )
-                steps = 12;
+            if ( steps > 40 )
+                steps = 40; // twenty rows: the board's length at half-row steps
             uint8_t tr, tg, tb;
             probeLedHue( style->tailHueDeg, 1.0f, &tr, &tg, &tb );
             for ( int k = 1; k < steps; k++ ) {
                 float f = (float)k / ( steps - 1 ); // 0 at the cursor, 1 at the far end
-                float fade = style->tailBright * ( 1.0f - 0.7f * f );
+                float fade = style->tailBright * ( 1.0f - 0.7f * f ) * shown / ( peak > 0.0f ? peak : 1.0f );
                 uint8_t sr = r, sg = g, sb = b;
                 blendColour( &sr, r, tr, f );
                 blendColour( &sg, g, tg, f );
