@@ -496,6 +496,53 @@ void test_shell_tweak_edits_a_value_over_the_app( void ) {
     TEST_ASSERT_EQUAL( was, flag );
 }
 
+// A held up/down steps the cursor no faster than stepRepeatMs on Home, a
+// menu page and a tweak (Kevin, 2026-09-25: "the up down needs to be way
+// less touchy" - the repeat came every 80 ms). Left/right keep the fast
+// repeat: that is what makes a number run.
+void test_shell_cursor_repeats_slowly( void ) {
+    shellSetUp( );
+    shell.stepRepeatMs = 300.0f;
+    hold( IN_BTN_A );
+    tap( IN_NAV_PRESS ); // tracker: [tracker on] [floor]
+    uint32_t t0 = t;
+    uiShellEvent( &shell, { IN_NAV_DOWN, IN_PRESS }, t0 ); // the press steps at once
+    TEST_ASSERT_EQUAL( 1, shell.menu.cursor );
+    uiShellEvent( &shell, { IN_NAV_DOWN, IN_REPEAT }, t0 + 400 ); // the first repeat: 400 ms on, steps (wraps)
+    TEST_ASSERT_EQUAL( 0, shell.menu.cursor );
+    uiShellEvent( &shell, { IN_NAV_DOWN, IN_REPEAT }, t0 + 480 ); // 80 ms later: too soon
+    uiShellEvent( &shell, { IN_NAV_DOWN, IN_REPEAT }, t0 + 560 );
+    uiShellEvent( &shell, { IN_NAV_DOWN, IN_REPEAT }, t0 + 640 );
+    TEST_ASSERT_EQUAL( 0, shell.menu.cursor );
+    uiShellEvent( &shell, { IN_NAV_DOWN, IN_REPEAT }, t0 + 720 ); // 320 ms since the last step: steps
+    TEST_ASSERT_EQUAL( 1, shell.menu.cursor );
+    uiShellEvent( &shell, { IN_NAV_DOWN, IN_RELEASE }, t0 + 800 );
+    t = t0 + 800;
+    // A number's left/right repeats every time.
+    number = 10.0f;
+    uiShellEvent( &shell, { IN_NAV_RIGHT, IN_PRESS }, t0 + 900 );
+    uiShellEvent( &shell, { IN_NAV_RIGHT, IN_REPEAT }, t0 + 1300 );
+    uiShellEvent( &shell, { IN_NAV_RIGHT, IN_REPEAT }, t0 + 1380 );
+    uiShellEvent( &shell, { IN_NAV_RIGHT, IN_REPEAT }, t0 + 1460 );
+    uiShellEvent( &shell, { IN_NAV_RIGHT, IN_RELEASE }, t0 + 1500 );
+    TEST_ASSERT_FLOAT_WITHIN( 0.01f, 12.0f, number );
+    t = t0 + 1500;
+    // Home too: a held direction walks the cells at the same pace.
+    send( IN_BTN_B, IN_PRESS );
+    send( IN_BTN_B, IN_HOLD );
+    send( IN_BTN_B, IN_RELEASE );
+    tap( IN_BTN_A );
+    TEST_ASSERT_EQUAL( 1, shell.home.cursor );
+    t0 = t;
+    uiShellEvent( &shell, { IN_NAV_RIGHT, IN_PRESS }, t0 );
+    TEST_ASSERT_EQUAL( 2, shell.home.cursor );
+    uiShellEvent( &shell, { IN_NAV_RIGHT, IN_REPEAT }, t0 + 400 );
+    TEST_ASSERT_EQUAL( 0, shell.home.cursor );
+    uiShellEvent( &shell, { IN_NAV_RIGHT, IN_REPEAT }, t0 + 480 );
+    TEST_ASSERT_EQUAL( 0, shell.home.cursor );
+    uiShellEvent( &shell, { IN_NAV_RIGHT, IN_RELEASE }, t0 + 500 );
+}
+
 void test_shell_confirm_and_result( void ) {
     shellSetUp( );
     hold( IN_BTN_A );
@@ -697,6 +744,7 @@ int main( int argc, char** argv ) {
     RUN_TEST( test_shell_swallows_a_held_control_across_a_focus_change );
     RUN_TEST( test_shell_menu_reopens_at_the_last_page );
     RUN_TEST( test_shell_tweak_edits_a_value_over_the_app );
+    RUN_TEST( test_shell_cursor_repeats_slowly );
     RUN_TEST( test_shell_confirm_and_result );
     RUN_TEST( test_shell_timeout_and_joystick );
     RUN_TEST( test_shell_absolute_joystick );

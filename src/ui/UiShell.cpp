@@ -37,6 +37,8 @@ void uiShellInit( UiShell* s, const UiApp* apps, int appCount, int firstApp, int
     s->absoluteJoystick = false;
     s->absolutePeak = 0.0f;
     s->absoluteFrozen = false;
+    s->stepRepeatMs = UISHELL_STEP_REPEAT_MS;
+    s->lastStepMs = 0;
     s->menuRows = 9;
     s->menuScrollTop = 0;
     if ( firstApp >= 0 && firstApp < appCount ) {
@@ -208,6 +210,21 @@ static bool isJoystickDirection( InputControl c ) {
     return c >= IN_JOY_UP && c <= IN_JOY_RIGHT;
 }
 
+static bool isUpDown( InputControl c ) {
+    return c == IN_NAV_UP || c == IN_NAV_DOWN || c == IN_JOY_UP || c == IN_JOY_DOWN;
+}
+
+// A direction's press or repeat steps a cursor - but a repeat only once
+// stepRepeatMs has passed since the last step: the raw repeat, every 80 ms
+// after the first 400, walked several rows on a tilt held a moment too
+// long. Returns whether this event steps.
+static bool cursorStep( UiShell* s, InputEvent e, uint32_t nowMs ) {
+    if ( e.kind == IN_REPEAT && nowMs - s->lastStepMs < (uint32_t)s->stepRepeatMs )
+        return false;
+    s->lastStepMs = nowMs;
+    return true;
+}
+
 int uiShellEvent( UiShell* s, InputEvent e, uint32_t nowMs ) {
     InputControl c = e.control;
     s->lastInputMs = nowMs == 0 ? 1 : nowMs;
@@ -255,7 +272,8 @@ int uiShellEvent( UiShell* s, InputEvent e, uint32_t nowMs ) {
     }
     case PANE_HOME:
         if ( isDirection( c ) && press ) {
-            homeKey( &s->home, directionKey( c ) );
+            if ( cursorStep( s, e, nowMs ) )
+                homeKey( &s->home, directionKey( c ) );
         } else if ( isSelect( c ) && e.kind == IN_PRESS ) {
             int app = uiShellHomeCellApp( s, s->home.cursor );
             if ( app >= 0 ) {
@@ -270,6 +288,8 @@ int uiShellEvent( UiShell* s, InputEvent e, uint32_t nowMs ) {
         return -1;
     case PANE_MENU:
         if ( isDirection( c ) && press ) {
+            if ( isUpDown( c ) && !cursorStep( s, e, nowMs ) )
+                return -1;
             return menuAction( s, menuKey( &s->menu, directionKey( c ), repeat ) );
         }
         if ( isSelect( c ) ) {
@@ -296,6 +316,8 @@ int uiShellEvent( UiShell* s, InputEvent e, uint32_t nowMs ) {
         if ( isJoystickDirection( c ) )
             return -1; // the stick is the app's here
         if ( isDirection( c ) && press ) {
+            if ( isUpDown( c ) && !cursorStep( s, e, nowMs ) )
+                return -1;
             menuKey( &s->menu, directionKey( c ), repeat ); // a direction never returns an action
             return -1;
         }

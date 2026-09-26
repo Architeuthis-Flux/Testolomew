@@ -13,7 +13,10 @@
 //                   B hold: Home
 //   Home            up/down/left/right move, a press (or A), on its way down,
 //                   selects; B closes
-//   Home            (opens with the cursor on Settings, the centre cell)
+//   Home            (opens with the cursor on Settings, the centre cell;
+//                   a held direction walks the cells no faster than
+//                   stepRepeatMs, as up/down walk a menu page - the raw
+//                   repeat, every 80 ms, skipped rows on a long tilt)
 //   Settings page   up/down move, LEFT/RIGHT CHANGE THE VALUE IN PLACE, a
 //                   press enters a page or runs an action on its way down;
 //                   a toggle flips and a choice cycles on the CLICK (the
@@ -58,6 +61,7 @@
 
 #define UISHELL_MAX_DEPTH 4
 #define UISHELL_IDLE_MS 20000
+#define UISHELL_STEP_REPEAT_MS 300.0f // a held direction steps the cursor no faster than this (the menu's "cursor repeat"; the raw repeat is every 80 ms: "way less touchy", Kevin 2026-09-25)
 #define UISHELL_RESULT_TITLE 24
 
 enum PaneKind {
@@ -102,6 +106,8 @@ struct UiShell {
     bool absoluteJoystick;
     float absolutePeak;  // the furthest the stick has been since it last left the centre
     bool absoluteFrozen; // ...and it is on its way back: the cursor stays where it was pointed
+    float stepRepeatMs;  // a held direction steps the cursor (Home: any way; a page or a tweak: up/down) no faster than this; left/right on a page keep the raw repeat, which is what makes a number run
+    uint32_t lastStepMs; // when the cursor last stepped on a held direction
     int menuRows;        // rows a menu page shows at once (the Ui says)
     int menuScrollTop;   // the first row shown (kept here so the stick and the drawing agree)
 };

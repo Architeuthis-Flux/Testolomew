@@ -152,6 +152,17 @@
 :ui root
 :screen
 @expect "menu: / cursor 1/"
+# A held down walks a page a row every "cursor repeat" (300 ms), not every
+# raw repeat (80 ms after the first 400): a second's hold from the top of
+# the tracking page lands on its fourth item, not its tenth (2026-09-25).
+:ui go tracking
+:key down down
+@run 1000
+:key down up
+@run 100
+:screen
+@expect "menu: /tracking cursor 4/"
+:ui back
 # ...and through the real button tracker (a 40 ms tap, a 700 ms hold): a
 # toggle flips on the tap's CLICK, and a hold on it tweaks it without
 # touching it (the review, 2026-09-25: the undo had run an accessor's
