@@ -17,9 +17,15 @@
 // only once it has held still for the debounce time (contacts do not close
 // on the same millisecond) and then INPUT_NAV_DIRECTION_MS more:
 //   - a direction (one contact) or a diagonal (two) that holds that long is
-//     a direction, whatever the push contact does - though with the push
-//     contact closed it has to hold INPUT_NAV_DIRECTION_WITH_PUSH_MS, since
-//     a centre push wobbles the stick into a direction for a while first;
+//     ONE direction - the contact that closed first, else up/down over
+//     left/right (2026-09-26: a diagonal was both, and a push down with a
+//     lean changed the setting under the cursor) - whatever the push
+//     contact does, though with the push contact closed it has to hold
+//     INPUT_NAV_DIRECTION_WITH_PUSH_MS, since a centre push wobbles the
+//     stick into a direction for a while first; it lasts while its contact
+//     is closed, and no other direction starts until the stick is centred
+//     (a second contact closing meanwhile, or left closed after it, is
+//     nothing);
 //   - the push contact closed that long with NO direction contact closed is
 //     the press;
 //   - once one is decided the other is ignored until it releases: a push's
@@ -184,7 +190,9 @@ class Input : public Service {
     bool navPressed = false; // the decoded press, with its release hysteresis
     bool navPushRaw = false, navPushStable = false;
     uint32_t navPushChangedMs = 0, navPushStableSinceMs = 0;
-    bool navDirectionOn = false; // a direction/diagonal is decided and still held
+    bool navDirectionOn = false; // a direction is decided and the stick not yet centred
+    uint8_t navDirection = 0;    // ...which one (a contact bit)
+    uint8_t navFirst = 0;        // the contact that closed first since the stick was centred (0 = none yet)
     // What the contacts did, for `J`: the last changes of the raw pattern.
     uint8_t navTracePattern[ INPUT_NAV_TRACE ]; // bits 0-3 the contacts, bit 4 the push
     uint8_t navTraceLast = 0;

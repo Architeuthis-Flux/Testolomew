@@ -26,8 +26,8 @@ int main() {
     // 2. one direction
     simPinLevel[10] = 0; run("", 150); drain("up", "UP:press "); simPinLevel[10] = 1; run("", 100); drain("up released", "UP:release ");
     // 3. a diagonal: two neighbours, second 6 ms later
-    simPinLevel[10] = 0; run("", 5); simPinLevel[13] = 0; run("", 150); drain("up+right (diagonal)", "UP:press RIGHT:press ");
-    simPinLevel[10] = 1; simPinLevel[13] = 1; run("", 100); drain("diagonal released", "UP:release RIGHT:release ");
+    simPinLevel[10] = 0; run("", 5); simPinLevel[13] = 0; run("", 150); drain("up+right (diagonal): the first", "UP:press ");
+    simPinLevel[10] = 1; simPinLevel[13] = 1; run("", 100); drain("diagonal released", "UP:release ");
     // 4. a bounce on one contact shorter than the debounce: nothing
     simPinLevel[11] = 0; run("", 10); simPinLevel[11] = 1; run("", 100); drain("10 ms bounce", "");
     // 5. slow release of a push: three, then two contacts stay for 60 ms - still the press, no diagonal
@@ -64,8 +64,21 @@ int main() {
     simPinLevel[14] = 0; simPinLevel[12] = 0; run("", 160); simPinLevel[12] = 1; simPinLevel[14] = 1; run("", 150); drain("160 ms flick", "LEFT:press LEFT:release ");
     // 10. A clean centre push, and a roll from up to up+right while tilted (the diagonal follows).
     simPinLevel[14] = 0; run("", 300); drain("clean push", "PRESS:press "); simPinLevel[14] = 1; run("", 150); drain("clean push released", "PRESS:release ");
-    simPinLevel[14] = 0; simPinLevel[10] = 0; run("", 200); drain("up", "UP:press "); simPinLevel[13] = 0; run("", 200); drain("rolled to up+right", "RIGHT:press ");
-    simPinLevel[10] = 1; simPinLevel[13] = 1; simPinLevel[14] = 1; run("", 150); drain("roll released", "UP:release RIGHT:release ");
+    simPinLevel[14] = 0; simPinLevel[10] = 0; run("", 200); drain("up", "UP:press "); simPinLevel[13] = 0; run("", 200); drain("rolled to up+right: nothing new", "");
+    simPinLevel[10] = 1; simPinLevel[13] = 1; simPinLevel[14] = 1; run("", 150); drain("roll released", "UP:release ");
+    // 11. A push down with a lean (2026-09-26): the left contact closes 30 ms after the down one and outlives it by 40 ms
+    // on the release - down only, never a left (on a Settings page left changes the value).
+    simPinLevel[14] = 0; simPinLevel[11] = 0; run("", 30); simPinLevel[12] = 0; run("", 300); drain("down with a lean left", "DOWN:press ");
+    simPinLevel[11] = 1; run("", 40); simPinLevel[12] = 1; simPinLevel[14] = 1; run("", 150); drain("lean released (left outlives down)", "DOWN:release ");
+    // 12. Left first, a wobble into down 15 ms later: the first contact wins.
+    simPinLevel[14] = 0; simPinLevel[12] = 0; run("", 15); simPinLevel[11] = 0; run("", 300); drain("left then down", "LEFT:press ");
+    simPinLevel[12] = 1; simPinLevel[11] = 1; simPinLevel[14] = 1; run("", 150); drain("left then down released", "LEFT:release ");
+    // 13. Both at once (within the settle): up/down over left/right - the cursor moves, the value is left alone.
+    simPinLevel[14] = 0; simPinLevel[12] = 0; simPinLevel[11] = 0; run("", 300); drain("down+left together", "DOWN:press ");
+    simPinLevel[12] = 1; simPinLevel[11] = 1; simPinLevel[14] = 1; run("", 150); drain("together released", "DOWN:release ");
+    // 14. ...and a second direction after the stick is centred is a direction again.
+    simPinLevel[14] = 0; simPinLevel[12] = 0; run("", 300); drain("left after centring", "LEFT:press ");
+    simPinLevel[12] = 1; simPinLevel[14] = 1; run("", 150); drain("left released", "LEFT:release ");
     printf("%s\n", fails ? "FAILURES" : "all ok");
     return fails;
 }

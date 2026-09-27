@@ -421,9 +421,24 @@ bool Input::pinDown( int c ) const {
     return s.pin >= 0 && ( digitalRead( s.pin ) == LOW ) == s.activeLow;
 }
 
+// ONE direction out of a pattern of one or two contacts: the contact that
+// closed first (`first`: the last single-contact pattern since the stick
+// was centred), else up/down over left/right - a push down with a lean
+// closes the left contact too, and on a Settings page left changes the
+// value while down only moves the cursor (Kevin, 2026-09-26: "too easy for
+// a down+left to change the setting"). A diagonal was both directions
+// until then.
+static uint8_t oneDirection( uint8_t pattern, uint8_t first ) {
+    if ( pattern & first )
+        return first;
+    if ( pattern & 0x3 )
+        return pattern & 0x1 ? 0x1 : 0x2;
+    return pattern & 0x4 ? 0x4 : ( pattern & 0x8 );
+}
+
 // The nav stick: its four contacts as one pattern, decoded once it has held
 // still for the debounce time (see Input.h). Fills navDown[ 0-3 ] with the
-// directions and navDown[ 4 ] with the press.
+// direction and navDown[ 4 ] with the press.
 void Input::decodeNav( uint32_t now, bool navDown[ 5 ] ) {
     uint8_t pattern = 0;
     for ( int c = IN_NAV_UP; c <= IN_NAV_RIGHT; c++ ) {
@@ -480,6 +495,12 @@ void Input::decodeNav( uint32_t now, bool navDown[ 5 ] ) {
     int decodedClosed = 0;
     for ( int k = 0; k < 4; k++ )
         decodedClosed += ( navDecoded >> k ) & 1;
+    // Which contact closed first since the stick was last centred (the
+    // stable pattern, so a bounce does not count).
+    if ( closed == 0 )
+        navFirst = 0;
+    else if ( closed == 1 && navFirst == 0 )
+        navFirst = navStable;
     for ( int k = 0; k < 5; k++ )
         navDown[ k ] = false;
     if ( sources[ IN_NAV_PRESS ].pin >= 0 ) {
@@ -499,12 +520,16 @@ void Input::decodeNav( uint32_t now, bool navDown[ 5 ] ) {
                 navPressed = false;
         } else if ( decodedClosed > 0 && closed > 0 ) {
             navDirectionOn = true;
+            navDirection = oneDirection( navDecoded, navFirst );
         } else if ( navPushStable && closed == 0 && (int32_t)( now - navPushStableSinceMs ) >= (int32_t)directionMs ) {
             navPressed = true;
         }
         if ( navDirectionOn ) {
+            // The one direction, while its contact is closed; a second contact
+            // closing meanwhile (a lean, a roll) is nothing, and so is what
+            // is left closed after it opens: the stick has to centre first.
             for ( int k = 0; k < 4; k++ )
-                navDown[ k ] = ( navStable >> k ) & 1; // follow the contacts as they are (a roll from up to up+right)
+                navDown[ k ] = ( navStable & navDirection ) == ( 1 << k );
         }
         navDown[ 4 ] = navPressed;
     } else {
@@ -515,8 +540,9 @@ void Input::decodeNav( uint32_t now, bool navDown[ 5 ] ) {
         } // two closed while leaving a press: still the press, not a diagonal
         navDown[ 4 ] = navPressed;
         if ( !navPressed ) {
+            uint8_t one = oneDirection( navDecoded, navFirst );
             for ( int k = 0; k < 4; k++ )
-                navDown[ k ] = ( navDecoded >> k ) & 1;
+                navDown[ k ] = ( navStable & one ) == ( 1 << k );
         }
     }
 }
