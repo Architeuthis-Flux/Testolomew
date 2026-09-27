@@ -16,9 +16,11 @@
 //  - RE-ARM after a release (rearmMs): a stick let go from full tilt
 //    springs back THROUGH the centre and rings for a moment, which at a
 //    low threshold fires the opposite direction (Godot's UI navigation hit
-//    exactly this when its threshold went from 0.5 to 0.2). An axis whose
-//    direction has just ended is disarmed until it has sat inside the off
-//    band for rearmMs; a deliberate second push takes longer than that.
+//    exactly this when its threshold went from 0.5 to 0.2). When a
+//    direction ends BOTH axes are disarmed until each has sat inside the
+//    off band for rearmMs - the other axis's lean, still past the
+//    threshold as the pushed one lets go, is not a direction either
+//    (2026-09-26) - and a deliberate second push takes longer than that.
 //
 // Feed it the linear stick every tick; read down[]. No Arduino in here;
 // host-tested (test/test_input).

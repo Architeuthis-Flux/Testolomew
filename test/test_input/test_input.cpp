@@ -197,7 +197,9 @@ void test_stick_direction_after_the_hold_with_hysteresis( void ) {
 }
 
 // A diagonal push is the dominant axis only, and the other axis cannot
-// start while it is on.
+// start while it is on - nor as it ends: the lean still there when the
+// pushed axis lets go is not a direction until the stick has centred
+// (2026-09-26: a push down with a lean left fired left on the release).
 void test_stick_one_axis_at_a_time( void ) {
     stickDpadInit( &d, 0.25f, 0.15f, 30, 80 );
     stick( 0.0f, 0.0f, false, 50 );
@@ -205,7 +207,10 @@ void test_stick_one_axis_at_a_time( void ) {
     TEST_ASSERT_EQUAL( STICK_UP, onlyDown( ) );
     stick( 0.9f, 0.6f, false, 100 ); // x now larger: y keeps it until y ends
     TEST_ASSERT_EQUAL( STICK_UP, onlyDown( ) );
-    stick( 0.9f, 0.0f, false, 50 ); // y over; x is still armed (it never fired) and past 'on'
+    stick( 0.9f, 0.0f, false, 200 ); // y over; x still past 'on': nothing, the stick has not centred
+    TEST_ASSERT_EQUAL( -1, onlyDown( ) );
+    stick( 0.0f, 0.0f, false, 100 ); // centred and rested: a push right is right
+    stick( 0.9f, 0.0f, false, 50 );
     TEST_ASSERT_EQUAL( STICK_RIGHT, onlyDown( ) );
 }
 

@@ -48,7 +48,11 @@ void stickDpadFeed( StickDpad* d, float x, float y, bool pressDown, uint32_t now
     // A direction on: it lasts until its axis is back inside the off band.
     if ( d->axis >= 0 ) {
         if ( mag[ d->axis ] < d->offAt ) {
-            d->armed[ d->axis ] = false; // the spring-back is not a direction
+            // The spring-back is not a direction - and nor is the OTHER axis's
+            // lean, still past 'on' as the pushed axis lets go: both have to
+            // rest in the off band first (2026-09-26: a push down with a lean
+            // left fired left as it was released, and left changes a value).
+            d->armed[ 0 ] = d->armed[ 1 ] = false;
             d->axis = -1;
             d->sign = 0;
         }
