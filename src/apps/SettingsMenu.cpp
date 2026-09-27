@@ -245,7 +245,7 @@ void settingsMenuBuild( Menu* m ) {
     menuAddNumber( m, leds, "budget mA", &probeLeds.stripMaxMa, 100.0f, PROBELED_STRIP_HARD_MAX_MA, 100.0f, "" ); // the ceiling is the most it can be
     menuAddToggle( m, leds, "full peak", &probeLeds.style.fullPeak );
     menuAddNumber( m, leds, "spot", &probeLeds.style.spot, 0.5f, 4.0f, 0.1f, "" );             // the spot's size, 1 = one hole
-    menuAddNumber( m, leds, "spot by height", &probeLeds.style.spotByHeight, 0.0f, 4.0f, 0.25f, "" ); // ...and how much wider at the height scale
+    menuAddNumber( m, leds, "spot by height", &probeLeds.style.spotByHeight, 0.0f, 8.0f, 0.25f, "" ); // ...and how much wider at the height scale
     menuAddNumber( m, leds, "bloom", &probeLeds.style.bloom, 0.0f, 1.0f, 0.1f, "" );
     menuAddNumber( m, leds, "sparkle", &probeLeds.style.sparkle, 0.0f, 1.0f, 0.1f, "" );
     menuAddNumber( m, leds, "pulse", &probeLeds.style.pulse, 0.0f, 1.0f, 0.1f, "" );
@@ -263,8 +263,8 @@ void settingsMenuBuild( Menu* m ) {
     menuAddChoice( m, colours, "scheme", &probeLeds.style.scheme, probeLedSchemeNames, PROBELED_SCHEME_COUNT );
     menuAddNumber( m, colours, "turns", &probeLeds.style.hueTurns, 0.1f, 4.0f, 0.05f, "" ); // of the wheel over the scale: under 1 a chunk of the spectrum, over 1 several rainbows
     menuAddNumber( m, colours, "hue start", &probeLeds.style.hueStartDeg, 0.0f, 355.0f, 5.0f, "deg" );
-    menuAddNumber( m, colours, "height scale", &probeLeds.style.liftFullMm, 5.0f, 60.0f, 1.0f, "mm" );
-    menuAddNumber( m, colours, "colour from", &probeLeds.style.colourByMm, 2.0f, 30.0f, 0.5f, "mm" ); // white on the board below 1.5 mm, all the colour from here up
+    menuAddNumber( m, colours, "height scale", &probeLeds.style.liftFullMm, 5.0f, 150.0f, 1.0f, "mm" ); // to the array's range: a far probe is drawn by the same mapping since 2026-09-27 (60 until then)
+    menuAddNumber( m, colours, "colour from", &probeLeds.style.colourByMm, 2.0f, 100.0f, 0.5f, "mm" );  // white on the board below 1.5 mm, all the colour from here up
     menuAddChoice( m, colours, "bright by", &probeLeds.style.brightBy, probeLedDataNames, PROBELED_DATA_COUNT );
     menuAddNumber( m, colours, "bright amount", &probeLeds.style.brightAmount, 0.0f, 1.0f, 0.05f, "" );
     menuAddChoice( m, colours, "sparkle by", &probeLeds.style.sparkleBy, probeLedDataNames, PROBELED_DATA_COUNT );

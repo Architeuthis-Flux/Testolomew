@@ -145,13 +145,12 @@ void test_vague_fix_is_wide_and_dim_with_the_same_light( void ) {
     int b = brightest( &frame );
     printf( "  sharp: total %.2f; vague: total %.2f over %d LEDs, peak %.2f\n", sharpTotal, vagueTotal, lit, frame.target[ b ] );
     TEST_ASSERT_TRUE( frame.target[ b ] < 0.2f * style.peak );
-    TEST_ASSERT_TRUE( lit > 5 ); // a patch (the floor that once kept a wide bell at 0.08 everywhere fades with the width)
-    // Dimmer as it widens (the floor fades out with the width, PROBELED_MAX_SIGMA_*): no more light than the sharp fix, and some.
-    TEST_ASSERT_TRUE( vagueTotal < 1.5f * sharpTotal && vagueTotal > 0.1f * sharpTotal );
+    TEST_ASSERT_TRUE( lit > 5 ); // a patch, at the floor (0.08 whatever the width since 2026-09-27; it faded out with the width before)
+    TEST_ASSERT_TRUE( vagueTotal > 0.1f * sharpTotal );
 }
 
-void test_vague_fix_at_full_peak_fades_with_width( void ) {
-    style.fullPeak = true; // a bell up to twice the narrowest keeps an LED at the peak; wider, the peak fades with the width
+void test_vague_fix_at_full_peak_keeps_the_peak( void ) {
+    style.fullPeak = true; // the brightest LED is the peak whatever the width (2026-09-27; up to twice the narrowest until then, fading with the width beyond)
     ProbeLedInput narrow = at( 14.0f, 6.35f, 0.5f, 1.5f );
     probeLedRender( &v6, &narrow, &style, 1.0f, &frame );
     int b = brightest( &frame );
@@ -162,16 +161,16 @@ void test_vague_fix_at_full_peak_fades_with_width( void ) {
     int lit = 0;
     for ( int i = 0; i < frame.count; i++ )
         lit += frame.target[ i ] > 0.02f;
-    TEST_ASSERT_TRUE( frame.target[ b ] > 0.2f * style.peak && frame.target[ b ] < 0.7f * style.peak );
+    TEST_ASSERT_FLOAT_WITHIN( 0.02f, style.peak, frame.target[ b ] );
     TEST_ASSERT_TRUE( lit > 20 );
-    ProbeLedInput huge = at( 14.0f, 6.35f, 8.0f, 20.0f ); // wider than the widest allowed: held at it, the floor gone
+    ProbeLedInput huge = at( 14.0f, 6.35f, 8.0f, 20.0f ); // wider than the widest allowed: held at it, still at the peak - a broad patch the chain's budget dims as a whole
     probeLedRender( &v6, &huge, &style, 1.0f, &frame );
     b = brightest( &frame );
     lit = 0;
     for ( int i = 0; i < frame.count; i++ )
         lit += frame.target[ i ] > 0.02f;
-    TEST_ASSERT_TRUE( frame.target[ b ] < 0.1f * style.peak );
-    TEST_ASSERT_TRUE( lit < 60 ); // a patch, not the board
+    TEST_ASSERT_FLOAT_WITHIN( 0.02f, style.peak, frame.target[ b ] );
+    TEST_ASSERT_TRUE( lit > 60 );
 }
 
 void test_looks( void ) {
@@ -448,22 +447,28 @@ void test_sparkle_density_follows_the_chosen_data( void ) {
     TEST_ASSERT_TRUE( lifted > 5 && onBoard * 2 > lifted ); // about as many
 }
 
-void test_far_probe_glows_purple( void ) {
-    // Dim whatever the peak rule: a hundred LEDs wide at the peak would be
-    // amps out of a breadboard's rail.
+// A far probe is drawn like any other (2026-09-27; a dim purple glow of its
+// own until then): the same colour by height, the same peak, as wide as its
+// bar - held at the widest allowed - so a far fix at the peak is a broad
+// patch the chain's current budget dims as a whole. Nothing: dark.
+void test_far_probe_is_drawn_like_any_other( void ) {
     style.fullPeak = true;
     ProbeLedInput in = at( 20.0f, 0.0f, 6.0f, 12.0f );
-    in.state = PROBELED_ROUGH;
+    in.heightMm = 40.0f;
     in.confidence = 0.1f;
+    in.state = PROBELED_ROUGH;
+    probeLedRender( &v6, &in, &style, 1.0f, &frame );
+    ProbeLedFrame rough = frame;
+    probeLedClear( &frame, v6.count );
+    in.state = PROBELED_TRACKING;
     probeLedRender( &v6, &in, &style, 1.0f, &frame );
     int b = brightest( &frame );
-    TEST_ASSERT_TRUE( frame.target[ b ] >= 0.029f && frame.target[ b ] < 0.15f ); // PROBELED_ROUGH_LEAST: a faint patch, held at the widest width
-    style.fullPeak = false;
-    probeLedRender( &v6, &in, &style, 1.0f, &frame );
-    b = brightest( &frame );
-    TEST_ASSERT_TRUE( frame.target[ b ] >= 0.029f && frame.target[ b ] < 0.15f );
-    TEST_ASSERT_EQUAL( style.roughR, frame.r[ b ] );
-    TEST_ASSERT_EQUAL( style.roughB, frame.b[ b ] );
+    TEST_ASSERT_EQUAL( b, brightest( &rough ) );
+    TEST_ASSERT_FLOAT_WITHIN( 0.001f, frame.target[ b ], rough.target[ b ] );
+    TEST_ASSERT_EQUAL( frame.r[ b ], rough.r[ b ] );
+    TEST_ASSERT_EQUAL( frame.b[ b ], rough.b[ b ] );
+    TEST_ASSERT_TRUE( rough.target[ b ] > 0.5f * style.peak ); // bright, not a faint "about here"
+    TEST_ASSERT_TRUE( rough.b[ b ] > 200 && rough.r[ b ] < 120 );  // classic, lifted: blue
     ProbeLedInput none = { };
     probeLedRender( &v6, &none, &style, 1.0f, &frame );
     TEST_ASSERT_FLOAT_WITHIN( 0.001f, 0.0f, total( &frame ) );
@@ -609,6 +614,12 @@ void test_spot_widens_with_height( void ) {
     for ( int i = 0; i < frame.count; i++ )
         litBig += frame.target[ i ] > 0.1f;
     TEST_ASSERT_TRUE( litBig > litLow );
+    // Both levers at their ends, lifted to the scale: a spot grown past the
+    // widest bell allowed is held at it, never brighter than the peak.
+    style.spot = 4.0f;
+    style.spotByHeight = 8.0f;
+    probeLedRender( &v6, &high, &style, 1.0f, &frame );
+    TEST_ASSERT_TRUE( frame.target[ brightest( &frame ) ] <= style.peak + 0.001f );
 }
 
 int main( int argc, char** argv ) {
@@ -619,13 +630,13 @@ int main( int argc, char** argv ) {
     RUN_TEST( test_v5_layout_and_pixels );
     RUN_TEST( test_sharp_fix_lights_one_hole );
     RUN_TEST( test_vague_fix_is_wide_and_dim_with_the_same_light );
-    RUN_TEST( test_vague_fix_at_full_peak_fades_with_width );
+    RUN_TEST( test_vague_fix_at_full_peak_keeps_the_peak );
     RUN_TEST( test_looks );
     RUN_TEST( test_hue_scale_turns_and_start );
     RUN_TEST( test_aim_scheme_colours_by_the_lean );
     RUN_TEST( test_brightness_follows_the_chosen_data );
     RUN_TEST( test_sparkle_density_follows_the_chosen_data );
-    RUN_TEST( test_far_probe_glows_purple );
+    RUN_TEST( test_far_probe_is_drawn_like_any_other );
     RUN_TEST( test_pointed_tail_points_back_at_the_tip );
     RUN_TEST( test_leds_fade_rather_than_snap );
     RUN_TEST( test_a_moving_cursor_sweeps_the_rows_between );

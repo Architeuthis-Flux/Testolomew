@@ -151,9 +151,6 @@ void probeLedDefaultStyle( ProbeLedStyle* s ) {
     s->liftR = 40;
     s->liftG = 120;
     s->liftB = 255; // blue in the air
-    s->roughR = 120;
-    s->roughG = 40;
-    s->roughB = 160; // purple haze from afar
     s->tailHueDeg = 25.0f; // amber at the tail's far end
     s->tailLength = 0.5f;  // halfway back toward the point
     s->tailBright = 0.5f;
@@ -209,28 +206,27 @@ static void blendColour( uint8_t* c, uint8_t a, uint8_t b, float t ) {
 
 // A bell of the given widths centred on (along, across), with total light
 // held constant: the peak is scaled by (minimum area / area), so a bell twice
-// as wide is a quarter as bright. Returns the amplitude it drew with (what
-// the bell's centre shows: the tail follows it).
-static float splat( const LedLayout* layout, ProbeLedFrame* frame, float along, float acrossMm, float sigmaRows, float sigmaAcrossMm, float peak, float floor, float least,
-                    float minSigmaRows, float minSigmaAcrossMm, float maxSigmaRows, float maxSigmaAcrossMm, uint8_t r, uint8_t g, uint8_t b ) {
+// as wide is a quarter as bright - but never under `floor` (the peak itself
+// with fullPeak). Held at the widest allowed (PROBELED_MAX_SIGMA_*). Returns
+// the amplitude it drew with (what the bell's centre shows: the tail
+// follows it).
+static float splat( const LedLayout* layout, ProbeLedFrame* frame, float along, float acrossMm, float sigmaRows, float sigmaAcrossMm, float peak, float floor, float minSigmaRows,
+                    float minSigmaAcrossMm, float maxSigmaRows, float maxSigmaAcrossMm, uint8_t r, uint8_t g, uint8_t b ) {
     if ( sigmaRows < minSigmaRows )
         sigmaRows = minSigmaRows;
     if ( sigmaAcrossMm < minSigmaAcrossMm )
         sigmaAcrossMm = minSigmaAcrossMm;
-    // How far past twice the narrowest the bell has widened, 0..1 at the
-    // widest it is allowed: the floor fades out over it, and the bell is
-    // held at the widest (see PROBELED_MAX_SIGMA_*).
-    float wideRows = ( sigmaRows - 2.0f * minSigmaRows ) / ( maxSigmaRows - 2.0f * minSigmaRows );
-    float wideAcross = ( sigmaAcrossMm - 2.0f * minSigmaAcrossMm ) / ( maxSigmaAcrossMm - 2.0f * minSigmaAcrossMm );
-    float wide = clamp01( wideRows > wideAcross ? wideRows : wideAcross );
     if ( sigmaRows > maxSigmaRows )
         sigmaRows = maxSigmaRows;
     if ( sigmaAcrossMm > maxSigmaAcrossMm )
         sigmaAcrossMm = maxSigmaAcrossMm;
+    // A minimum grown past the widest (the spot levers at their ends) is the
+    // widest: the ratio below never takes a bell over the peak.
+    if ( minSigmaRows > maxSigmaRows )
+        minSigmaRows = maxSigmaRows;
+    if ( minSigmaAcrossMm > maxSigmaAcrossMm )
+        minSigmaAcrossMm = maxSigmaAcrossMm;
     float amplitude = peak * ( minSigmaRows * minSigmaAcrossMm ) / ( sigmaRows * sigmaAcrossMm );
-    floor *= 1.0f - wide; // a wide bell still shows as something the eye can find, until it is as wide as it gets
-    if ( floor < least )
-        floor = least; // ...but never less than this (the far probe's faint "about here")
     if ( amplitude < floor )
         amplitude = floor;
     // Reciprocals once, and the along test alone first: most LEDs fail it,
@@ -434,48 +430,41 @@ void probeLedRender( const LedLayout* layout, const ProbeLedInput* in, const Pro
             float breath = 0.5f - 0.5f * cosf( 2.0f * (float)M_PI * frame->timeS / PROBELED_PULSE_PERIOD_S );
             peak *= 1.0f - 0.5f * style->pulse * breath;
         }
-        if ( in->state == PROBELED_ROUGH ) {
-            r = style->roughR;
-            g = style->roughG;
-            b = style->roughB;
-            peak *= 0.6f;
-        } else {
-            schemeColour( style, in, frame->timeS, &r, &g, &b );
-            // Dimmed by the chosen data (unsure by default: a coin-toss row at half).
-            peak *= 1.0f - clamp01( style->brightAmount ) * dataOf( style, in, style->brightBy );
-            if ( in->state == PROBELED_COASTING )
-                peak *= 0.7f;
-        }
+        // One mapping for every state, a far fix included (2026-09-27):
+        // the scheme's colour by the height, dimmed by the chosen data
+        // (unsure by default: a coin-toss row at half), and a coasting
+        // track a little dimmer.
+        schemeColour( style, in, frame->timeS, &r, &g, &b );
+        peak *= 1.0f - clamp01( style->brightAmount ) * dataOf( style, in, style->brightBy );
+        if ( in->state == PROBELED_COASTING )
+            peak *= 0.7f;
         // The cursor keeps its total light (a wide bell is a dim one) down to a
-        // floor an LED can still show; a far probe's glow is a flashlight, and
-        // gets a higher one. With fullPeak the floor IS the peak: the widest
-        // bell still has one LED at full - but never for the far probe's
-        // glow, which is a hundred LEDs wide: at the peak that is amps out of
-        // a breadboard's 5 V rail (a V5 browned out on 2026-09-18), and it
-        // is meant to be a faint "about here", not a floodlight.
-        float floor = style->fullPeak && in->state != PROBELED_ROUGH ? peak : ( in->state == PROBELED_ROUGH ? 0.12f : 0.08f );
+        // floor an LED can still show; with fullPeak the floor IS the peak,
+        // whatever the width. A far probe's bell at the peak is a hundred
+        // LEDs: the chain's current budget (ProbeLedService::sendFrame) is
+        // what keeps that off a breadboard's 5 V rail, by dimming the frame
+        // as a whole - not a dimmer glow of its own (that went 2026-09-27).
+        float floor = style->fullPeak ? peak : 0.08f;
         // The spot's size: the narrowest bell times "spot", and wider again
         // with the point's lift by "spot by height" (a cone; the floor above
         // keeps the peak, so it is a wider spot and not a dimmer one).
         float lift = style->liftFullMm > 0.0f ? clamp01( in->heightMm / style->liftFullMm ) : 0.0f;
         float grow = ( style->spot > 0.0f ? style->spot : 1.0f ) * ( 1.0f + style->spotByHeight * lift );
         float minRows = style->minSigmaRows * grow, minAcross = style->minSigmaAcrossMm * grow;
-        float shown = splat( layout, frame, in->along, in->acrossMm, in->sigmaRows, in->sigmaAcrossMm, peak, floor, in->state == PROBELED_ROUGH ? PROBELED_ROUGH_LEAST : 0.0f, minRows,
-                             minAcross, PROBELED_MAX_SIGMA_ROWS, PROBELED_MAX_SIGMA_ACROSS_MM, r, g, b );
+        float shown = splat( layout, frame, in->along, in->acrossMm, in->sigmaRows, in->sigmaAcrossMm, peak, floor, minRows, minAcross, PROBELED_MAX_SIGMA_ROWS, PROBELED_MAX_SIGMA_ACROSS_MM, r, g, b );
         if ( style->bloom > 0.0f ) {
             // The halo: three times as wide, a fraction as bright, the same
             // colour; the max rule in splat() keeps it under the cursor.
             float wide = 3.0f;
-            splat( layout, frame, in->along, in->acrossMm, in->sigmaRows * wide, in->sigmaAcrossMm * wide, 0.3f * style->bloom * peak, 0.0f, 0.0f, minRows * wide, minAcross * wide,
+            splat( layout, frame, in->along, in->acrossMm, in->sigmaRows * wide, in->sigmaAcrossMm * wide, 0.3f * style->bloom * peak, 0.0f, minRows * wide, minAcross * wide,
                    PROBELED_MAX_SIGMA_ROWS * wide, PROBELED_MAX_SIGMA_ACROSS_MM * wide, r, g, b );
         }
 
         // The sweep: from where the cursor was last frame to where it is, at
         // half-row steps (the tail's pattern), the cursor's own width and
         // colour, full at the head and PROBELED_SWEEP_TAIL of it at the old
-        // end - a stroke, not beads (PROBELED_SWEEP_S; the far glow is wide
-        // enough as it is).
-        if ( sweep && in->state != PROBELED_ROUGH ) {
+        // end - a stroke, not beads (PROBELED_SWEEP_S).
+        if ( sweep ) {
             float dAlong = frame->lastAlong - in->along, dAcross = frame->lastAcrossMm - in->acrossMm;
             float length = sqrtf( dAlong * dAlong + dAcross * dAcross / ( PITCH_MM * PITCH_MM ) ); // in rows
             int steps = (int)( length * 2.0f ) + 1;
@@ -484,16 +473,14 @@ void probeLedRender( const LedLayout* layout, const ProbeLedInput* in, const Pro
             for ( int k = 1; k < steps; k++ ) {
                 float f = (float)k / ( steps - 1 ); // 0 at the head, 1 at the old end
                 float fade = 1.0f - ( 1.0f - PROBELED_SWEEP_TAIL ) * f;
-                splat( layout, frame, in->along + f * dAlong, in->acrossMm + f * dAcross, in->sigmaRows, in->sigmaAcrossMm, peak * fade, floor * fade, 0.0f, minRows, minAcross,
+                splat( layout, frame, in->along + f * dAlong, in->acrossMm + f * dAcross, in->sigmaRows, in->sigmaAcrossMm, peak * fade, floor * fade, minRows, minAcross,
                        PROBELED_MAX_SIGMA_ROWS, PROBELED_MAX_SIGMA_ACROSS_MM, r, g, b );
             }
         }
-        if ( in->state != PROBELED_ROUGH ) {
-            frame->haveLast = true;
-            frame->lastAlong = in->along;
-            frame->lastAcrossMm = in->acrossMm;
-            frame->lastTimeS = frame->timeS;
-        }
+        frame->haveLast = true;
+        frame->lastAlong = in->along;
+        frame->lastAcrossMm = in->acrossMm;
+        frame->lastTimeS = frame->timeS;
 
         // Where the point itself is, when that is somewhere else: a tail from
         // the cursor back toward it for tailLength of the way, brightest at
@@ -502,7 +489,7 @@ void probeLedRender( const LedLayout* layout, const ProbeLedInput* in, const Pro
         // cursor's colour, fading to the tail hue at its far end. A step
         // every half row, so a long tail is a line (twelve steps over twenty
         // rows were beads; the review, 2026-09-26).
-        if ( in->haveUnder && in->state != PROBELED_ROUGH && style->tailLength > 0.0f ) {
+        if ( in->haveUnder && style->tailLength > 0.0f ) {
             float dAlong = ( in->underAlong - in->along ) * style->tailLength, dAcross = ( in->underAcrossMm - in->acrossMm ) * style->tailLength;
             float length = sqrtf( dAlong * dAlong + dAcross * dAcross / ( PITCH_MM * PITCH_MM ) ); // in rows
             int steps = (int)( length * 2.0f ) + 1;
@@ -517,7 +504,7 @@ void probeLedRender( const LedLayout* layout, const ProbeLedInput* in, const Pro
                 blendColour( &sr, r, tr, f );
                 blendColour( &sg, g, tg, f );
                 blendColour( &sb, b, tb, f );
-                splat( layout, frame, in->along + f * dAlong, in->acrossMm + f * dAcross, style->minSigmaRows, style->minSigmaAcrossMm, peak * fade, 0.0f, 0.0f, style->minSigmaRows,
+                splat( layout, frame, in->along + f * dAlong, in->acrossMm + f * dAcross, style->minSigmaRows, style->minSigmaAcrossMm, peak * fade, 0.0f, style->minSigmaRows,
                        style->minSigmaAcrossMm, PROBELED_MAX_SIGMA_ROWS, PROBELED_MAX_SIGMA_ACROSS_MM, sr, sg, sb );
             }
         }
@@ -573,7 +560,7 @@ void probeLedRender( const LedLayout* layout, const ProbeLedInput* in, const Pro
     // so no two twinkle quite alike; the decay below turns each flash into
     // a twinkle.
     if ( style->sparkle > 0.0f && in->state != PROBELED_NONE && !asBrush ) {
-        float byData = in->state == PROBELED_ROUGH || style->sparkleBy == PROBELED_DATA_NONE ? 1.0f : PROBELED_SPARKLE_FLOOR + ( 1.0f - PROBELED_SPARKLE_FLOOR ) * dataOf( style, in, style->sparkleBy );
+        float byData = style->sparkleBy == PROBELED_DATA_NONE ? 1.0f : PROBELED_SPARKLE_FLOOR + ( 1.0f - PROBELED_SPARKLE_FLOOR ) * dataOf( style, in, style->sparkleBy );
         uint32_t odds = (uint32_t)( style->sparkle * byData * 0.03f * 4294967296.0f );
         for ( int i = 0; i < layout->count; i++ ) {
             if ( frame->target[ i ] < 0.02f )

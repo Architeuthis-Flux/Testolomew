@@ -46,7 +46,7 @@
 #define MAGFIT_COARSE_STEP_MM 25.0f
 #define MAGFIT_COARSE_MARGIN_MM 45.0f
 #define MAGFIT_COARSE_Z_MIN_MM 4.0f
-#define MAGFIT_COARSE_Z_MAX_MM 110.0f
+#define MAGFIT_COARSE_Z_MAX_MM 150.0f // (110 until 2026-09-27: a probe first seen higher was never found by a cold start, and the bench's ~11600 mT*mm^3 magnet is present to 100 mm and more; as high as MAGFIT_Z_MAX, two more layers of the lattice)
 #define MAGFIT_COARSE_FINAL_MM 3.0f
 // A cold start refined from the lattice's best point that fits this well
 // (as a fraction of the misfit limit, in cost) is taken; worse, and the old

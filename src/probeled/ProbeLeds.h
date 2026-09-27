@@ -5,7 +5,9 @@
 // The probe's cursor on the breadboard's own LEDs: a soft spot of light that
 // follows the probe and shows, by its size and brightness, how sure the
 // tracker is. Sharp fix over a hole: one bright LED and its neighbours barely
-// lit. Rough fix from far away: a wide dim glow. Nothing: dark.
+// lit. A far fix: the same spot, as wide as its error bar (held at a
+// limit), in the same colours - one colours/height mapping for everything
+// (2026-09-27; a dim purple glow of its own until then). Nothing: dark.
 //
 // The renderer knows nothing about pixel wiring. A LedLayout is a table of
 // where every LED sits in BREADBOARD terms - along (in rows, 1..30, the same
@@ -132,7 +134,7 @@ int ledLayoutV5RailPixel( const LedLayout* layout, int i );
 // What to draw.
 enum ProbeLedState {
     PROBELED_NONE,     // nothing to show
-    PROBELED_ROUGH,    // a far probe: wide dim glow
+    PROBELED_ROUGH,    // a far probe (drawn like any other since 2026-09-27; the state is for the stream and the screen)
     PROBELED_COASTING, // carried on through a gap: as tracking, a little dimmer
     PROBELED_TRACKING
 };
@@ -151,7 +153,7 @@ struct ProbeLedInput {
 };
 
 enum ProbeLedScheme {
-    PROBELED_SCHEME_CLASSIC, // white on the board, blue lifted (touch/lift colours below), purple from afar
+    PROBELED_SCHEME_CLASSIC, // white on the board, blue lifted (touch/lift colours below)
     PROBELED_SCHEME_HEIGHT,  // hue by height: hueTurns of the wheel from the board to liftFullMm
     PROBELED_SCHEME_SURE,    // hue by how sure the row is: the wheel from a toss-up to certain
     PROBELED_SCHEME_AIM,     // hue by which way the probe leans (one turn of the wheel is the compass, whatever hueTurns says), white standing straight, all colour from PROBELED_AIM_FULL_DEG of lean
@@ -192,13 +194,14 @@ extern const char* const probeLedDataNames[ PROBELED_DATA_COUNT ];
 #define PROBELED_RING_STEP_ROWS 0.8f
 #define PROBELED_RING_REARM_S 0.1f
 // The bell is never wider than this (a far or lost probe's error bar is the
-// whole board), and its floor - the least a wide bell shows - fades out as
-// the bell widens, from all of it at twice the narrowest to nothing at the
-// widest: a probe pulled away shrinks into a soft, dimming patch, not a disc
-// over the board (2026-09-19). The bloom's halo widens the same limits.
+// whole board): held at it, a far probe is a broad patch - at the peak with
+// fullPeak - that the chain's current budget dims as a whole. (Until
+// 2026-09-27 the floor faded out with the width and a far fix had a dim
+// purple glow of its own; Kevin: "make the rough above brighter ... a
+// single colours / height mapping for everything".) The bloom's halo
+// widens the same limits.
 #define PROBELED_MAX_SIGMA_ROWS 3.0f
 #define PROBELED_MAX_SIGMA_ACROSS_MM 7.0f
-#define PROBELED_ROUGH_LEAST 0.03f // the far probe's glow never fades below this: a faint "about here"
 #define PROBELED_TOUCH_MM 2.0f     // the point is "on the board" below this (as the paint's touch, 2026-09-19)
 #define PROBELED_SWEEP_S 0.25f     // a cursor seen this recently is swept to the new one (a fast hand's refused frames are a few; a cold start across the board is a jump)
 #define PROBELED_SWEEP_TAIL 0.6f   // the sweep's old end, as a fraction of the head (it was lit last frame, and has decayed since: a comet)
@@ -208,7 +211,6 @@ extern const char* const probeLedDataNames[ PROBELED_DATA_COUNT ];
 struct ProbeLedStyle {
     uint8_t touchR, touchG, touchB; // cursor colour with the point on the board (classic scheme; white)
     uint8_t liftR, liftG, liftB;    // ...and lifted well above it (blended by height)
-    uint8_t roughR, roughG, roughB; // the far-probe glow
     float tailHueDeg;               // the tail's colour at its far end, in pointed mode (its near end is the cursor's)
     float tailLength;               // how far back toward the point the tail runs, as a fraction of the way (1 = to the point)
     float tailBright;               // the tail's near end, as a fraction of the cursor's peak
