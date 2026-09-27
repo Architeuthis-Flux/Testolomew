@@ -213,8 +213,10 @@ struct ProbeLedStyle {
     float tailLength;               // how far back toward the point the tail runs, as a fraction of the way (1 = to the point)
     float tailBright;               // the tail's near end, as a fraction of the cursor's peak
     float peak;                     // brightest any LED gets, 0..1
-    float minSigmaRows;             // the bell is never narrower than this (one hole lights, neighbours faint)
+    float minSigmaRows;             // the bell is never narrower than this (one hole lights, neighbours faint)...
     float minSigmaAcrossMm;
+    float spot;         // ...times this (the menu's "spot": the size of the spot itself, 1 = one hole)...
+    float spotByHeight; // ...and this much wider again at the height scale, growing with the point's lift (the menu's "spot by height": 0 = the same size at any height, 2 = three times as wide at liftFullMm - a flashlight's cone, the peak kept)
     float liftFullMm;      // the height scale: where the height's wheel ends (and classic's colour is all "lift"), mm
     float attackS, decayS; // per-LED smoothing time constants
     // The looks.

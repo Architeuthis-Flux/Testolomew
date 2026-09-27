@@ -571,6 +571,46 @@ void test_a_moving_cursor_sweeps_the_rows_between( void ) {
     TEST_ASSERT_TRUE( frame.target[ find( &v6, 17, 3 ) ] < 0.02f );
 }
 
+// The spot's size: "spot" scales the narrowest bell, and "spot by height"
+// widens it as the point lifts - a flashlight's cone, the peak kept (Kevin,
+// 2026-09-26: "we should be able to adjust spot size by height"). At 0 the
+// height does nothing, as before.
+void test_spot_widens_with_height( void ) {
+    style.fullPeak = true;
+    ProbeLedInput low = at( 14.0f, 6.35f, 0.05f, 0.2f );
+    low.heightMm = 0.0f;
+    probeLedRender( &v6, &low, &style, 1.0f, &frame );
+    int litLow = 0;
+    for ( int i = 0; i < frame.count; i++ )
+        litLow += frame.target[ i ] > 0.1f;
+    ProbeLedInput high = low;
+    high.heightMm = style.liftFullMm;
+    probeLedRender( &v6, &high, &style, 1.0f, &frame );
+    int litHigh = 0;
+    for ( int i = 0; i < frame.count; i++ )
+        litHigh += frame.target[ i ] > 0.1f;
+    TEST_ASSERT_EQUAL( litLow, litHigh ); // the lever at 0: the height changes nothing
+    style.spotByHeight = 2.0f;           // three times as wide at the height scale
+    probeLedRender( &v6, &high, &style, 1.0f, &frame );
+    litHigh = 0;
+    for ( int i = 0; i < frame.count; i++ )
+        litHigh += frame.target[ i ] > 0.1f;
+    TEST_ASSERT_TRUE( litHigh > 3 * litLow );
+    TEST_ASSERT_FLOAT_WITHIN( 0.02f, style.peak, frame.target[ brightest( &frame ) ] ); // still at the peak: a wider spot, not a dimmer one
+    probeLedRender( &v6, &low, &style, 1.0f, &frame ); // on the board: the narrow spot again
+    int litBack = 0;
+    for ( int i = 0; i < frame.count; i++ )
+        litBack += frame.target[ i ] > 0.1f;
+    TEST_ASSERT_EQUAL( litLow, litBack );
+    style.spotByHeight = 0.0f;
+    style.spot = 2.0f; // the base size itself
+    probeLedRender( &v6, &low, &style, 1.0f, &frame );
+    int litBig = 0;
+    for ( int i = 0; i < frame.count; i++ )
+        litBig += frame.target[ i ] > 0.1f;
+    TEST_ASSERT_TRUE( litBig > litLow );
+}
+
 int main( int argc, char** argv ) {
     (void)argc;
     (void)argv;
@@ -589,5 +629,6 @@ int main( int argc, char** argv ) {
     RUN_TEST( test_pointed_tail_points_back_at_the_tip );
     RUN_TEST( test_leds_fade_rather_than_snap );
     RUN_TEST( test_a_moving_cursor_sweeps_the_rows_between );
+    RUN_TEST( test_spot_widens_with_height );
     return UNITY_END( );
 }

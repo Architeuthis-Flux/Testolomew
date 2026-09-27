@@ -244,6 +244,8 @@ void settingsMenuBuild( Menu* m ) {
     menuAddNumber( m, leds, "strip", &probeLeds.stripBrightness, 0.02f, 1.0f, 0.02f, "" );
     menuAddNumber( m, leds, "budget mA", &probeLeds.stripMaxMa, 100.0f, PROBELED_STRIP_HARD_MAX_MA, 100.0f, "" ); // the ceiling is the most it can be
     menuAddToggle( m, leds, "full peak", &probeLeds.style.fullPeak );
+    menuAddNumber( m, leds, "spot", &probeLeds.style.spot, 0.5f, 4.0f, 0.1f, "" );             // the spot's size, 1 = one hole
+    menuAddNumber( m, leds, "spot by height", &probeLeds.style.spotByHeight, 0.0f, 4.0f, 0.25f, "" ); // ...and how much wider at the height scale
     menuAddNumber( m, leds, "bloom", &probeLeds.style.bloom, 0.0f, 1.0f, 0.1f, "" );
     menuAddNumber( m, leds, "sparkle", &probeLeds.style.sparkle, 0.0f, 1.0f, 0.1f, "" );
     menuAddNumber( m, leds, "pulse", &probeLeds.style.pulse, 0.0f, 1.0f, 0.1f, "" );

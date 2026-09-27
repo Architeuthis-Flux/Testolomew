@@ -75,6 +75,8 @@ The smoothing defaults were set on the bench (`tools/hostsim/pencil.cpp`): a han
 | strip | `stripBrightness` - a lever on everything sent to the chain | 1.0 |
 | budget mA | the per-frame current budget: a frame that would draw more (12 mA per colour channel at full, an assumption) is dimmed whole, every LED by the same factor; never above the compile-time ceiling `PROBELED_STRIP_HARD_MAX_MA` = 800 | 600 |
 | full peak | the widest bell still keeps one LED at the peak (up to twice the narrowest width; wider, the peak fades with the width - see §4) | on |
+| spot | the size of the spot itself: the narrowest bell (one hole lit, its neighbours faint) times this (2026-09-26) | 1.0 |
+| spot by height | how much wider the spot grows as the point lifts: at the colours page's `height scale` it is (1 + this) times the size above - a flashlight's cone, the peak kept (0 = the same size at any height; 2 = three times as wide at 15 mm). The sweep and the bloom grow with it; the tail does not | 0 |
 | bloom | a halo three times as wide as the cursor at 0.3 x this | 0 |
 | sparkle | random near-white flashes in the glow; what the density follows is the colours page's `sparkle by` (the height by default: few on the board, all of it lifted) | 0 |
 | pulse | breathing of the peak | 0 |

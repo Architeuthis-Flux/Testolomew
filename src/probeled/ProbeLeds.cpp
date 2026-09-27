@@ -160,6 +160,8 @@ void probeLedDefaultStyle( ProbeLedStyle* s ) {
     s->peak = 1.0f;
     s->minSigmaRows = 0.33f;
     s->minSigmaAcrossMm = 0.9f;
+    s->spot = 1.0f;
+    s->spotByHeight = 0.0f;
     s->liftFullMm = 15.0f;
     s->attackS = 0.02f;
     s->decayS = 0.12f;
@@ -452,14 +454,20 @@ void probeLedRender( const LedLayout* layout, const ProbeLedInput* in, const Pro
         // a breadboard's 5 V rail (a V5 browned out on 2026-09-18), and it
         // is meant to be a faint "about here", not a floodlight.
         float floor = style->fullPeak && in->state != PROBELED_ROUGH ? peak : ( in->state == PROBELED_ROUGH ? 0.12f : 0.08f );
-        float shown = splat( layout, frame, in->along, in->acrossMm, in->sigmaRows, in->sigmaAcrossMm, peak, floor, in->state == PROBELED_ROUGH ? PROBELED_ROUGH_LEAST : 0.0f,
-                             style->minSigmaRows, style->minSigmaAcrossMm, PROBELED_MAX_SIGMA_ROWS, PROBELED_MAX_SIGMA_ACROSS_MM, r, g, b );
+        // The spot's size: the narrowest bell times "spot", and wider again
+        // with the point's lift by "spot by height" (a cone; the floor above
+        // keeps the peak, so it is a wider spot and not a dimmer one).
+        float lift = style->liftFullMm > 0.0f ? clamp01( in->heightMm / style->liftFullMm ) : 0.0f;
+        float grow = ( style->spot > 0.0f ? style->spot : 1.0f ) * ( 1.0f + style->spotByHeight * lift );
+        float minRows = style->minSigmaRows * grow, minAcross = style->minSigmaAcrossMm * grow;
+        float shown = splat( layout, frame, in->along, in->acrossMm, in->sigmaRows, in->sigmaAcrossMm, peak, floor, in->state == PROBELED_ROUGH ? PROBELED_ROUGH_LEAST : 0.0f, minRows,
+                             minAcross, PROBELED_MAX_SIGMA_ROWS, PROBELED_MAX_SIGMA_ACROSS_MM, r, g, b );
         if ( style->bloom > 0.0f ) {
             // The halo: three times as wide, a fraction as bright, the same
             // colour; the max rule in splat() keeps it under the cursor.
             float wide = 3.0f;
-            splat( layout, frame, in->along, in->acrossMm, in->sigmaRows * wide, in->sigmaAcrossMm * wide, 0.3f * style->bloom * peak, 0.0f, 0.0f,
-                   style->minSigmaRows * wide, style->minSigmaAcrossMm * wide, PROBELED_MAX_SIGMA_ROWS * wide, PROBELED_MAX_SIGMA_ACROSS_MM * wide, r, g, b );
+            splat( layout, frame, in->along, in->acrossMm, in->sigmaRows * wide, in->sigmaAcrossMm * wide, 0.3f * style->bloom * peak, 0.0f, 0.0f, minRows * wide, minAcross * wide,
+                   PROBELED_MAX_SIGMA_ROWS * wide, PROBELED_MAX_SIGMA_ACROSS_MM * wide, r, g, b );
         }
 
         // The sweep: from where the cursor was last frame to where it is, at
@@ -476,8 +484,8 @@ void probeLedRender( const LedLayout* layout, const ProbeLedInput* in, const Pro
             for ( int k = 1; k < steps; k++ ) {
                 float f = (float)k / ( steps - 1 ); // 0 at the head, 1 at the old end
                 float fade = 1.0f - ( 1.0f - PROBELED_SWEEP_TAIL ) * f;
-                splat( layout, frame, in->along + f * dAlong, in->acrossMm + f * dAcross, in->sigmaRows, in->sigmaAcrossMm, peak * fade, floor * fade, 0.0f, style->minSigmaRows,
-                       style->minSigmaAcrossMm, PROBELED_MAX_SIGMA_ROWS, PROBELED_MAX_SIGMA_ACROSS_MM, r, g, b );
+                splat( layout, frame, in->along + f * dAlong, in->acrossMm + f * dAcross, in->sigmaRows, in->sigmaAcrossMm, peak * fade, floor * fade, 0.0f, minRows, minAcross,
+                       PROBELED_MAX_SIGMA_ROWS, PROBELED_MAX_SIGMA_ACROSS_MM, r, g, b );
             }
         }
         if ( in->state != PROBELED_ROUGH ) {
