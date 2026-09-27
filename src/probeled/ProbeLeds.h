@@ -24,6 +24,13 @@
 // so the two are never confused (2026-09-26: it ran the whole way from
 // under the tip, and was too long).
 //
+// A moving cursor is swept from where it was last frame to where it is
+// (half-row steps, full at the head, PROBELED_SWEEP_TAIL of it at the old
+// end): a hand at writing speed moves a row and a half a frame, and the
+// bell alone left the LED between two frames' cursors at 6 %, a dotted
+// line ("gaps in the LEDs", 2026-09-26). Only from a cursor seen within
+// PROBELED_SWEEP_S: a jump after a pause is a jump, not a stroke.
+//
 // Per-LED smoothing (fast attack, slower decay) leaves a short comet's tail
 // behind a moving cursor and keeps the picture calm; the tracker's 1-Euro
 // filter has already removed the jitter. A longer decay ("fade") is a
@@ -193,6 +200,8 @@ extern const char* const probeLedDataNames[ PROBELED_DATA_COUNT ];
 #define PROBELED_MAX_SIGMA_ACROSS_MM 7.0f
 #define PROBELED_ROUGH_LEAST 0.03f // the far probe's glow never fades below this: a faint "about here"
 #define PROBELED_TOUCH_MM 2.0f     // the point is "on the board" below this (as the paint's touch, 2026-09-19)
+#define PROBELED_SWEEP_S 0.25f     // a cursor seen this recently is swept to the new one (a fast hand's refused frames are a few; a cold start across the board is a jump)
+#define PROBELED_SWEEP_TAIL 0.6f   // the sweep's old end, as a fraction of the head (it was lit last frame, and has decayed since: a comet)
 #define PROBELED_LIFTED_MM 5.0f    // ...and was "off it" above this (a ring needs the one after the other)
 
 // Colours, linear 0..255 per channel (gamma is applied on output).
@@ -239,6 +248,8 @@ struct ProbeLedFrame {
     float ringAlong, ringAcrossMm;
     int ringHole; // the LED the point was over at the last ring (-1 = none): moving on to another, still down, rings again
     uint8_t ringLit[ PROBELED_MAX ]; // 1 where the ring lit the LED: it goes dark at the ring's own pace, not the cursor's decay
+    bool haveLast; // the cursor last frame (a tracked or coasting one), for the sweep
+    float lastAlong, lastAcrossMm, lastTimeS;
 };
 
 // Hue (0..360) at full saturation to linear RGB.

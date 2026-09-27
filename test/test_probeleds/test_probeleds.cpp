@@ -540,6 +540,37 @@ void test_leds_fade_rather_than_snap( void ) {
     TEST_ASSERT_TRUE( frame.level[ nowAt ] > 0.98f );
 }
 
+// A hand at writing speed moves a row and a half a frame (200 mm/s at 50
+// Hz): the bell alone left the LED between two frames' cursors at 6 %, a
+// dotted line ("gaps in the LEDs", Kevin, 2026-09-26). The cursor is swept
+// from where it was to where it is, so a move is a stroke; a jump after a
+// pause is a jump, and a cursor that has just appeared starts where it is.
+void test_a_moving_cursor_sweeps_the_rows_between( void ) {
+    ProbeLedInput a = at( 10.0f, 6.35f, 0.05f, 0.2f );
+    probeLedRender( &v6, &a, &style, 1.0f, &frame );
+    ProbeLedInput b = at( 11.6f, 6.35f, 0.05f, 0.2f );
+    probeLedRender( &v6, &b, &style, 0.02f, &frame );
+    ProbeLedInput c = at( 13.2f, 6.35f, 0.05f, 0.2f );
+    probeLedRender( &v6, &c, &style, 0.02f, &frame );
+    int passed = find( &v6, 12, 3 ), head = find( &v6, 13, 3 ), before = find( &v6, 11, 3 );
+    TEST_ASSERT_TRUE( frame.target[ head ] > 0.5f );
+    TEST_ASSERT_TRUE( frame.target[ passed ] > 0.3f );                  // the row the cursor passed over this frame is lit...
+    TEST_ASSERT_TRUE( frame.target[ passed ] < frame.target[ head ] );  // ...a little less than the head: a comet, not a bar
+    TEST_ASSERT_TRUE( frame.target[ before ] < frame.target[ passed ] ); // the last frame's stretch is not drawn again (it fades)
+    // A jump after a pause is not a stroke...
+    probeLedClear( &frame, v6.count );
+    probeLedRender( &v6, &a, &style, 1.0f, &frame );
+    ProbeLedInput far = at( 25.0f, 6.35f, 0.05f, 0.2f );
+    probeLedRender( &v6, &far, &style, 0.5f, &frame );
+    TEST_ASSERT_TRUE( frame.target[ find( &v6, 17, 3 ) ] < 0.02f );
+    // ...nor is where a cursor first appears.
+    probeLedClear( &frame, v6.count );
+    ProbeLedInput none = { };
+    probeLedRender( &v6, &none, &style, 1.0f, &frame );
+    probeLedRender( &v6, &far, &style, 0.02f, &frame );
+    TEST_ASSERT_TRUE( frame.target[ find( &v6, 17, 3 ) ] < 0.02f );
+}
+
 int main( int argc, char** argv ) {
     (void)argc;
     (void)argv;
@@ -557,5 +588,6 @@ int main( int argc, char** argv ) {
     RUN_TEST( test_far_probe_glows_purple );
     RUN_TEST( test_pointed_tail_points_back_at_the_tip );
     RUN_TEST( test_leds_fade_rather_than_snap );
+    RUN_TEST( test_a_moving_cursor_sweeps_the_rows_between );
     return UNITY_END( );
 }

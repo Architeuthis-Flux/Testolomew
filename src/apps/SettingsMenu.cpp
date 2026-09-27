@@ -218,7 +218,7 @@ void settingsMenuBuild( Menu* m ) {
     menuAddNumber( m, tracking, "shaft beta", &magLocator.track.shaftBeta, 0.0f, 10.0f, 0.25f, "" );
     menuAddNumber( m, tracking, "floor", &magLocator.track.sigmaFloorMm, 0.1f, 3.0f, 0.1f, "mm" );
     menuAddNumber( m, tracking, "gate", &magLocator.track.gate, 2.0f, 8.0f, 0.5f, "sd" ); // (to 10 until 2026-09-25: the drop line is 11.3, past 8 the soft zone is nothing)
-    menuAddNumber( m, tracking, "presence", &magLocator.presentMt, 0.04f, 0.20f, 0.01f, "mT" ); // (from 0.02 until 2026-09-25: under the TMAGs' plain level, 0.04, presence needs two of them plainly anyway - the lever did nothing there with the MMC out)
+    menuAddNumber( m, tracking, "presence", &magLocator.presentMt, 0.02f, 0.20f, 0.01f, "mT" ); // (0.04-0.20 on 2026-09-25: below the TMAGs' plain level the lever did nothing, presence needing two of them at 0.04 anyway; since 2026-09-26 the two TMAGs are asked for the lever's level, so below 0.04 it reaches further out - as far as the zeros' drift allows)
     menuAddNumber( m, tracking, "fit chi", &magLocator.fitMaxChi, 1.0f, 6.0f, 0.5f, "" );
     menuAddNumber( m, tracking, "far hold", &magLocator.track.roughHoldS, 0.5f, 10.0f, 0.5f, "s" );
     int fitLoad = menuAddToggle( m, tracking, "fit load", &magLocator.steadyFit ); // steady: the same work every frame (the supply shows bursts)

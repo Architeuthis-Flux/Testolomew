@@ -64,7 +64,7 @@
 // however little it reads - "almost nothing here" pins a magnet down too - and
 // what decides whether the answer is any good is its error bar.) So a weak
 // magnet close to two sensors, with its neighbours down at 0.02 mT, locks.
-#define MAGLOC_PRESENT_MT 0.04f // the menu's "presence" lever starts here
+#define MAGLOC_PRESENT_MT 0.04f // the menu's "presence" lever starts here (0.02-0.20); its corroboration - two TMAGs reading plainly - is at the lever too, below MAGLOC_SEEN_MT, so a strong magnet can be met further out where the zeros allow it (2026-09-26; the absent run's toggles say whether they do)
 #define MAGLOC_PRESENT_LOW 0.5f // ...and once present it stays so down to this fraction of it (hysteresis) - while a fix has been made in the last MAGLOC_PRESENT_HOLD_MS; with nothing fitting, presence needs the full level again (2026-09-22: a TMAG's 0.028 mT zero error after a boot held presence on at the half level for minutes, and the lattice ran twice a second for nothing)
 #define MAGLOC_PRESENT_HOLD_MS 2000
 // Presence takes the MMC56x3's word, or two TMAG5273s': no probe can be seen
@@ -172,6 +172,13 @@
 // chi; the next slice's does not.
 #define MAGLOC_COLD_RETRY_MS 400
 #define MAGLOC_MAX_ERROR_MM 30.0f
+// With the tracker OFF there is no track to start the next fit from: a
+// refused fit keeps its own answer as the start for this many frames running
+// before the cold start (the tracker's coast does this with it on). A fast
+// hand's frame (the sensors read round-robin over it) fails the chi; the cold
+// start's slices and its retry hold-off were then a half-second gap on the
+// LEDs on every fast approach (2026-09-26, the bench with the tracker off).
+#define MAGLOC_RAW_WARM_FRAMES 10
 
 // The probe's magnet strength, mT*mm^3, that the fit starts out holding
 // (held, the height noise about halves - magFitSolveKnownStrength - and far

@@ -775,7 +775,8 @@ void MagLocator::assessFrame( FrameScratch& f ) {
     fix.seenBy = 0;
     fix.faintBy = 0;
     bool haveMmc = false, mmcPresent = false;
-    int tmagPlain = 0; // TMAGs reading plainly (the unscaled level): what corroborates presence
+    int tmagPlain = 0; // TMAGs reading plainly (the unscaled level, or the presence lever below it): what corroborates presence
+    float corroborateMt = presentMt < MAGLOC_SEEN_MT ? presentMt : MAGLOC_SEEN_MT;
     int tmagPlainLow = 0; // ...and at three quarters of it: what keeps presence on once it is (a zero followed out does not flicker it on its way down)
     int tmagSeen = 0;
     bool peakHeld = false;
@@ -821,11 +822,13 @@ void MagLocator::assessFrame( FrameScratch& f ) {
         float plainLevel = magSensorPlaces[ i ].type == MAG_MMC56X3 ? MAGLOC_SEEN_ABSORB_LEVEL : MAGLOC_SEEN_MT; // plainly is the HIGH bar, not scaled: the strength is learned and the absorb judged only on strong readings (scaled, the learning fired at the array's end where the calibration errors bias it most, 2026-09-23)
         if ( levelSq > plainLevel * plainLevel ) {
             f.plain++;
-            if ( magSensorPlaces[ i ].type != MAG_MMC56X3 )
-                tmagPlain++;
         }
-        if ( magSensorPlaces[ i ].type != MAG_MMC56X3 && levelSq > 0.75f * 0.75f * plainLevel * plainLevel )
-            tmagPlainLow++;
+        if ( magSensorPlaces[ i ].type != MAG_MMC56X3 ) {
+            if ( levelSq > corroborateMt * corroborateMt )
+                tmagPlain++;
+            if ( levelSq > 0.75f * 0.75f * corroborateMt * corroborateMt )
+                tmagPlainLow++;
+        }
         if ( magSensorPlaces[ i ].type == MAG_MMC56X3 ) {
             haveMmc = true;
             if ( levelSq > presentMt * presentMt )
@@ -1139,7 +1142,10 @@ ServiceStatus MagLocator::runFit( MagTrackInput* in, FrameScratch& f ) {
     if ( f.good ) {
         lastFixMs = millis( ) == 0 ? 1 : millis( );
     }
-    result.valid = f.good; // the fit's own memory: its answer; without one, the track's (above)
+    // The fit's own memory: its answer; without one, the track's (above) -
+    // and with no track, a CONVERGED answer the acceptance refused still,
+    // for MAGLOC_RAW_WARM_FRAMES (never a solver's unfinished iterate).
+    result.valid = f.good || ( solved && !track.enabled && wasTracking && missRun <= MAGLOC_RAW_WARM_FRAMES );
     if ( f.good ) {
         freeWarmRun = 0;
     }

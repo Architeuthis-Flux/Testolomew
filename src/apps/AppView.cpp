@@ -47,8 +47,8 @@
 #define COLOR_SOUTH RGB565( 60, 110, 255 )
 #define COLOR_SHADOW RGB565( 240, 200, 40 )
 #define COLOR_TIP RGB565( 255, 255, 255 )
-#define COLOR_TEXT RGB565( 220, 220, 220 )
-#define COLOR_TEXT_DIM RGB565( 120, 120, 120 )
+#define COLOR_TEXT RGB565( 240, 240, 240 )     // (220 / 120 until 2026-09-26: "2 shades of gray lighter")
+#define COLOR_TEXT_DIM RGB565( 160, 160, 160 )
 #define COLOR_WARNING RGB565( 255, 140, 0 )
 #define COLOR_ERROR RGB565( 200, 80, 200 )
 #define COLOR_ROW RGB565( 40, 50, 40 )
@@ -427,7 +427,10 @@ static void drawMagnet( ) {
 }
 
 // Text is drawn at UI_TEXT (2: 12 x 16 px characters, 20 to a line on
-// this panel), the counted row at twice that. Every line is written to fit.
+// this panel), the counted row at twice that, and the figures - the
+// magnet's x y z with its bar, the two lines at the bottom - at half that
+// (6 x 8; 2026-09-26: "a bit smaller"), with the point's height above the
+// surface at the top right in the large size. Every line is written to fit.
 static void textAt( GFXcanvas16* canvas, int x, int y, int size, uint16_t color, const char* text ) {
     fastText( canvas, x, y, size, color, text );
 }
@@ -435,14 +438,23 @@ static void textAt( GFXcanvas16* canvas, int x, int y, int size, uint16_t color,
 static void drawText( ) {
     const MagProbeFix& fix = magLocator.fix;
     char line[ 48 ];
-    const int T = UI_TEXT, H = UI_LINE_H;
+    const int T = UI_TEXT, H = UI_LINE_H, S = UI_TEXT / 2, SH = UI_LINE_H / 2; // S: the small size
 
+    const MagTrack& track = magLocator.track;
+    bool live = track.enabled ? track.state != MAGTRACK_NONE : fix.valid;
+    if ( live ) {
+        // The point's height above the surface (what the LEDs colour by), top right.
+        Vec3 tip = track.enabled ? track.tip : fix.tip;
+        float heightMm = tip.z - magLocator.boardZ;
+        snprintf( line, sizeof( line ), "%.1fmm", heightMm < 0.0f ? 0.0f : heightMm );
+        textAt( canvas, LCD_WIDTH - (int)strlen( line ) * UI_CHAR_W - 2, 2, T, COLOR_TEXT, line );
+    }
     if ( fix.valid ) {
         snprintf( line, sizeof( line ), "x%.1f y%.1f z%.1f", fix.magnet.x, fix.magnet.y, fix.magnet.z );
-        textAt( canvas, 2, 2, T, COLOR_TEXT, line );
+        textAt( canvas, 2, 2, S, COLOR_TEXT, line );
         snprintf( line, sizeof( line ), "+-%.1f %s%.0f %.0f%%%s", fix.errorMm, fix.rough ? "rough " : "tilt", fix.rough ? fix.errorMm : fix.tiltDeg, fix.misfit * 100.0f,
                   magLocator.knownStrength > 0.0f ? " =" : "" );
-        textAt( canvas, 2, 2 + H, T, COLOR_TEXT_DIM, line );
+        textAt( canvas, 2, 2 + SH, S, COLOR_TEXT_DIM, line );
 #if MODULE_ROW_COUNT
         // Row mode: the counted row, large, coloured by how sure the track (or
         // this fix) is of it; under it the offset, error bar and chance.
@@ -462,13 +474,12 @@ static void drawText( ) {
             textAt( canvas, 2, 2 + 4 * H + 6, T, COLOR_TEXT_DIM, line );
         }
 #endif
-    } else if ( magLocator.track.enabled && magLocator.track.state != MAGTRACK_NONE ) {
-        const MagTrack& track = magLocator.track;
+    } else if ( track.enabled && track.state != MAGTRACK_NONE ) {
         bool rough = track.state == MAGTRACK_ROUGH;
         snprintf( line, sizeof( line ), rough ? "about x%.0f y%.0f z%.0f" : "x%.1f y%.1f z%.1f", track.position.x, track.position.y, track.position.z );
-        textAt( canvas, 2, 2, T, rough ? COLOR_WARNING : COLOR_TEXT, line );
+        textAt( canvas, 2, 2, S, rough ? COLOR_WARNING : COLOR_TEXT, line );
         snprintf( line, sizeof( line ), "+-%.0f mm %s", track.sigma.x, rough ? "rough" : "coasting" );
-        textAt( canvas, 2, 2 + H, T, rough ? COLOR_WARNING : COLOR_TEXT_DIM, line );
+        textAt( canvas, 2, 2 + SH, S, rough ? COLOR_WARNING : COLOR_TEXT_DIM, line );
     } else {
         const char* one = nullptr;
         const char* two = nullptr;
@@ -518,18 +529,18 @@ static void drawText( ) {
     }
 #endif
 
-    // A simulated probe (:probe) is marked, so a screen shot says so.
+    // A simulated probe (:probe) is marked, so a screen shot says so (under the height).
     if ( magLocator.simProbeActive( ) ) {
-        textAt( canvas, LCD_WIDTH - 3 * UI_CHAR_W - 2, 2, T, COLOR_WARNING, "SIM" );
+        textAt( canvas, LCD_WIDTH - 3 * UI_CHAR_W - 2, 2 + H, T, COLOR_WARNING, "SIM" );
     }
     // Two lines at the bottom: the array and frame rate; the camera, the
     // track's state and the cursor mode.
     static const char* trackNames[ 4 ] = { "-", "rough", "coast", "track" };
     snprintf( line, sizeof( line ), "%d/%d sens %2.0ffps s%.1f", magArray.sensorsOk( ), magArray.sensorCount( ), display.fps( ), magLocator.boardZ ); // s = the surface's height
-    textAt( canvas, 2, LCD_HEIGHT - 2 * H - 2, T, COLOR_TEXT_DIM, line );
-    snprintf( line, sizeof( line ), "%s %s %s", cameraModeNames[ viewCamera.mode ], magLocator.track.enabled ? trackNames[ magLocator.track.state ] : "raw",
-              magLocator.track.cursorMode == MAGCURSOR_UNDER ? "under" : "aim" );
-    textAt( canvas, 2, LCD_HEIGHT - H - 2, T, COLOR_TEXT_DIM, line );
+    textAt( canvas, 2, LCD_HEIGHT - 2 * SH - 2, S, COLOR_TEXT_DIM, line );
+    snprintf( line, sizeof( line ), "%s %s %s", cameraModeNames[ viewCamera.mode ], track.enabled ? trackNames[ track.state ] : "raw",
+              track.cursorMode == MAGCURSOR_UNDER ? "under" : "aim" );
+    textAt( canvas, 2, LCD_HEIGHT - SH - 2, S, COLOR_TEXT_DIM, line );
 }
 
 

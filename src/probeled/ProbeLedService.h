@@ -37,6 +37,7 @@
 
 #define PROBELED_PERIOD_US 20000       // 50 Hz
 #define PROBELED_STREAM_EVERY 2        // stream at 25 Hz
+#define PROBELED_RAW_HOLD_MS 250       // with the tracker off, the last raw fix's cursor stays (as coasting) this long after a frame with no fix: a fast hand's refused frames were dark ones (2026-09-26)
 #define PROBELED_STRIP_BRIGHTNESS 1.0f // the menu's "strip" lever; 1 = the LEDs as bright as they go
 // The chain's current, kept under a budget: a frame that would draw more
 // than the budget is scaled down whole, so the picture keeps its shape and
@@ -82,6 +83,8 @@ class ProbeLedService : public Service {
     ProbeLedFrame frame;
     ProbeLedStyle style;
     ProbeLedInput input = { };
+    ProbeLedInput rawHeld = { }; // with the tracker off: the last live input, and when it was taken (PROBELED_RAW_HOLD_MS)
+    uint32_t rawHeldMs = 0;
     bool v5 = false; // which board the layout is for
     bool streaming = false;
     bool strip = false;            // a real LED chain is wired and driven

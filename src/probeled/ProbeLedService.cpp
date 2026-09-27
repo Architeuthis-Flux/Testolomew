@@ -326,6 +326,20 @@ ServiceStatus ProbeLedService::service( ) {
         in.confidence = 0.5f;
 #endif
     }
+    if ( !track.enabled ) {
+        // Raw fixes: the tracker's coast is not there to carry a refused
+        // frame, so the last cursor is held a moment (PROBELED_RAW_HOLD_MS),
+        // shown as coasting, rather than the LEDs going dark on it.
+        uint32_t nowMs = millis( );
+        if ( live ) {
+            rawHeld = in;
+            rawHeldMs = nowMs;
+        } else if ( rawHeld.state != PROBELED_NONE && nowMs - rawHeldMs < PROBELED_RAW_HOLD_MS ) {
+            in = rawHeld;
+            if ( in.state != PROBELED_ROUGH )
+                in.state = PROBELED_COASTING;
+        }
+    }
     input = in;
     uint32_t t0 = micros( );
 #if MODULE_PLAY

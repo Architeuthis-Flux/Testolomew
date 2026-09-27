@@ -193,6 +193,8 @@ void probeLedClear( ProbeLedFrame* frame, int count ) {
     for ( int i = 0; i < PROBELED_MAX; i++ )
         frame->ringLit[ i ] = 0;
     frame->ringAlong = frame->ringAcrossMm = 0.0f;
+    frame->haveLast = false;
+    frame->lastAlong = frame->lastAcrossMm = frame->lastTimeS = 0.0f;
 }
 
 static float clamp01( float v ) {
@@ -380,6 +382,8 @@ void probeLedRender( const LedLayout* layout, const ProbeLedInput* in, const Pro
         frame->target[ i ] = 0.0f;
     }
     bool asBrush = brush != nullptr && brush->active;
+    bool sweep = frame->haveLast && frame->timeS - frame->lastTimeS <= PROBELED_SWEEP_S;
+    frame->haveLast = false;
 
     // A touch ring starts when the point lands after having been lifted -
     // and, still down, when it moves on to another hole: a slide along the
@@ -456,6 +460,31 @@ void probeLedRender( const LedLayout* layout, const ProbeLedInput* in, const Pro
             float wide = 3.0f;
             splat( layout, frame, in->along, in->acrossMm, in->sigmaRows * wide, in->sigmaAcrossMm * wide, 0.3f * style->bloom * peak, 0.0f, 0.0f,
                    style->minSigmaRows * wide, style->minSigmaAcrossMm * wide, PROBELED_MAX_SIGMA_ROWS * wide, PROBELED_MAX_SIGMA_ACROSS_MM * wide, r, g, b );
+        }
+
+        // The sweep: from where the cursor was last frame to where it is, at
+        // half-row steps (the tail's pattern), the cursor's own width and
+        // colour, full at the head and PROBELED_SWEEP_TAIL of it at the old
+        // end - a stroke, not beads (PROBELED_SWEEP_S; the far glow is wide
+        // enough as it is).
+        if ( sweep && in->state != PROBELED_ROUGH ) {
+            float dAlong = frame->lastAlong - in->along, dAcross = frame->lastAcrossMm - in->acrossMm;
+            float length = sqrtf( dAlong * dAlong + dAcross * dAcross / ( PITCH_MM * PITCH_MM ) ); // in rows
+            int steps = (int)( length * 2.0f ) + 1;
+            if ( steps > 40 )
+                steps = 40;
+            for ( int k = 1; k < steps; k++ ) {
+                float f = (float)k / ( steps - 1 ); // 0 at the head, 1 at the old end
+                float fade = 1.0f - ( 1.0f - PROBELED_SWEEP_TAIL ) * f;
+                splat( layout, frame, in->along + f * dAlong, in->acrossMm + f * dAcross, in->sigmaRows, in->sigmaAcrossMm, peak * fade, floor * fade, 0.0f, style->minSigmaRows,
+                       style->minSigmaAcrossMm, PROBELED_MAX_SIGMA_ROWS, PROBELED_MAX_SIGMA_ACROSS_MM, r, g, b );
+            }
+        }
+        if ( in->state != PROBELED_ROUGH ) {
+            frame->haveLast = true;
+            frame->lastAlong = in->along;
+            frame->lastAcrossMm = in->acrossMm;
+            frame->lastTimeS = frame->timeS;
         }
 
         // Where the point itself is, when that is somewhere else: a tail from
