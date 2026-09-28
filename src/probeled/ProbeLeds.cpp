@@ -174,6 +174,7 @@ void probeLedDefaultStyle( ProbeLedStyle* s ) {
     s->sparkle = 0.0f;
     s->pulse = 0.0f;
     s->touchRing = false;
+    s->ringRepeat = false;
 }
 
 void probeLedClear( ProbeLedFrame* frame, int count ) {
@@ -396,7 +397,7 @@ void probeLedRender( const LedLayout* layout, const ProbeLedInput* in, const Pro
         }
         bool landed = down && frame->wasLifted;
         bool movedOn = false;
-        if ( down && !frame->wasLifted && hole >= 0 && hole != frame->ringHole ) {
+        if ( style->ringRepeat && down && !frame->wasLifted && hole >= 0 && hole != frame->ringHole ) {
             float da = along - frame->ringAlong, dc = ( acrossMm - frame->ringAcrossMm ) / PITCH_MM;
             bool far = frame->ringHole < 0 || da * da + dc * dc > PROBELED_RING_STEP_ROWS * PROBELED_RING_STEP_ROWS;
             bool rearmed = frame->ringAgeS < 0.0f || frame->ringAgeS > PROBELED_RING_REARM_S;

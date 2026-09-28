@@ -252,6 +252,7 @@ void settingsMenuBuild( Menu* m ) {
     menuAddNumber( m, leds, "pulse", &probeLeds.style.pulse, 0.0f, 1.0f, 0.1f, "" );
     menuAddNumber( m, leds, "fade", &probeLeds.style.decayS, 0.05f, 2.0f, 0.05f, "s" );
     menuAddToggle( m, leds, "touch ring", &probeLeds.style.touchRing );
+    menuAddToggle( m, leds, "ring repeat", &probeLeds.style.ringRepeat ); // ...again at every new hole while down
     menuAddToggle( m, leds, "V5 stream", &probeLeds.streaming );
 
     // The colours (2026-09-25): the scheme (what drives the hue), how the

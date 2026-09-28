@@ -233,7 +233,8 @@ struct ProbeLedStyle {
     float bloom;    // 0..1, a wide soft halo round the cursor
     float sparkle;  // 0..1, white twinkles in the glow
     float pulse;    // 0..1, how deeply the cursor breathes
-    bool touchRing; // a ring spreads from the cursor when the point lands
+    bool touchRing;  // a ring spreads from the cursor when the point lands...
+    bool ringRepeat; // ...and, if asked, again at every new hole it slides to while down (2026-09-27: it always did; Kevin: "make the touch ring thing not repeat")
 };
 
 void probeLedDefaultStyle( ProbeLedStyle* style );

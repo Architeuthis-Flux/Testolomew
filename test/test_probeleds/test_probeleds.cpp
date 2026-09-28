@@ -622,6 +622,31 @@ void test_spot_widens_with_height( void ) {
     TEST_ASSERT_TRUE( frame.target[ brightest( &frame ) ] <= style.peak + 0.001f );
 }
 
+// The touch ring rings when the point lands; sliding on to another hole
+// while down rings again only with "ring repeat" (2026-09-27: it always did).
+void test_touch_ring_repeats_only_when_asked( void ) {
+    style.touchRing = true;
+    ProbeLedInput lifted = at( 14.0f, 6.35f, 0.05f, 0.2f );
+    lifted.heightMm = 10.0f;
+    probeLedRender( &v6, &lifted, &style, 0.02f, &frame );
+    ProbeLedInput down = lifted;
+    down.heightMm = 0.0f;
+    probeLedRender( &v6, &down, &style, 0.02f, &frame );
+    TEST_ASSERT_TRUE( frame.ringAgeS >= 0.0f ); // landed: a ring
+    for ( int k = 0; k < 12; k++ )
+        probeLedRender( &v6, &down, &style, 0.02f, &frame ); // the ring over
+    TEST_ASSERT_TRUE( frame.ringAgeS < 0.0f );
+    ProbeLedInput slid = down;
+    slid.along = 16.0f;
+    probeLedRender( &v6, &slid, &style, 0.02f, &frame );
+    TEST_ASSERT_TRUE( frame.ringAgeS < 0.0f ); // slid two rows on, still down: no ring
+    style.ringRepeat = true;
+    ProbeLedInput slid2 = down;
+    slid2.along = 18.0f;
+    probeLedRender( &v6, &slid2, &style, 0.02f, &frame );
+    TEST_ASSERT_TRUE( frame.ringAgeS >= 0.0f ); // asked to: it rings again
+}
+
 int main( int argc, char** argv ) {
     (void)argc;
     (void)argv;
@@ -641,5 +666,6 @@ int main( int argc, char** argv ) {
     RUN_TEST( test_leds_fade_rather_than_snap );
     RUN_TEST( test_a_moving_cursor_sweeps_the_rows_between );
     RUN_TEST( test_spot_widens_with_height );
+    RUN_TEST( test_touch_ring_repeats_only_when_asked );
     return UNITY_END( );
 }

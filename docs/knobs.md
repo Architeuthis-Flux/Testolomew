@@ -82,7 +82,8 @@ The smoothing defaults were set on the bench (`tools/hostsim/pencil.cpp`): a han
 | sparkle | random near-white flashes in the glow; what the density follows is the colours page's `sparkle by` (the height by default: few on the board, all of it lifted) | 0 |
 | pulse | breathing of the peak | 0 |
 | fade | `decayS` - how long a lit LED takes to go dark (s); the attack is 20 ms. A moving cursor is also SWEPT from where it was last frame to where it is (half-row steps, full at the head, 0.6 at the old end; `PROBELED_SWEEP_S` 0.25: a cursor seen more than that ago is a jump, not a stroke) - a hand at writing speed moves a row and a half a frame, and the bell alone left the LED between at 6 %, a dotted line (2026-09-26). With the tracker off the last raw cursor is held 250 ms as "coasting" over a frame with no fix (`PROBELED_RAW_HOLD_MS`), and the fit keeps a refused answer as its next start for ten frames (`MAGLOC_RAW_WARM_FRAMES`) before a cold start | 0.12 |
-| touch ring | a ring runs out from the point when it lands, and again at every new hole it slides to while down | off |
+| touch ring | a ring runs out from the point when it lands | off |
+| ring repeat | ...and again at every new hole it slides to while down (2026-09-27: it always did) | off |
 | V5 stream *(mode)* | the cursor as CSV on the console for a V5 to follow (`L`) | off |
 
 ### colours
