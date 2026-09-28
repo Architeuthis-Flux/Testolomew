@@ -1257,18 +1257,7 @@ ServiceStatus MagLocator::publishFix( MagTrackInput* in, const FrameScratch& f )
     in->position = fix.rawMagnet;
     in->sigma = fix.sigma;
     in->shaft = fix.shaft;
-    in->haveShaft = true;
-    {
-        // A far fix's axis is noise, and the aim cursor would swing by its
-        // whole reach on it: the shaft handed in leans toward vertical by the
-        // fix's bar, continuously (MAGTRACK_FAR_BAR_MM) - straight up for a
-        // 12 mm bar, itself for a sharp one, and nothing steps between.
-        float farness = fix.errorMm / MAGTRACK_FAR_BAR_MM;
-        float trust = 1.0f / ( 1.0f + farness * farness );
-        Vec3 s = { fix.shaft.x * trust, fix.shaft.y * trust, fix.shaft.z * trust + ( 1.0f - trust ) };
-        float len = sqrtf( s.x * s.x + s.y * s.y + s.z * s.z );
-        in->shaft = len > 1e-3f ? Vec3 { s.x / len, s.y / len, s.z / len } : Vec3 { 0, 0, 1 };
-    }
+    in->haveShaft = true; // the shaft as the fit gives it, far or near: its own filter and its slowing with height take a far fix's noise (2026-09-28 afternoon: leaned toward vertical by the bar for three hours, which turned the aim cursor BACK under the tip as the probe rose - the "jump at 40 mm")
 
     Stream* out = console.port( );
     if ( streaming && out != nullptr && ++streamTick % STREAM_EVERY_N_FIXES == 0 ) {
