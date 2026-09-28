@@ -445,7 +445,7 @@ static void drawText( ) {
     if ( live ) {
         // The point's height above the surface (what the LEDs colour by), top right.
         float heightMm = track.heightMm; // through the height's own filter (2026-09-28)
-        snprintf( line, sizeof( line ), "%.1fmm", heightMm < 0.0f ? 0.0f : heightMm );
+        snprintf( line, sizeof( line ), "%.1fmm", heightMm ); // signed: a minus says the surface setting is too high (2026-09-28)
         textAt( canvas, LCD_WIDTH - (int)strlen( line ) * UI_CHAR_W - 2, 2, T, COLOR_TEXT, line );
     }
     if ( fix.valid ) {

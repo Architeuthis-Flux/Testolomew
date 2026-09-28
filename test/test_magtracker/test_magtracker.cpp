@@ -551,6 +551,15 @@ void test_height_has_its_own_filter( void ) {
         magTrackUpdate( &track, DT, &in );
         TEST_ASSERT_FLOAT_WITHIN( 0.001f, in.position.z - 17.5f, track.heightMm );
     }
+    // Below the believed surface the height is negative, smoothed or not
+    // (2026-09-28: it was clamped at 0; a minus says the surface is set too high).
+    MagTrackInput under = fixAt( { 20.0f, 20.0f, 15.0f }, 0.3f );
+    magTrackUpdate( &track, DT, &under );
+    TEST_ASSERT_FLOAT_WITHIN( 0.001f, -2.5f, track.heightMm );
+    track.smooth = true;
+    for ( int frame = 0; frame < 300; frame++ )
+        magTrackUpdate( &track, DT, &under );
+    TEST_ASSERT_FLOAT_WITHIN( 0.05f, -2.5f, track.heightMm );
 }
 
 int main( int argc, char** argv ) {

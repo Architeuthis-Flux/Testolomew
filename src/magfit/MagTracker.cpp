@@ -222,11 +222,10 @@ static void finishFrame( MagTrack* t, float dtS, bool roughHeld ) {
     // The filters slow with the point's height (MAGTRACK_HZ_HALF_MM, the
     // Hz; MAGTRACK_BETA_HALF_MM, the betas): a far fix is a noisy one, and
     // calm "about here" is what it should show.
-    float height = t->tip.z - t->surfaceZ;
-    if ( height < 0.0f )
-        height = 0.0f;
-    float kHz = t->hzHalfMm > 0.0f ? 1.0f / ( 1.0f + height / t->hzHalfMm ) : 1.0f;
-    float kBeta = t->betaHalfMm > 0.0f ? 1.0f / ( 1.0f + height / t->betaHalfMm ) : 1.0f;
+    float height = t->tip.z - t->surfaceZ; // negative below the believed surface (2026-09-28: it was clamped at 0; a minus says the surface setting is too high)
+    float lift = height > 0.0f ? height : 0.0f;
+    float kHz = t->hzHalfMm > 0.0f ? 1.0f / ( 1.0f + lift / t->hzHalfMm ) : 1.0f;
+    float kBeta = t->betaHalfMm > 0.0f ? 1.0f / ( 1.0f + lift / t->betaHalfMm ) : 1.0f;
     float cursorCutoff = t->oneEuroMinCutoff * kHz, cursorBeta = t->oneEuroBeta * kBeta;
     float viewCutoff = t->viewMinCutoff * kHz, viewBeta = t->viewBeta * kBeta;
     if ( !t->smooth ) {
@@ -245,8 +244,6 @@ static void finishFrame( MagTrack* t, float dtS, bool roughHeld ) {
     } else {
         // The height on its own levers (what the LEDs colour and size by).
         t->heightMm = oneEuro( &t->heightEuro, height, dtS, t->heightMinCutoff * kHz, t->heightBeta * kBeta );
-        if ( t->heightMm < 0.0f )
-            t->heightMm = 0.0f;
         t->cursor.x = oneEuro( &t->euro[ 0 ], t->rawCursor.x, dtS, cursorCutoff, cursorBeta );
         t->cursor.y = oneEuro( &t->euro[ 1 ], t->rawCursor.y, dtS, cursorCutoff, cursorBeta );
         t->cursor.z = t->rawCursor.z;

@@ -156,7 +156,7 @@ struct MagTrack {
     Vec3 rawCursor;      // before the 1-Euro filter
     Vec3 viewPosition;   // the magnet for the scene: the position through its own 1-Euro filter (viewMinCutoff, viewBeta)
     Vec3 viewTip;        // ...and the point from it
-    float heightMm;      // the point's height above the surface, through its own 1-Euro (heightMinCutoff, heightBeta); tip.z - surfaceZ is the raw one
+    float heightMm;      // the point's height above the surface, through its own 1-Euro (heightMinCutoff, heightBeta); tip.z - surfaceZ is the raw one; NEGATIVE below the believed surface (the surface setting is too high)
     float cursorSigmaMm; // about how far the cursor may be off, across the board
     float reachMm;       // how far the cursor sits from under the tip (0 in UNDER mode)
     uint32_t ageMs;      // since the last accepted proper fix

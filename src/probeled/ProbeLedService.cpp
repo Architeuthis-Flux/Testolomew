@@ -300,9 +300,7 @@ ServiceStatus ProbeLedService::service( ) {
         in.sigmaAcrossMm = rowGridSigmaAcross( &grid, barVec );
         in.confidence = rowGridConfidence( place, in.sigmaRows, in.sigmaAcrossMm );
         Vec3 tip = track.tip;
-        in.heightMm = track.heightMm; // through the height's own filter (2026-09-28)
-        if ( in.heightMm < 0.0f )
-            in.heightMm = 0.0f;
+        in.heightMm = track.heightMm; // through the height's own filter (2026-09-28); negative below the believed surface - the renderer clamps its own uses
         // The lean (for the aim scheme and the tilt data) and the speed.
         Vec3 shaft = track.shaft;
         in.tiltDeg = track.tiltDeg;
