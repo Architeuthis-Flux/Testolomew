@@ -280,16 +280,16 @@ ServiceStatus ProbeLedService::service( ) {
 
     const MagTrack& track = magLocator.track;
     ProbeLedInput in = { };
+    // The track, in both modes: with the tracker off it is this frame's fix
+    // passed straight through, and the cursor's 1-Euro filter (cursor Hz /
+    // beta, slowing with the height) applies either way (2026-09-27: raw
+    // mode read fix.pointer, and the levers did nothing there).
     bool live = track.enabled ? track.state != MAGTRACK_NONE : magLocator.fix.valid;
     if ( live ) {
-        Vec3 cursor = track.enabled ? track.cursor : magLocator.fix.pointer;
-        Vec3 sigma = track.enabled ? track.sigma : magLocator.fix.sigma;
-        float bar = track.enabled ? track.cursorSigmaMm : magLocator.fix.errorXyMm;
-        if ( !track.enabled ) {
-            in.state = magLocator.fix.rough ? PROBELED_ROUGH : PROBELED_TRACKING;
-        } else {
-            in.state = track.state == MAGTRACK_ROUGH ? PROBELED_ROUGH : ( track.state == MAGTRACK_COASTING ? PROBELED_COASTING : PROBELED_TRACKING );
-        }
+        Vec3 cursor = track.cursor;
+        Vec3 sigma = track.sigma;
+        float bar = track.cursorSigmaMm;
+        in.state = track.state == MAGTRACK_ROUGH ? PROBELED_ROUGH : ( track.state == MAGTRACK_COASTING ? PROBELED_COASTING : PROBELED_TRACKING );
         Vec3 barVec = { bar * 0.7071f, bar * 0.7071f, sigma.z };
 #if MODULE_ROW_COUNT
         const RowGrid& grid = rowCounter.grid;
@@ -299,18 +299,18 @@ ServiceStatus ProbeLedService::service( ) {
         in.sigmaRows = rowGridSigmaAlong( &grid, barVec );
         in.sigmaAcrossMm = rowGridSigmaAcross( &grid, barVec );
         in.confidence = rowGridConfidence( place, in.sigmaRows, in.sigmaAcrossMm );
-        Vec3 tip = track.enabled ? track.tip : magLocator.fix.tip;
+        Vec3 tip = track.tip;
         in.heightMm = tip.z - magLocator.boardZ;
         if ( in.heightMm < 0.0f )
             in.heightMm = 0.0f;
         // The lean (for the aim scheme and the tilt data) and the speed.
-        Vec3 shaft = track.enabled ? track.shaft : magLocator.fix.shaft;
-        in.tiltDeg = track.enabled ? track.tiltDeg : magLocator.fix.tiltDeg;
+        Vec3 shaft = track.shaft;
+        in.tiltDeg = track.tiltDeg;
         in.aimDeg = atan2f( shaft.y, shaft.x ) * ( 180.0f / (float)M_PI );
         if ( in.aimDeg < 0.0f )
             in.aimDeg += 360.0f;
-        in.speedMmS = track.enabled ? sqrtf( track.velocity.x * track.velocity.x + track.velocity.y * track.velocity.y + track.velocity.z * track.velocity.z ) : 0.0f;
-        if ( track.enabled && track.reachMm > 0.5f ) {
+        in.speedMmS = sqrtf( track.velocity.x * track.velocity.x + track.velocity.y * track.velocity.y + track.velocity.z * track.velocity.z ); // 0 with the tracker off
+        if ( track.reachMm > 0.5f ) {
             Vec3 under = { tip.x, tip.y, magLocator.boardZ };
             RowPlace u = rowGridPlace( &grid, under );
             in.haveUnder = true;

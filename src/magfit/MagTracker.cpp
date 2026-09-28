@@ -38,6 +38,7 @@ void magTrackInit( MagTrack* t, float surfaceZ, float tipOffsetMm ) {
     t->viewBeta = MAGTRACK_VIEW_BETA;
     t->shaftMinCutoff = MAGTRACK_SHAFT_MIN_CUTOFF;
     t->shaftBeta = MAGTRACK_SHAFT_BETA;
+    t->smoothHalfMm = MAGTRACK_SMOOTH_HALF_MM;
     t->roughHoldS = MAGTRACK_ROUGH_HOLD_S;
     magTrackReset( t );
 }
@@ -214,11 +215,12 @@ static void finishFrame( MagTrack* t, float dtS, bool roughHeld ) {
     t->tiltDeg = acosf( t->shaft.z > 1.0f ? 1.0f : ( t->shaft.z < -1.0f ? -1.0f : t->shaft.z ) ) * 180.0f / (float)M_PI;
     t->tip = { t->position.x - t->tipOffsetMm * t->shaft.x, t->position.y - t->tipOffsetMm * t->shaft.y, t->position.z - t->tipOffsetMm * t->shaft.z };
     t->rawCursor = magTrackCursorOf( t, t->tip, t->shaft, &t->reachMm );
-    // A rough fix (the far probe: 8-12 mm bars, the glow) gets a calmer
-    // filter of its own, with no opening for speed: about here, smoothly.
-    bool roughNow = t->state == MAGTRACK_ROUGH;
-    float cursorCutoff = roughNow ? MAGTRACK_ROUGH_CUTOFF_HZ : t->oneEuroMinCutoff, cursorBeta = roughNow ? 0.0f : t->oneEuroBeta;
-    float viewCutoff = roughNow ? MAGTRACK_ROUGH_CUTOFF_HZ : t->viewMinCutoff, viewBeta = roughNow ? 0.0f : t->viewBeta;
+    // The filters slow with the point's height (MAGTRACK_SMOOTH_HALF_MM):
+    // a far fix is a noisy one, and calm "about here" is what it should show.
+    float height = t->tip.z - t->surfaceZ;
+    float k = t->smoothHalfMm > 0.0f && height > 0.0f ? 1.0f / ( 1.0f + height / t->smoothHalfMm ) : 1.0f;
+    float cursorCutoff = t->oneEuroMinCutoff * k, cursorBeta = t->oneEuroBeta * k;
+    float viewCutoff = t->viewMinCutoff * k, viewBeta = t->viewBeta * k;
     t->cursor.x = oneEuro( &t->euro[ 0 ], t->rawCursor.x, dtS, cursorCutoff, cursorBeta );
     t->cursor.y = oneEuro( &t->euro[ 1 ], t->rawCursor.y, dtS, cursorCutoff, cursorBeta );
     t->cursor.z = t->rawCursor.z;

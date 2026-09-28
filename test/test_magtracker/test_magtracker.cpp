@@ -425,6 +425,56 @@ void test_a_rough_fix_inside_the_gate_keeps_a_fresh_track_tracking( void ) {
     TEST_ASSERT_EQUAL_MESSAGE( MAGTRACK_ROUGH, track.state, "no proper fix for the coast time: a rough track" );
 }
 
+// The cursor's filter slows with the point's height (smoothHalfMm): the same
+// noisy fixes jitter the cursor less at the half-pace height than on the
+// board; at 0 the height does nothing. And with the tracker off the cursor
+// is still the fix through that filter, steadier than the fixes themselves
+// (2026-09-27: raw mode bypassed it, and the levers did nothing there).
+void test_smoothing_slows_with_height( void ) {
+    float jitter[ 3 ];
+    for ( int run = 0; run < 3; run++ ) {
+        srand( 7 );
+        magTrackInit( &track, 17.5f, 0.0f );
+        float z = run == 0 ? 17.5f + 2.0f : 17.5f + track.smoothHalfMm;
+        if ( run == 2 )
+            track.smoothHalfMm = 0.0f;
+        Vec3 p = { 20.0f, 20.0f, z };
+        float sum = 0.0f;
+        int n = 0;
+        for ( int frame = 0; frame < 600; frame++ ) {
+            MagTrackInput in = noisyFixAt( p, 0.5f );
+            magTrackUpdate( &track, DT, &in );
+            if ( frame >= 100 ) {
+                sum += ( track.cursor.x - p.x ) * ( track.cursor.x - p.x );
+                n++;
+            }
+        }
+        jitter[ run ] = sqrtf( sum / n );
+    }
+    printf( "  cursor jitter: on the board %.3f mm, at the half-pace height %.3f, with the lever off %.3f\n", jitter[ 0 ], jitter[ 1 ], jitter[ 2 ] );
+    TEST_ASSERT_TRUE( jitter[ 1 ] < 0.8f * jitter[ 0 ] );
+    TEST_ASSERT_FLOAT_WITHIN( 0.1f * jitter[ 0 ], jitter[ 0 ], jitter[ 2 ] );
+    // The tracker off: the fix is the track, and the cursor is that through the filter.
+    srand( 7 );
+    magTrackInit( &track, 17.5f, 0.0f );
+    track.enabled = false;
+    Vec3 p = { 20.0f, 20.0f, 19.5f };
+    float sumRaw = 0.0f, sumCursor = 0.0f;
+    int n = 0;
+    for ( int frame = 0; frame < 600; frame++ ) {
+        MagTrackInput in = noisyFixAt( p, 0.5f );
+        magTrackUpdate( &track, DT, &in );
+        if ( frame >= 100 ) {
+            sumRaw += ( in.position.x - p.x ) * ( in.position.x - p.x );
+            sumCursor += ( track.cursor.x - p.x ) * ( track.cursor.x - p.x );
+            n++;
+        }
+    }
+    printf( "  tracker off: fixes %.3f mm, cursor %.3f\n", sqrtf( sumRaw / n ), sqrtf( sumCursor / n ) );
+    TEST_ASSERT_TRUE( sumCursor < 0.5f * sumRaw );
+    TEST_ASSERT_EQUAL( MAGTRACK_TRACKING, track.state );
+}
+
 int main( int argc, char** argv ) {
     (void)argc;
     (void)argv;
@@ -439,5 +489,6 @@ int main( int argc, char** argv ) {
     RUN_TEST( test_rough_fixes_keep_a_far_probe_on_the_map );
     RUN_TEST( test_cursor_modes_and_the_surface_plane );
     RUN_TEST( test_whole_chain_on_a_simulated_hand );
+    RUN_TEST( test_smoothing_slows_with_height );
     return UNITY_END( );
 }

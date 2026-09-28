@@ -214,6 +214,7 @@ void settingsMenuBuild( Menu* m ) {
     menuAddNumber( m, tracking, "view beta", &magLocator.track.viewBeta, 0.0f, 2.0f, 0.02f, "" );
     menuAddNumber( m, tracking, "cursor Hz", &magLocator.track.oneEuroMinCutoff, 0.1f, 5.0f, 0.1f, "" );
     menuAddNumber( m, tracking, "cursor beta", &magLocator.track.oneEuroBeta, 0.0f, 2.0f, 0.02f, "" );
+    menuAddNumber( m, tracking, "smooth height", &magLocator.track.smoothHalfMm, 0.0f, 150.0f, 5.0f, "mm" ); // the cursor's and view's filters at half the pace at this height (0 = the same at any height)
     menuAddNumber( m, tracking, "shaft Hz", &magLocator.track.shaftMinCutoff, 0.1f, 5.0f, 0.1f, "" );
     menuAddNumber( m, tracking, "shaft beta", &magLocator.track.shaftBeta, 0.0f, 10.0f, 0.25f, "" );
     menuAddNumber( m, tracking, "floor", &magLocator.track.sigmaFloorMm, 0.1f, 3.0f, 0.1f, "mm" );

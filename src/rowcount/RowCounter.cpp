@@ -407,9 +407,9 @@ ServiceStatus RowCounter::service( ) {
     }
 
     const MagTrack& track = magLocator.track;
-    bool tracked = track.enabled && ( track.state == MAGTRACK_TRACKING || track.state == MAGTRACK_COASTING );
+    bool tracked = track.state == MAGTRACK_TRACKING || track.state == MAGTRACK_COASTING; // in both modes (2026-09-27): with the tracker off the track is the fix through the cursor's filter
     // A rough fix (the probe far up or off the edge) counts no row.
-    bool rough = track.enabled ? track.state == MAGTRACK_ROUGH : fix.rough;
+    bool rough = track.state == MAGTRACK_ROUGH;
 
     if ( !fix.valid || rough ) {
         if ( tracked && !rough ) {

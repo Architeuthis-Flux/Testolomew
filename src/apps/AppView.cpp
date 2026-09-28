@@ -133,7 +133,7 @@ static void aimCamera( uint32_t nowMs ) {
     // The probe for the follow / POV modes: the track when there is one, else the fix.
     const MagTrack& track = magLocator.track;
     const MagProbeFix& fix = magLocator.fix;
-    bool tracked = track.enabled && ( track.state == MAGTRACK_TRACKING || track.state == MAGTRACK_COASTING );
+    bool tracked = track.state == MAGTRACK_TRACKING || track.state == MAGTRACK_COASTING; // the track in both modes (2026-09-27): raw mode is the fix through the view's filter
     bool haveProbe = tracked || fix.valid;
     Vec3 tip = tracked ? track.viewTip : fix.tip;
     Vec3 shaft = tracked ? track.shaft : fix.shaft;
@@ -363,7 +363,7 @@ static void drawMagnet( ) {
     // With the tracker on, what is drawn is the TRACK: the filtered magnet,
     // its shaft, and the cursor on the surface - carried on through a gap in
     // the fixes (dimmer), and for a far probe just a soft ring of "about here".
-    bool tracked = track.enabled && track.state != MAGTRACK_NONE;
+    bool tracked = track.state != MAGTRACK_NONE;
     if ( tracked && track.state == MAGTRACK_ROUGH ) {
         Vec3 under = { track.position.x, track.position.y, magLocator.boardZ };
         ring( under, track.sigma.x, track.sigma.y, COLOR_ERROR );
@@ -444,7 +444,7 @@ static void drawText( ) {
     bool live = track.enabled ? track.state != MAGTRACK_NONE : fix.valid;
     if ( live ) {
         // The point's height above the surface (what the LEDs colour by), top right.
-        Vec3 tip = track.enabled ? track.tip : fix.tip;
+        Vec3 tip = track.tip;
         float heightMm = tip.z - magLocator.boardZ;
         snprintf( line, sizeof( line ), "%.1fmm", heightMm < 0.0f ? 0.0f : heightMm );
         textAt( canvas, LCD_WIDTH - (int)strlen( line ) * UI_CHAR_W - 2, 2, T, COLOR_TEXT, line );
@@ -555,7 +555,7 @@ void viewDraw( GFXcanvas16* into ) {
     if ( nowMs - lastTrailMs >= VIEW_TRAIL_PERIOD_MS ) {
         lastTrailMs = nowMs;
         const MagTrack& track = magLocator.track;
-        bool tracked = track.enabled && ( track.state == MAGTRACK_TRACKING || track.state == MAGTRACK_COASTING );
+        bool tracked = track.state == MAGTRACK_TRACKING || track.state == MAGTRACK_COASTING;
         if ( tracked || fix.valid ) {
             trail[ trailHead ] = tracked ? track.viewPosition : fix.magnet;
             trailHead = ( trailHead + 1 ) % VIEW_TRAIL_POINTS;

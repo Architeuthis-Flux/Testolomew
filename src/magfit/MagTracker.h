@@ -62,7 +62,6 @@
 #define MAGTRACK_COAST_MS 400             // how long a track outlives its last fix
 #define MAGTRACK_ROUGH_HOLD_S 1.0f        // ...and how long a ROUGH one (the far glow) outlives its last rough fix (menu: far hold; 2.5 until 2026-09-23: a stale glow for two seconds after the probe had gone)
 #define MAGTRACK_ROUGH_SPREAD_MM_S 8.0f   // while it is held its bar widens this fast (the glow spreads and dims, honestly)
-#define MAGTRACK_ROUGH_CUTOFF_HZ 0.5f     // the far glow's own filter: a rough fix is "about here", and about here should not jitter (2026-09-21 night: the MMC as the far sensor, smoothly)
 #define MAGTRACK_COAST_TAU_S 0.15f        // velocity dies away with this time constant while coasting
 #define MAGTRACK_SHAFT_MIN_CUTOFF 1.0f    // Hz: the shaft direction's 1-Euro filter at rest (menu: shaft Hz)
 #define MAGTRACK_SHAFT_BETA 10.0f         // per unit/s of a component's change: how fast the cutoff opens as the pencil turns (menu: shaft beta)
@@ -88,6 +87,15 @@
 #define MAGTRACK_ONE_EURO_MIN_CUTOFF 1.0f // Hz: how much the cursor may jitter at rest
 #define MAGTRACK_ONE_EURO_BETA 0.5f       // per mm/s: how fast the cutoff opens with speed (pencil.cpp: 20 ms behind at writing speed, 0.02 mm jitter at rest)
 #define MAGTRACK_ONE_EURO_D_CUTOFF 1.0f   // Hz: smoothing of the speed estimate itself
+// The cursor's and the view's filters slow with the point's height above the
+// surface: their cutoffs and betas are divided by (1 + height / this), so at
+// this height they run at half the pace, at twice it a third (menu: smooth
+// height; 0 = the same at any height). A far fix is a noisy one - its bar
+// grows with the fourth power of the distance - and one lever at rest cannot
+// serve both the board and a hover (Kevin, 2026-09-27: "better ways to scale
+// beta vs height"). The rough fix's own calmer filter (0.5 Hz, no beta) went
+// with it: this is continuous where that was a step at the 5 mm bar.
+#define MAGTRACK_SMOOTH_HALF_MM 40.0f
 
 enum MagTrackState {
     MAGTRACK_NONE,     // nothing tracked
@@ -146,7 +154,7 @@ struct MagTrack {
     uint32_t accepted, dropped, reinits, coasted; // counters since reset
 
     // settings
-    bool enabled; // off = fixes pass straight through (for comparing)
+    bool enabled; // off = fixes pass straight through the Kalman, gate and coast (for comparing); the cursor's, view's and shaft's 1-Euro filters still apply, and what is shown reads the track either way (2026-09-27)
     MagCursorMode cursorMode;
     float surfaceZ;    // the breadboard's surface, mm above the sensors
     float tipOffsetMm; // the point is this far down the shaft from the magnet
@@ -157,6 +165,7 @@ struct MagTrack {
     float oneEuroMinCutoff, oneEuroBeta;
     float viewMinCutoff, viewBeta; // the scene's smoothing of the magnet
     float shaftMinCutoff, shaftBeta; // the shaft direction's own 1-Euro (a turn is followed at once, a resting shaft stays put)
+    float smoothHalfMm;            // the height at which the cursor's and the view's filters run at half the pace (0 = the same at any height)
     float roughHoldS;              // how long the far glow is held after its last rough fix
 
     // private-ish
