@@ -80,7 +80,7 @@
 #define MAGTRACK_VIEW_MIN_CUTOFF 2.7f     // Hz: the 1-Euro filter on what the SCENE draws of the magnet (menu: view) (the bench's setting on 2026-09-27, taken as the default: 1.5 until then)
 #define MAGTRACK_VIEW_BETA 0.04f           // per mm/s (0.05 lagged 40 ms at writing speed; this 20, jitter at rest 0.025 mm - pencil.cpp) (the bench's setting on 2026-09-27, taken as the default: 0.5 until then)
 #define MAGTRACK_SHAFT_FLIP_DEG 45.0f     // a shaft swing bigger than this in one frame waits for confirmation
-#define MAGTRACK_MAX_REACH_MM 60.0f       // the pointer never reaches further from the tip than this (the bench's setting on 2026-09-27, taken as the default: 40 until then)
+#define MAGTRACK_MAX_REACH_MM 0.0f        // the pointer never reaches further from the tip than this - 0 = no cap, the aim runs to wherever the shaft meets the surface, off the board too (2026-09-28, Kevin: "keep aim going to infinite distance" - at 60 the cursor froze at 40 mm of height on a 55 degree lean; 40 until 2026-09-27, 60 the bench's setting after)
 // ...and never as if the probe were flatter than this: the reach is drop x
 // tan(tilt), and past 70 degrees the tangent runs away - at 84 degrees a
 // millimetre of drop and the shaft's 0.8 degree of jitter at rest put the
@@ -88,7 +88,7 @@
 // probe laid flat on the board). A probe flatter than this points as if it
 // were at 70 degrees: the same direction, a bounded reach, and the jitter of
 // the tilt no longer in it.
-#define MAGTRACK_MAX_POINT_TILT_DEG 70.0f
+#define MAGTRACK_MAX_POINT_TILT_DEG 85.0f // (70 until 2026-09-28: a lean flatter than that froze the cursor too; 85 is a guard against the tangent alone - a probe laid flat points off the board, which is where it points)
 // A point this close to the surface (or under it: in a hole) is TOUCHING,
 // and a touching point is where the user means, whatever the tilt: the
 // cursor is the point itself, not a projection. Above it the probe hovers

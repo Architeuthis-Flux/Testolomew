@@ -295,10 +295,17 @@ void test_cursor_modes_and_the_surface_plane( void ) {
     TEST_ASSERT_FLOAT_WITHIN( 0.01f, 16.0f, c.z );
 
     Vec3 high = { 20.0f, 20.0f, 60.0f };
-    Vec3 level = { 0.99f, 0.0f, 0.1f }; // nearly lying down
+    Vec3 level = { 0.99f, 0.0f, 0.1f }; // nearly lying down (84 degrees)
+    track.maxReachMm = 60.0f; // capped: the cursor stops 60 mm out
     c = magTrackCursorOf( &track, high, level, &reach );
-    TEST_ASSERT_FLOAT_WITHIN( 0.01f, MAGTRACK_MAX_REACH_MM, reach );
-    TEST_ASSERT_FLOAT_WITHIN( 0.1f, 20.0f - MAGTRACK_MAX_REACH_MM, c.x );
+    TEST_ASSERT_FLOAT_WITHIN( 0.01f, 60.0f, reach );
+    TEST_ASSERT_FLOAT_WITHIN( 0.1f, 20.0f - 60.0f, c.x );
+    track.maxReachMm = 0.0f; // no cap (the default since 2026-09-28): to wherever the shaft meets the surface, 420 mm out here
+    c = magTrackCursorOf( &track, high, level, &reach );
+    float far = ( 60.0f - 17.5f ) * ( 0.99f / 0.1f );
+    TEST_ASSERT_FLOAT_WITHIN( 1.0f, far, reach );
+    TEST_ASSERT_FLOAT_WITHIN( 1.0f, 20.0f - far, c.x );
+    TEST_ASSERT_FLOAT_WITHIN( 0.001f, MAGTRACK_MAX_REACH_MM, 0.0f );
 }
 
 // The whole chain on a simulated hand: a probe magnet (4200, along a shaft

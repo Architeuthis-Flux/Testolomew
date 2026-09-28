@@ -92,8 +92,8 @@ Vec3 magTrackPointer( float surfaceZ, float maxReachMm, Vec3 tip, Vec3 shaft, fl
         tanTilt = maxTan;
     }
     float reach = drop * tanTilt;
-    if ( reach > maxReachMm ) {
-        reach = maxReachMm;
+    if ( maxReachMm > 0.0f && reach > maxReachMm ) {
+        reach = maxReachMm; // (a cap only when asked: 0 is none)
     }
     cursor.x = tip.x - reach * shaft.x / lean;
     cursor.y = tip.y - reach * shaft.y / lean;

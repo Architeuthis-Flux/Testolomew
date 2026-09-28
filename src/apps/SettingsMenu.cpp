@@ -220,8 +220,8 @@ void settingsMenuBuild( Menu* m ) {
                  "How high the breadboard's surface sits above the sensors at the taps' centre, mm. The height shown, where the aim cursor lands and the touch come from it. The 12-tap calibration also learns how the surface runs across the board (a tilt, a bow), so the height reads the same in every hole; forget anchors flattens it." );
     menuAddNumber( m, tracking, "tip", &magLocator.tipOffsetMm, 0.0f, 60.0f, 0.5f, "mm",
                  "The magnet's centre sits this far up the shaft from the probe's point, mm. Wrong here and the point lands off along the lean - a row off at 40 degrees for 3 mm. The lean calibration (tools) measures it, with the fix's own lean bias; editing this by hand drops that model." );
-    menuAddNumber( m, tracking, "reach", &magLocator.track.maxReachMm, 5.0f, 60.0f, 2.5f, "mm",
-                 "The aim cursor never lands further from under the tip than this, mm. Lower it if a flat lean throws the cursor across the board." ); // (5-100 until 2026-09-25: the reach is the drop x tan 70 deg at most - 55 mm from a 20 mm hover - so 60 is the useful end)
+    menuAddNumber( m, tracking, "reach", &magLocator.track.maxReachMm, 0.0f, 100.0f, 5.0f, "mm",
+                 "The aim cursor never lands further from under the tip than this, mm. 0: no cap - the aim runs to wherever the shaft meets the surface, off the board too. A cap freezes the cursor where the lean and the height reach it." ); // (5-100 until 2026-09-25: the reach is the drop x tan 70 deg at most - 55 mm from a 20 mm hover - so 60 is the useful end)
     // The smoothing, the levers that are felt first (tools/hostsim/pencil.cpp,
     // 2026-09-25: the ranges are where the pencil measured a change):
     // accel sets the Kalman's rest jitter against its lag (0.075 mm at 500
