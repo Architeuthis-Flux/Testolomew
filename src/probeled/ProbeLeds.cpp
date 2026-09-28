@@ -93,6 +93,7 @@ int ledLayoutV5Pixel( const LedLayout* layout, int i ) {
 
 const char* const probeLedSchemeNames[ PROBELED_SCHEME_COUNT ] = { "classic", "height", "sure", "aim", "rainbow" };
 const char* const probeLedDataNames[ PROBELED_DATA_COUNT ] = { "none", "unsure", "height", "tilt", "speed" };
+const char* const probeLedOnBoardNames[ PROBELED_ONBOARD_COUNT ] = { "white", "fade", "color" };
 
 void probeLedHue( float hueDeg, float brightness, uint8_t* r, uint8_t* g, uint8_t* b ) {
     while ( hueDeg < 0.0f )
@@ -173,7 +174,7 @@ void probeLedDefaultStyle( ProbeLedStyle* s ) {
     s->hueTurns = 1.05f;                // (0.667: two thirds of the wheel, red to blue)
     s->hueStartDeg = 240.0f;            // (0)
     s->colourByMm = 2.5f;               // (6)
-    s->whiteOnBoard = true;
+    s->onBoard = PROBELED_ONBOARD_FADE; // smoothly to white at the board (the flat white section until 2026-09-28)
     s->brightBy = PROBELED_DATA_NONE;   // (sure)
     s->brightAmount = 1.0f;             // signed since 2026-09-28: + brightens toward the data's far end, - dims (0.5 dimmed a coin-toss row by half until then; by "none" it is inert)
     s->sparkleBy = PROBELED_DATA_NONE;  // (height)
@@ -269,8 +270,14 @@ static float splat( const LedLayout* layout, ProbeLedFrame* frame, float along, 
 // (white) with the point on the board, all of it from the style's
 // colourByMm up. The classic scheme has its own, longer ramp.
 static float colourByHeight( const ProbeLedStyle* style, float heightMm ) {
-    if ( !style->whiteOnBoard )
+    if ( style->onBoard == PROBELED_ONBOARD_COLOR )
         return 1.0f; // the scheme's colour at every height
+    if ( style->onBoard == PROBELED_ONBOARD_FADE ) {
+        // White at the board itself, the colour all in at colourByMm, a
+        // straight fade between: no flat white section.
+        float by = style->colourByMm > 0.1f ? style->colourByMm : 0.1f;
+        return clamp01( heightMm / by );
+    }
     float by = style->colourByMm > PROBELED_WHITE_BELOW_MM + 0.1f ? style->colourByMm : PROBELED_WHITE_BELOW_MM + 0.1f;
     return clamp01( ( heightMm - PROBELED_WHITE_BELOW_MM ) / ( by - PROBELED_WHITE_BELOW_MM ) );
 }
@@ -565,7 +572,7 @@ void probeLedRender( const LedLayout* layout, const ProbeLedInput* in, const Pro
         } else {
             float radius = frame->ringAgeS * PROBELED_RING_ROWS_PER_S;
             float amp = style->peak * 0.6f * ( 1.0f - frame->ringAgeS / PROBELED_RING_S );
-            schemeColour( style, in, frame->timeS, &frame->ringR, &frame->ringG, &frame->ringB );
+            frame->ringR = frame->ringG = frame->ringB = 255; // the ring is white whatever the scheme does on the board (2026-09-28)
             for ( int i = 0; i < layout->count; i++ ) {
                 float da = layout->along[ i ] - frame->ringAlong;
                 float dc = ( layout->acrossMm[ i ] - frame->ringAcrossMm ) / PITCH_MM;

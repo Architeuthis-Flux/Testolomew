@@ -175,6 +175,21 @@ enum ProbeLedData {
     PROBELED_DATA_COUNT
 };
 extern const char* const probeLedDataNames[ PROBELED_DATA_COUNT ];
+
+// How a wheel scheme's colour meets the board: WHITE - white below
+// PROBELED_WHITE_BELOW_MM, blended to the scheme's colour by colourByMm (a
+// flat white section at the bottom of the scale); FADE - the scheme's
+// colour at colourByMm fading smoothly to white AT the board, no flat
+// section (Kevin, 2026-09-28: "smoothly go toward white on the board");
+// COLOR - the scheme's colour at every height, no white. The touch ring is
+// white whichever.
+enum ProbeLedOnBoard {
+    PROBELED_ONBOARD_WHITE,
+    PROBELED_ONBOARD_FADE,
+    PROBELED_ONBOARD_COLOR,
+    PROBELED_ONBOARD_COUNT
+};
+extern const char* const probeLedOnBoardNames[ PROBELED_ONBOARD_COUNT ];
 #define PROBELED_TILT_FULL_DEG 60.0f
 #define PROBELED_SPEED_FULL_MM_S 200.0f
 #define PROBELED_AIM_FULL_DEG 30.0f // the aim scheme's colour is all in at this much lean
@@ -232,7 +247,7 @@ struct ProbeLedStyle {
     float hueTurns;     // turns of the wheel over the scheme's scale - the height (held at the scale's end above it), the sureness, the board's rows (under 1 a chunk of the spectrum, over 1 several rainbows; not the aim's compass, not classic)
     float hueStartDeg;  // where the wheel starts (0 red, 120 green, 240 blue)
     float colourByMm;   // the scheme's colour is all in from this height (white on the board below PROBELED_WHITE_BELOW_MM)...
-    bool whiteOnBoard;  // ...or not: off, a wheel scheme's colour at every height, no white plateau at the bottom of the scale (the menu's "white on board", 2026-09-28; classic keeps its own white-to-blue ramp)
+    int onBoard;        // ProbeLedOnBoard: how a wheel scheme meets the board (the menu's "on board", 2026-09-28; classic keeps its own white-to-blue ramp)
     int brightBy;       // ProbeLedData: what dims the cursor...
     float brightAmount; // ...by this much at the data's far end, SIGNED: +1 doubles the peak there (never past the full peak), -1 takes it to nothing (-0.5 by unsure: a toss-up row at half)
     int sparkleBy;      // ProbeLedData: what raises the sparkle's density from PROBELED_SPARKLE_FLOOR of the lever to all of it (nothing: all of it always)

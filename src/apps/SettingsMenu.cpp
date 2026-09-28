@@ -340,10 +340,10 @@ void settingsMenuBuild( Menu* m ) {
                  "Where the wheel starts, degrees: 0 red, 120 green, 240 blue." );
     menuAddNumber( m, colours, "height scale", &probeLeds.style.liftFullMm, 5.0f, 150.0f, 1.0f, "mm",
                  "The height, mm, the height scheme's wheel runs to. Classic's color is all blue there, and the spot's, the sparkle's and the dimming's height data end there too." ); // to the array's range: a far probe is drawn by the same mapping since 2026-09-27 (60 until then)
-    menuAddToggle( m, colours, "white on board", &probeLeds.style.whiteOnBoard,
-                   "On: a wheel scheme's cursor is white with the point on the board, the scheme's color all in from color from up. Off: the scheme's color at every height, no white at the bottom of the scale. Classic keeps its own white-to-blue ramp." );
+    menuAddChoice( m, colours, "on board", &probeLeds.style.onBoard, probeLedOnBoardNames, PROBELED_ONBOARD_COUNT,
+                   "How a wheel scheme meets the board. white: white below 1.5 mm, then the color comes in by color from. fade: the color at color from fading smoothly to white at the board itself. color: the scheme's color at every height. The tap ring is white whichever; classic keeps its own ramp." );
     menuAddNumber( m, colours, "color from", &probeLeds.style.colourByMm, 0.0f, 100.0f, 0.5f, "mm",
-                 "With white on board: the height, mm, from which a wheel scheme's color is all in. Below 1.5 mm the cursor is white, blended between." );  // white on the board below 1.5 mm, all the colour from here up
+                 "The height, mm, at which a wheel scheme's color is all in (on board: white or fade); below it the cursor is white, or blended toward white." );  // white on the board below 1.5 mm, all the colour from here up
     menuAddChoice( m, colours, "bright by", &probeLeds.style.brightBy, probeLedDataNames, PROBELED_DATA_COUNT,
                  "What dims the cursor: unsure (how far the row is from certain), height, tilt, speed, or none." );
     menuAddNumber( m, colours, "bright amount", &probeLeds.style.brightAmount, -1.0f, 1.0f, 0.05f, "",
