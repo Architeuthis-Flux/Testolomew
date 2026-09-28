@@ -88,11 +88,13 @@
 #define MAGTRACK_ONE_EURO_MIN_CUTOFF 3.2f // Hz: how much the cursor may jitter at rest (the bench's setting on 2026-09-27, taken as the default: 1.0 until then)
 #define MAGTRACK_ONE_EURO_BETA 0.12f       // per mm/s: how fast the cutoff opens with speed (pencil.cpp: 20 ms behind at writing speed, 0.02 mm jitter at rest) (the bench's setting on 2026-09-27, taken as the default: 0.5 until then)
 #define MAGTRACK_ONE_EURO_D_CUTOFF 1.0f   // Hz: smoothing of the speed estimate itself
-// The cursor's and the view's filters slow with the point's height above the
-// surface: their cutoffs (Hz) are divided by (1 + height / HZ_HALF) and their
-// betas by (1 + height / BETA_HALF), so at those heights each runs at half
-// the pace, at twice them a third (menu: Hz height, beta height; 0 = the
-// same at any height). A far fix is a noisy one - its bar grows with the
+// The cursor's, the height's and the view's filters slow with the point's
+// height above the surface: their cutoffs (Hz) are divided by
+// 1 + (height / HZ_HALF)^2 and their betas by 1 + (height / BETA_HALF)^2 -
+// a smooth gradient, flat at the board, half the pace at those heights, a
+// fifth at twice them (menu: Hz halved at, beta halved at; 0 = the same at
+// any height; 2026-09-28: 1 + height / half until then, steepest right at
+// the board, which read as a switch). A far fix is a noisy one - its bar grows with the
 // fourth power of the distance - and one lever at rest cannot serve both the
 // board and a hover; the beta's own lever is what makes it "responsive with
 // the probe close but very smooth at a distance" (Kevin, 2026-09-27): the

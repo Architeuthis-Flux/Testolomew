@@ -224,9 +224,16 @@ static void finishFrame( MagTrack* t, float dtS, bool roughHeld ) {
     // Hz; MAGTRACK_BETA_HALF_MM, the betas): a far fix is a noisy one, and
     // calm "about here" is what it should show.
     float height = t->tip.z - t->surfaceZ; // negative below the believed surface (2026-09-28: it was clamped at 0; a minus says the surface setting is too high)
-    float lift = height > 0.0f ? height : 0.0f;
-    float kHz = t->hzHalfMm > 0.0f ? 1.0f / ( 1.0f + lift / t->hzHalfMm ) : 1.0f;
-    float kBeta = t->betaHalfMm > 0.0f ? 1.0f / ( 1.0f + lift / t->betaHalfMm ) : 1.0f;
+    // The slowing with height: a smooth gradient, flat at the board and
+    // easing through the halving height - 1 / (1 + (lift / half)^2): nothing
+    // to speak of below a third of the lever, half at it, a fifth at twice
+    // it - on the SMOOTHED height of the last frame, so the factor never
+    // jumps with a noisy fix (2026-09-28: 1 / (1 + lift / half) was steepest
+    // right at the board, on the raw height, and read as a switch).
+    float lift = t->heightMm > 0.0f ? t->heightMm : 0.0f;
+    float hz = t->hzHalfMm > 0.0f ? lift / t->hzHalfMm : 0.0f, bz = t->betaHalfMm > 0.0f ? lift / t->betaHalfMm : 0.0f;
+    float kHz = 1.0f / ( 1.0f + hz * hz );
+    float kBeta = 1.0f / ( 1.0f + bz * bz );
     float cursorCutoff = t->oneEuroMinCutoff * kHz, cursorBeta = t->oneEuroBeta * kBeta;
     float viewCutoff = t->viewMinCutoff * kHz, viewBeta = t->viewBeta * kBeta;
     if ( !t->smooth ) {
