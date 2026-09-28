@@ -39,6 +39,7 @@ void setUp( void ) {
     style.tailHueDeg = 25.0f;
     style.errorWidth = 1.0f;
     style.falloff = 1.0f;
+    style.whiteOnBoard = true;
     probeLedClear( &frame, v6.count );
 }
 void tearDown( void ) {}
@@ -306,6 +307,21 @@ void test_looks( void ) {
 // way, and the mapping is the style's - how many turns of the wheel over
 // the scale, where it starts, the height the scale runs to, and the height
 // by which the colour is all in (white on the board below it).
+// "white on board" off (2026-09-28): a wheel scheme's colour at every
+// height, the point on the board included - no white plateau.
+void test_white_on_board_can_be_turned_off( void ) {
+    style.scheme = PROBELED_SCHEME_HEIGHT;
+    style.hueStartDeg = 0.0f; // red at the bottom of the wheel
+    ProbeLedInput down = at( 14.0f, 6.35f, 0.05f, 0.2f );
+    down.heightMm = 0.0f;
+    probeLedRender( &v6, &down, &style, 1.0f, &frame );
+    int i = find( &v6, 14, 3 );
+    TEST_ASSERT_TRUE( frame.r[ i ] > 240 && frame.g[ i ] > 240 && frame.b[ i ] > 240 ); // white on the board
+    style.whiteOnBoard = false;
+    probeLedRender( &v6, &down, &style, 1.0f, &frame );
+    TEST_ASSERT_TRUE( frame.r[ i ] > 240 && frame.g[ i ] < 40 && frame.b[ i ] < 40 ); // the wheel's red, on the board
+}
+
 void test_hue_scale_turns_and_start( void ) {
     TEST_ASSERT_EQUAL( 5, PROBELED_SCHEME_COUNT ); // classic, height, sure, aim, rainbow: the single-colour ones are gone
     TEST_ASSERT_EQUAL_STRING( "aim", probeLedSchemeNames[ PROBELED_SCHEME_AIM ] );
@@ -782,6 +798,7 @@ int main( int argc, char** argv ) {
     RUN_TEST( test_vague_fix_is_wide_and_dim_with_the_same_light );
     RUN_TEST( test_vague_fix_at_full_peak_keeps_the_peak );
     RUN_TEST( test_looks );
+    RUN_TEST( test_white_on_board_can_be_turned_off );
     RUN_TEST( test_hue_scale_turns_and_start );
     RUN_TEST( test_aim_scheme_colours_by_the_lean );
     RUN_TEST( test_brightness_follows_the_chosen_data );

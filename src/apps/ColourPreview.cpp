@@ -15,7 +15,7 @@
 #define PREVIEW_LABEL_W 42 // size-1 text, up to seven characters, before each band
 
 int colourPreviewRows( const char* page ) {
-    return strcmp( page, "colours" ) == 0 ? 3 : 0;
+    return strcmp( page, "colors" ) == 0 ? 3 : 0; // (the page is "colors" since 2026-09-28)
 }
 
 #if MODULE_PROBE_LEDS

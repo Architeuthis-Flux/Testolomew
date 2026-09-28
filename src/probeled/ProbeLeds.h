@@ -231,7 +231,8 @@ struct ProbeLedStyle {
     int scheme;         // ProbeLedScheme
     float hueTurns;     // turns of the wheel over the scheme's scale - the height (held at the scale's end above it), the sureness, the board's rows (under 1 a chunk of the spectrum, over 1 several rainbows; not the aim's compass, not classic)
     float hueStartDeg;  // where the wheel starts (0 red, 120 green, 240 blue)
-    float colourByMm;   // the scheme's colour is all in from this height (white on the board below PROBELED_WHITE_BELOW_MM)
+    float colourByMm;   // the scheme's colour is all in from this height (white on the board below PROBELED_WHITE_BELOW_MM)...
+    bool whiteOnBoard;  // ...or not: off, a wheel scheme's colour at every height, no white plateau at the bottom of the scale (the menu's "white on board", 2026-09-28; classic keeps its own white-to-blue ramp)
     int brightBy;       // ProbeLedData: what dims the cursor...
     float brightAmount; // ...by this much at the data's far end, SIGNED: +1 doubles the peak there (never past the full peak), -1 takes it to nothing (-0.5 by unsure: a toss-up row at half)
     int sparkleBy;      // ProbeLedData: what raises the sparkle's density from PROBELED_SPARKLE_FLOOR of the lever to all of it (nothing: all of it always)

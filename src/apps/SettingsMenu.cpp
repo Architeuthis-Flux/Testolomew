@@ -246,7 +246,7 @@ void settingsMenuBuild( Menu* m ) {
     menuAddToggle( m, tracking, "smoothing", &magLocator.track.smooth,
                  "The cursor's, the scene's and the shaft's smoothing filters (the Hz, beta and height levers around it). Off: what is shown is the track's own output - with the tracker off too, the bare fix, raw, for comparing." );
     menuAddNumber( m, tracking, "height Hz", &magLocator.track.heightMinCutoff, 0.1f, 5.0f, 0.1f, "",
-                   "The height's own smoothing (what the LEDs colour and size by, and the View shows): where its filter sits at rest, Hz. Lower: a calmer height that lags more." );
+                   "The height's own smoothing (what the LEDs color and size by, and the View shows): where its filter sits at rest, Hz. Lower: a calmer height that lags more." );
     menuAddNumber( m, tracking, "height beta", &magLocator.track.heightBeta, 0.0f, 2.0f, 0.02f, "",
                    "How fast the height's filter opens with speed, per mm/s. Higher follows a lift or a landing at once; more jitter at rest." );
     menuAddNumber( m, tracking, "Hz halved at", &magLocator.track.hzHalfMm, 0.0f, 150.0f, 5.0f, "mm",
@@ -313,7 +313,7 @@ void settingsMenuBuild( Menu* m ) {
     menuAddNumber( m, leds, "bloom", &probeLeds.style.bloom, 0.0f, 1.0f, 0.1f, "",
                  "A soft halo three times as wide as the spot, at this fraction of its light." );
     menuAddNumber( m, leds, "sparkle", &probeLeds.style.sparkle, 0.0f, 1.0f, 0.1f, "",
-                 "Random near-white flashes in the glow, 0-1. What raises their density is the colours page's sparkle by." );
+                 "Random near-white flashes in the glow, 0-1. What raises their density is the colors page's sparkle by." );
     menuAddNumber( m, leds, "pulse", &probeLeds.style.pulse, 0.0f, 1.0f, 0.1f, "",
                  "The cursor breathes: how deeply, 0-1." );
     menuAddNumber( m, leds, "fade", &probeLeds.style.decayS, 0.05f, 2.0f, 0.05f, "s",
@@ -331,7 +331,7 @@ void settingsMenuBuild( Menu* m ) {
     // the page previews the mapping under its items (ColourPreview.h).
     ui.shell.pageRowsTaken = colourPreviewRows; // the shell steers by the rows left (the absolute stick)
     ui.menuPreview = colourPreviewDraw;
-    int colours = menuAddSubmenu( m, MENU_ROOT, "colours" );
+    int colours = menuAddSubmenu( m, MENU_ROOT, "colors" ); // (US spelling since 2026-09-28: "colors" until then, whose saved values retired to the defaults - the bench's own)
     menuAddChoice( m, colours, "scheme", &probeLeds.style.scheme, probeLedSchemeNames, PROBELED_SCHEME_COUNT,
                  "What drives the hue. classic: white on the board, blue in the air. height: the wheel from the board to height scale. sure: from a toss-up row to a certain one. aim: the direction the probe leans. rainbow: along the board, turning with time. Every scheme is white with the point on the board." );
     menuAddNumber( m, colours, "turns", &probeLeds.style.hueTurns, 0.1f, 4.0f, 0.05f, "",
@@ -339,9 +339,11 @@ void settingsMenuBuild( Menu* m ) {
     menuAddNumber( m, colours, "hue start", &probeLeds.style.hueStartDeg, 0.0f, 355.0f, 5.0f, "deg",
                  "Where the wheel starts, degrees: 0 red, 120 green, 240 blue." );
     menuAddNumber( m, colours, "height scale", &probeLeds.style.liftFullMm, 5.0f, 150.0f, 1.0f, "mm",
-                 "The height, mm, the height scheme's wheel runs to. Classic's colour is all blue there, and the spot's, the sparkle's and the dimming's height data end there too." ); // to the array's range: a far probe is drawn by the same mapping since 2026-09-27 (60 until then)
-    menuAddNumber( m, colours, "colour from", &probeLeds.style.colourByMm, 2.0f, 100.0f, 0.5f, "mm",
-                 "The height, mm, from which a wheel scheme's colour is all in. Below 1.5 mm the cursor is white, blended between." );  // white on the board below 1.5 mm, all the colour from here up
+                 "The height, mm, the height scheme's wheel runs to. Classic's color is all blue there, and the spot's, the sparkle's and the dimming's height data end there too." ); // to the array's range: a far probe is drawn by the same mapping since 2026-09-27 (60 until then)
+    menuAddToggle( m, colours, "white on board", &probeLeds.style.whiteOnBoard,
+                   "On: a wheel scheme's cursor is white with the point on the board, the scheme's color all in from color from up. Off: the scheme's color at every height, no white at the bottom of the scale. Classic keeps its own white-to-blue ramp." );
+    menuAddNumber( m, colours, "color from", &probeLeds.style.colourByMm, 0.0f, 100.0f, 0.5f, "mm",
+                 "With white on board: the height, mm, from which a wheel scheme's color is all in. Below 1.5 mm the cursor is white, blended between." );  // white on the board below 1.5 mm, all the colour from here up
     menuAddChoice( m, colours, "bright by", &probeLeds.style.brightBy, probeLedDataNames, PROBELED_DATA_COUNT,
                  "What dims the cursor: unsure (how far the row is from certain), height, tilt, speed, or none." );
     menuAddNumber( m, colours, "bright amount", &probeLeds.style.brightAmount, -1.0f, 1.0f, 0.05f, "",
@@ -349,18 +351,18 @@ void settingsMenuBuild( Menu* m ) {
     menuAddChoice( m, colours, "sparkle by", &probeLeds.style.sparkleBy, probeLedDataNames, PROBELED_DATA_COUNT,
                  "What raises the sparkle's density from a tenth of the lever to all of it: height, unsure, tilt, speed, or none." );
     menuAddToggle( m, colours, "tail", &probeLeds.style.tail,
-                   "In aim mode, a tail from the cursor back toward the point, along the lean, in the cursor's colour fading to tail hue. Off: the spot alone (at full length and brightness it read as a bar)." );
+                   "In aim mode, a tail from the cursor back toward the point, along the lean, in the cursor's color fading to tail hue. Off: the spot alone (at full length and brightness it read as a bar)." );
     menuAddNumber( m, colours, "tail length", &probeLeds.style.tailLength, 0.1f, 1.0f, 0.05f, "",
                  "In aim mode a tail runs from the cursor back toward the point, this fraction of the way. 1 reaches the point." ); // in pointed mode: how far back toward the point the tail runs (2026-09-26)
     menuAddNumber( m, colours, "tail bright", &probeLeds.style.tailBright, 0.1f, 1.0f, 0.05f, "",
                  "The tail's near end, as a fraction of the cursor's peak." );
     menuAddNumber( m, colours, "tail hue", &probeLeds.style.tailHueDeg, 0.0f, 355.0f, 5.0f, "deg",
-                 "The tail's colour at its far end, degrees round the wheel. Its near end is the cursor's own colour." );
+                 "The tail's color at its far end, degrees round the wheel. Its near end is the cursor's own color." );
 #else
-    int colours = menuAddSubmenu( m, MENU_ROOT, "colours" );
+    int colours = menuAddSubmenu( m, MENU_ROOT, "colors" ); // (US spelling since 2026-09-28: "colors" until then, whose saved values retired to the defaults - the bench's own)
 #endif
     menuAddToggle( m, colours, "poles", &viewStyle.poles,
-                 "The View's magnet bar: its north and south halves coloured, or a thin plain bar." ); // the View's magnet bar: north and south coloured, or a plain bar
+                 "The View's magnet bar: its north and south halves colored, or a thin plain bar." ); // the View's magnet bar: north and south coloured, or a plain bar
     menuAddNumber( m, colours, "pole size", &viewStyle.poleMm, 1.0f, 15.0f, 0.5f, "mm",
                  "The bar's half length, mm." );
     menuAddNumber( m, colours, "north hue", &viewStyle.northHueDeg, 0.0f, 355.0f, 5.0f, "deg",
@@ -409,9 +411,9 @@ void settingsMenuBuild( Menu* m ) {
     menuAddChoice( m, playPage, "mode", &play.mode, playModeNames, PLAY_MODE_COUNT,
                  "off, paint, target. The Draw and Target apps set this on entry and clear it on leaving." );
     menuAddNumber( m, playPage, "hue", &play.paintHue, 0.0f, 359.0f, 5.0f, "deg",
-                 "The brush colour: degrees round the wheel." ); // the Draw app's colour wheel sets these too
+                 "The brush color: degrees round the wheel." ); // the Draw app's colour wheel sets these too
     menuAddNumber( m, playPage, "sat", &play.paintSat, 0.0f, 1.0f, 0.05f, "",
-                 "The brush colour's saturation: 0 white, 1 the rim of the wheel." );
+                 "The brush color's saturation: 0 white, 1 the rim of the wheel." );
     menuAddNumber( m, playPage, "paint bright", &play.paintBright, PLAY_BRIGHT_STEP, 1.0f, PLAY_BRIGHT_STEP, "",
                  "The brush's level. What is painted keeps the level it got." ); // nav up/down in the Draw app
     menuAddNumber( m, playPage, "brush", &play.brushSize, 0.0f, (float)PLAY_BRUSH_MAX, 1.0f, "rows",

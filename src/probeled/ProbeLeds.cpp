@@ -173,6 +173,7 @@ void probeLedDefaultStyle( ProbeLedStyle* s ) {
     s->hueTurns = 1.05f;                // (0.667: two thirds of the wheel, red to blue)
     s->hueStartDeg = 240.0f;            // (0)
     s->colourByMm = 2.5f;               // (6)
+    s->whiteOnBoard = true;
     s->brightBy = PROBELED_DATA_NONE;   // (sure)
     s->brightAmount = 1.0f;             // signed since 2026-09-28: + brightens toward the data's far end, - dims (0.5 dimmed a coin-toss row by half until then; by "none" it is inert)
     s->sparkleBy = PROBELED_DATA_NONE;  // (height)
@@ -268,6 +269,8 @@ static float splat( const LedLayout* layout, ProbeLedFrame* frame, float along, 
 // (white) with the point on the board, all of it from the style's
 // colourByMm up. The classic scheme has its own, longer ramp.
 static float colourByHeight( const ProbeLedStyle* style, float heightMm ) {
+    if ( !style->whiteOnBoard )
+        return 1.0f; // the scheme's colour at every height
     float by = style->colourByMm > PROBELED_WHITE_BELOW_MM + 0.1f ? style->colourByMm : PROBELED_WHITE_BELOW_MM + 0.1f;
     return clamp01( ( heightMm - PROBELED_WHITE_BELOW_MM ) / ( by - PROBELED_WHITE_BELOW_MM ) );
 }

@@ -433,8 +433,8 @@ s
 @expect "camera/mode="
 @expect "camera/glide="
 @expect "LEDs/layout="
-@expect "colours/scheme="
-@expect "colours/north hue="
+@expect "colors/scheme="
+@expect "colors/north hue="
 @expect "play/hue="
 
 # The real fit on simulated fields: a magnet in row 20 lands on row 20.
