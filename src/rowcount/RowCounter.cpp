@@ -512,7 +512,7 @@ void RowCounter::printReading( Stream* out ) const {
     char tracked[ 48 ] = "";
     if ( reading.tracked ) {
         float t = reading.trackPlace.along + ( reading.trackPlace.acrossMm < 0.0f ? ROWGRID_ROWS_PER_HALF : 0 );
-        snprintf( tracked, sizeof( tracked ), "  track %6.2f +/-%.2f %3.0f %%", t, reading.trackSigmaRows, reading.trackConfidence * 100.0f );
+        snprintf( tracked, sizeof( tracked ), "  %s %6.2f +/-%.2f %3.0f %%", magLocator.track.enabled ? "track" : ( magLocator.track.smooth ? "smooth" : "raw" ), t, reading.trackSigmaRows, reading.trackConfidence * 100.0f );
     }
     snprintf( line, sizeof( line ), "row %s   this fix %6.2f (%+.2f) hole %d  +/-%.2f rows  %3.0f %% sure%s   x %.1f y %.1f z %.1f%s  misfit %.0f %%  seen by %d+%d faint",
               counted, shown, reading.offsetRows, reading.hole, reading.sigmaRows, reading.confidence * 100.0f, tracked,

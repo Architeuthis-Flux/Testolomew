@@ -158,7 +158,8 @@ struct MagTrack {
     uint32_t accepted, dropped, reinits, coasted; // counters since reset
 
     // settings
-    bool enabled; // off = fixes pass straight through the Kalman, gate and coast (for comparing); the cursor's, view's and shaft's 1-Euro filters still apply, and what is shown reads the track either way (2026-09-27)
+    bool enabled; // off = fixes pass straight through the Kalman, gate and coast (for comparing); what is shown reads the track either way (2026-09-27)
+    bool smooth;  // the cursor's, view's and shaft's 1-Euro filters; off = what is shown is the track's own output, and with the tracker off too that is the bare fix - RAW, for comparing (2026-09-27 evening: with the filters in both modes the tracker toggle changed nothing to see)
     MagCursorMode cursorMode;
     float surfaceZ;    // the breadboard's surface, mm above the sensors
     float tipOffsetMm; // the point is this far down the shaft from the magnet

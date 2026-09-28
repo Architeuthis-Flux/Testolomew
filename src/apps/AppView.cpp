@@ -538,7 +538,7 @@ static void drawText( ) {
     static const char* trackNames[ 4 ] = { "-", "rough", "coast", "track" };
     snprintf( line, sizeof( line ), "%d/%d sens %2.0ffps s%.1f", magArray.sensorsOk( ), magArray.sensorCount( ), display.fps( ), magLocator.boardZ ); // s = the surface's height
     textAt( canvas, 2, LCD_HEIGHT - 2 * SH - 2, S, COLOR_TEXT_DIM, line );
-    snprintf( line, sizeof( line ), "%s %s %s", cameraModeNames[ viewCamera.mode ], track.enabled ? trackNames[ track.state ] : "raw",
+    snprintf( line, sizeof( line ), "%s %s %s", cameraModeNames[ viewCamera.mode ], track.enabled ? trackNames[ track.state ] : ( track.smooth ? "smooth" : "raw" ),
               track.cursorMode == MAGCURSOR_UNDER ? "under" : "aim" );
     textAt( canvas, 2, LCD_HEIGHT - SH - 2, S, COLOR_TEXT_DIM, line );
 }

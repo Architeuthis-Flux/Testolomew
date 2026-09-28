@@ -25,6 +25,7 @@ void magTrackInit( MagTrack* t, float surfaceZ, float tipOffsetMm ) {
     MagTrack empty = { };
     *t = empty;
     t->enabled = true;
+    t->smooth = true;
     t->cursorMode = MAGCURSOR_POINTED;
     t->surfaceZ = surfaceZ;
     t->tipOffsetMm = tipOffsetMm;
@@ -226,14 +227,26 @@ static void finishFrame( MagTrack* t, float dtS, bool roughHeld ) {
     float kBeta = t->betaHalfMm > 0.0f ? 1.0f / ( 1.0f + height / t->betaHalfMm ) : 1.0f;
     float cursorCutoff = t->oneEuroMinCutoff * kHz, cursorBeta = t->oneEuroBeta * kBeta;
     float viewCutoff = t->viewMinCutoff * kHz, viewBeta = t->viewBeta * kBeta;
-    t->cursor.x = oneEuro( &t->euro[ 0 ], t->rawCursor.x, dtS, cursorCutoff, cursorBeta );
-    t->cursor.y = oneEuro( &t->euro[ 1 ], t->rawCursor.y, dtS, cursorCutoff, cursorBeta );
-    t->cursor.z = t->rawCursor.z;
-    // What the scene draws: the same magnet through a filter of its own, so
-    // the picture can be calmer than the track without slowing the cursor.
-    t->viewPosition.x = oneEuro( &t->viewEuro[ 0 ], t->position.x, dtS, viewCutoff, viewBeta );
-    t->viewPosition.y = oneEuro( &t->viewEuro[ 1 ], t->position.y, dtS, viewCutoff, viewBeta );
-    t->viewPosition.z = oneEuro( &t->viewEuro[ 2 ], t->position.z, dtS, viewCutoff, viewBeta );
+    if ( !t->smooth ) {
+        // No smoothing: the track's own output as it is (the bare fix with
+        // the tracker off), and the filters start afresh when switched on.
+        t->cursor = t->rawCursor;
+        t->viewPosition = t->position;
+        for ( int a = 0; a < 3; a++ ) {
+            OneEuroAxis e = { false, 0.0f, 0.0f };
+            t->euro[ a ] = e;
+            t->viewEuro[ a ] = e;
+        }
+    } else {
+        t->cursor.x = oneEuro( &t->euro[ 0 ], t->rawCursor.x, dtS, cursorCutoff, cursorBeta );
+        t->cursor.y = oneEuro( &t->euro[ 1 ], t->rawCursor.y, dtS, cursorCutoff, cursorBeta );
+        t->cursor.z = t->rawCursor.z;
+        // What the scene draws: the same magnet through a filter of its own, so
+        // the picture can be calmer than the track without slowing the cursor.
+        t->viewPosition.x = oneEuro( &t->viewEuro[ 0 ], t->position.x, dtS, viewCutoff, viewBeta );
+        t->viewPosition.y = oneEuro( &t->viewEuro[ 1 ], t->position.y, dtS, viewCutoff, viewBeta );
+        t->viewPosition.z = oneEuro( &t->viewEuro[ 2 ], t->position.z, dtS, viewCutoff, viewBeta );
+    }
     t->viewTip = { t->viewPosition.x - t->tipOffsetMm * t->shaft.x, t->viewPosition.y - t->tipOffsetMm * t->shaft.y, t->viewPosition.z - t->tipOffsetMm * t->shaft.z };
     // The cursor's bar: the track's, plus what a few degrees of shaft error do
     // over the reach, plus the tip offset's share of the same.
@@ -446,7 +459,7 @@ void magTrackUpdate( MagTrack* t, float dtS, const MagTrackInput* in ) {
             if ( swingDeg > MAGTRACK_SHAFT_FLIP_DEG && ++t->shaftSwings < TRACK_SHAFT_CONFIRM ) {
                 // wait
             } else {
-                if ( t->shaftSwings >= TRACK_SHAFT_CONFIRM ) {
+                if ( t->shaftSwings >= TRACK_SHAFT_CONFIRM || !t->smooth ) {
                     t->shaft = s; // it meant it
                     for ( int a = 0; a < 3; a++ ) {
                         OneEuroAxis e = { false, 0.0f, 0.0f };

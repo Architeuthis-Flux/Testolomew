@@ -227,6 +227,8 @@ void settingsMenuBuild( Menu* m ) {
                  "The LED cursor's smoothing: where its filter sits at rest, Hz. Lower: a calmer cursor that lags more. 1 Hz is about 160 ms to settle." );
     menuAddNumber( m, tracking, "cursor beta", &magLocator.track.oneEuroBeta, 0.0f, 2.0f, 0.02f, "",
                  "How fast the cursor's filter opens with speed, per mm/s. Higher: a fast hand is followed with less lag - but the rest jitter's own speed opens it too, so more jitter at rest." );
+    menuAddToggle( m, tracking, "smoothing", &magLocator.track.smooth,
+                 "The cursor's, the scene's and the shaft's smoothing filters (the Hz, beta and height levers around it). Off: what is shown is the track's own output - with the tracker off too, the bare fix, raw, for comparing." );
     menuAddNumber( m, tracking, "Hz height", &magLocator.track.hzHalfMm, 0.0f, 150.0f, 5.0f, "mm",
                  "The height above the surface, mm, at which the cursor's and the scene's Hz are halved; a third at twice it. A far fix is a noisy one. 0: the same at any height." ); // the cursor's and view's Hz halved at this height (0 = the same at any height)...
     menuAddNumber( m, tracking, "beta height", &magLocator.track.betaHalfMm, 0.0f, 150.0f, 5.0f, "mm",

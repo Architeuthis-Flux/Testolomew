@@ -25,7 +25,7 @@
 // ---------------------------------------------------------------------------
 #include <stdbool.h>
 
-#define MENU_MAX_ITEMS 128 // ~110 in use on 2026-09-19 (fixed pages + one per console command); a full table drops items, with a line at boot
+#define MENU_MAX_ITEMS 144 // 121 in use on 2026-09-27 (fixed pages + one per console command; 128 held ~110 on 2026-09-19); a full table drops items, with a line at boot, and the sim wants eight to spare
 #define MENU_MAX_DEPTH 4
 #define MENU_ROOT -1
 #define MENU_AT_ROOT -2   // menuKey's answer to BACK at the root: the caller closes the menu

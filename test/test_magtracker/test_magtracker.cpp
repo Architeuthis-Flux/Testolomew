@@ -476,6 +476,14 @@ void test_smoothing_slows_with_height( void ) {
     printf( "  tracker off: fixes %.3f mm, cursor %.3f\n", sqrtf( sumRaw / n ), sqrtf( sumCursor / n ) );
     TEST_ASSERT_TRUE( sumCursor < 0.5f * sumRaw );
     TEST_ASSERT_EQUAL( MAGTRACK_TRACKING, track.state );
+    // ...and with the smoothing off as well, the cursor IS the fix: raw.
+    track.smooth = false;
+    for ( int frame = 0; frame < 50; frame++ ) {
+        MagTrackInput in = noisyFixAt( p, 0.5f );
+        magTrackUpdate( &track, DT, &in );
+        TEST_ASSERT_FLOAT_WITHIN( 0.001f, in.position.x, track.cursor.x );
+        TEST_ASSERT_FLOAT_WITHIN( 0.001f, in.position.z, track.viewPosition.z );
+    }
 }
 
 int main( int argc, char** argv ) {

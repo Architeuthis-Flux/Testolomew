@@ -57,7 +57,7 @@ void rowsDraw( GFXcanvas16* canvas ) {
     snprintf( line, sizeof( line ), "%+.2f +-%.2f rows", offset, bar );
     fastText( canvas, 2, barY + 20 + UI_LINE_H, UI_TEXT, UI_COLOR_DIM, line );
     static const char* trackNames[ 4 ] = { "-", "rough", "coast", "track" };
-    snprintf( line, sizeof( line ), "%s  %s", magLocator.track.enabled ? trackNames[ magLocator.track.state ] : "raw", r.touching ? "touching" : "lifted" );
+    snprintf( line, sizeof( line ), "%s  %s", magLocator.track.enabled ? trackNames[ magLocator.track.state ] : ( magLocator.track.smooth ? "smooth" : "raw" ), r.touching ? "touching" : "lifted" );
     fastText( canvas, 2, LCD_HEIGHT - UI_LINE_H - 2, UI_TEXT, UI_COLOR_DIM, line );
 #else
     fastText( canvas, 4, 4, UI_TEXT, UI_COLOR_DIM, "MODULE_ROW_COUNT is off" );
