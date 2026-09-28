@@ -486,8 +486,14 @@ void test_pointed_tail_points_back_at_the_tip( void ) {
     in.underAlong = 18.0f; // the point is eight rows away from where it aims
     in.underAcrossMm = 6.35f;
     TEST_ASSERT_FLOAT_WITHIN( 0.01f, 0.5f, style.tailLength );
-    probeLedRender( &v6, &in, &style, 1.0f, &frame );
     int cursor = find( &v6, 10, 3 ), near = find( &v6, 11, 3 ), mid = find( &v6, 13, 3 ), end = find( &v6, 14, 3 ), past = find( &v6, 15, 3 ), under = find( &v6, 18, 3 );
+    // Off by default (2026-09-27): the spot alone, nothing along the lean.
+    TEST_ASSERT_FALSE( style.tail );
+    probeLedRender( &v6, &in, &style, 1.0f, &frame );
+    TEST_ASSERT_TRUE( frame.target[ cursor ] > 0.5f );
+    TEST_ASSERT_TRUE( frame.target[ near ] < 0.05f && frame.target[ mid ] < 0.02f );
+    style.tail = true;
+    probeLedRender( &v6, &in, &style, 1.0f, &frame );
     TEST_ASSERT_TRUE( frame.target[ cursor ] > 0.5f );
     TEST_ASSERT_TRUE( frame.target[ near ] > 0.1f && frame.target[ near ] < frame.target[ cursor ] ); // the tail's bright end, next to the cursor
     TEST_ASSERT_TRUE( frame.target[ mid ] > 0.03f && frame.target[ mid ] < frame.target[ near ] );   // fading toward its far end...

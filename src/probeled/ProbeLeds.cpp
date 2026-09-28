@@ -151,6 +151,7 @@ void probeLedDefaultStyle( ProbeLedStyle* s ) {
     s->liftR = 40;
     s->liftG = 120;
     s->liftB = 255; // blue in the air
+    s->tail = false;       // no tail unless asked
     s->tailHueDeg = 25.0f; // amber at the tail's far end
     s->tailLength = 0.5f;  // halfway back toward the point
     s->tailBright = 0.5f;
@@ -490,7 +491,7 @@ void probeLedRender( const LedLayout* layout, const ProbeLedInput* in, const Pro
         // cursor's colour, fading to the tail hue at its far end. A step
         // every half row, so a long tail is a line (twelve steps over twenty
         // rows were beads; the review, 2026-09-26).
-        if ( in->haveUnder && style->tailLength > 0.0f ) {
+        if ( style->tail && in->haveUnder && style->tailLength > 0.0f ) {
             float dAlong = ( in->underAlong - in->along ) * style->tailLength, dAcross = ( in->underAcrossMm - in->acrossMm ) * style->tailLength;
             float length = sqrtf( dAlong * dAlong + dAcross * dAcross / ( PITCH_MM * PITCH_MM ) ); // in rows
             int steps = (int)( length * 2.0f ) + 1;

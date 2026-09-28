@@ -324,6 +324,8 @@ void settingsMenuBuild( Menu* m ) {
                  "How much the chosen data dims the cursor at its far end. 0.5 by unsure: a coin-toss row at half." );
     menuAddChoice( m, colours, "sparkle by", &probeLeds.style.sparkleBy, probeLedDataNames, PROBELED_DATA_COUNT,
                  "What raises the sparkle's density from a tenth of the lever to all of it: height, unsure, tilt, speed, or none." );
+    menuAddToggle( m, colours, "tail", &probeLeds.style.tail,
+                   "In aim mode, a tail from the cursor back toward the point, along the lean, in the cursor's colour fading to tail hue. Off: the spot alone (at full length and brightness it read as a bar)." );
     menuAddNumber( m, colours, "tail length", &probeLeds.style.tailLength, 0.1f, 1.0f, 0.05f, "",
                  "In aim mode a tail runs from the cursor back toward the point, this fraction of the way. 1 reaches the point." ); // in pointed mode: how far back toward the point the tail runs (2026-09-26)
     menuAddNumber( m, colours, "tail bright", &probeLeds.style.tailBright, 0.1f, 1.0f, 0.05f, "",

@@ -211,6 +211,7 @@ extern const char* const probeLedDataNames[ PROBELED_DATA_COUNT ];
 struct ProbeLedStyle {
     uint8_t touchR, touchG, touchB; // cursor colour with the point on the board (classic scheme; white)
     uint8_t liftR, liftG, liftB;    // ...and lifted well above it (blended by height)
+    bool tail;                      // the pointed-mode tail at all (off by default, 2026-09-27: at full length and brightness it read as a bar along the lean - "a line showing the north and south poles")
     float tailHueDeg;               // the tail's colour at its far end, in pointed mode (its near end is the cursor's)
     float tailLength;               // how far back toward the point the tail runs, as a fraction of the way (1 = to the point)
     float tailBright;               // the tail's near end, as a fraction of the cursor's peak
