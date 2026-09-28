@@ -97,7 +97,8 @@ class WorldService : public Service {
     Vec3 magnet = { 0, 0, 0 };
     Vec3 shaft = { 0, 0, 1 };
     float strength = 4232.0f; // the 2026-09-18 probe's magnet, which check.txt and strength.txt were written with (the firmware's default is the bench's current magnet; @strength changes it)
-    float surfaceZ = MAGLOC_BOARD_Z_MM; // @surface: where the board's top really is (the locator's setting is its belief)
+    float surfaceZ = MAGLOC_BOARD_Z_MM; // @surface: where the board's top really is (the locator's setting is its belief)...
+    float slopeX = 0.0f, slopeY = 0.0f; // ...and its tilt, mm per mm of x and y (@surface <mm> [<slope x> <slope y>], 2026-09-28)
     float tipMm = -1.0f; // @tip: the magnet's centre this far up the shaft from the point (-1 = whatever the locator believes)
     Vec3 noise = { 0.012f, 0.012f, 0.006f }; // a TMAG5273's noise a frame per axis, the bench's (2026-09-21: 0.012 x/y, 0.006 z; the datasheet's Z is half of X/Y), the other types by their ratio (@noise). Isotropic 0.010 until 2026-09-23: with the fit weighing Z by its quietness the sim must have the bench's anisotropy or it misjudges the weight.
     uint64_t dropoutUntilUs = 0;
@@ -398,7 +399,7 @@ static bool directive( const std::vector<std::string>& w, int lineNo ) {
             float lean = ( w.size( ) >= 6 ? atof( w[ 5 ].c_str( ) ) : 0.0f ) * (float)M_PI / 180.0f;
             RowPlace place = rowGridHolePlace( row, hole );
             Vec3 tip = rowGridToBoard( &rowCounter.grid, place.along, place.acrossMm );
-            tip.z = world.surfaceZ + up;
+            tip.z = world.surfaceZ + world.slopeX * tip.x + world.slopeY * tip.y + up;
             world.shaft = { sinf( lean ), 0.0f, cosf( lean ) };
             { float tt = world.tipMm >= 0.0f ? world.tipMm : magLocator.tipOffsetMm; world.magnet = { tip.x + tt * world.shaft.x, tip.y + tt * world.shaft.y, tip.z + tt * world.shaft.z }; }
             world.on = true;
@@ -455,6 +456,7 @@ static bool directive( const std::vector<std::string>& w, int lineNo ) {
         magLocator.speedJitterK = 0.4f;
         magLocator.boardZ = 17.5f;
         world.surfaceZ = 17.5f;
+        world.slopeX = world.slopeY = 0.0f;
         magLocator.track.accelSigma = 10000.0f;
         magLocator.track.sigmaFloorMm = 0.4f;
         magLocator.track.gate = 4.0f;
@@ -477,6 +479,8 @@ static bool directive( const std::vector<std::string>& w, int lineNo ) {
         input.joyDead = 0.10f;
     } else if ( d == "@surface" && w.size( ) >= 2 ) {
         world.surfaceZ = (float)atof( w[ 1 ].c_str( ) );
+        world.slopeX = w.size( ) >= 4 ? (float)atof( w[ 2 ].c_str( ) ) : 0.0f;
+        world.slopeY = w.size( ) >= 4 ? (float)atof( w[ 3 ].c_str( ) ) : 0.0f;
     } else if ( d == "@tip" && w.size( ) >= 2 ) {
         world.tipMm = (float)atof( w[ 1 ].c_str( ) );
     } else if ( d == "@strength" && w.size( ) >= 2 ) {

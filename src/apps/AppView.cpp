@@ -365,7 +365,7 @@ static void drawMagnet( ) {
     // the fixes (dimmer), and for a far probe just a soft ring of "about here".
     bool tracked = track.state != MAGTRACK_NONE;
     if ( tracked && track.state == MAGTRACK_ROUGH ) {
-        Vec3 under = { track.position.x, track.position.y, magLocator.boardZ };
+        Vec3 under = { track.position.x, track.position.y, magLocator.surfaceAt( track.position.x, track.position.y ) };
         ring( under, track.sigma.x, track.sigma.y, COLOR_ERROR );
         ring( under, 0.5f * track.sigma.x, 0.5f * track.sigma.y, COLOR_ERROR );
         line3d( under, track.position, COLOR_GRID );

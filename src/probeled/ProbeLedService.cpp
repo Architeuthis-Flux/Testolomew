@@ -309,7 +309,7 @@ ServiceStatus ProbeLedService::service( ) {
             in.aimDeg += 360.0f;
         in.speedMmS = sqrtf( track.velocity.x * track.velocity.x + track.velocity.y * track.velocity.y + track.velocity.z * track.velocity.z ); // 0 with the tracker off
         if ( track.reachMm > 0.5f ) {
-            Vec3 under = { tip.x, tip.y, magLocator.boardZ };
+            Vec3 under = { tip.x, tip.y, magLocator.surfaceAt( tip.x, tip.y ) };
             RowPlace u = rowGridPlace( &grid, under );
             in.haveUnder = true;
             in.underAlong = u.along;

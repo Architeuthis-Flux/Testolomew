@@ -379,6 +379,7 @@ static void onAuditVerb( int argc, char** argv, Stream* out ); // below, with th
 
 void MagLocator::begin( ) {
     magTrackInit( &track, boardZ, tipOffsetMm );
+    surfaceMapClear( &surfaceMap );
     consoleAddVerb( "probe", "<x> <y> <z> [ms] [sigma s] [shaft dx dy dz] [rough] | row <r> <h> [up mm] [ms] [lean deg] | off", "a simulated probe fed to the tracker in place of the fit", CONSOLE_CHANGES,
                     onProbeVerb );
     consoleAddCommand( 'd', "stream probe fixes as CSV (toggle)", onStream );
@@ -599,7 +600,14 @@ ServiceStatus MagLocator::service( ) {
         lastStatus = sim.on ? simFrame( &in ) : fitFrame( &in );
     }
     keepStrengthRecord( millis( ) );
-    track.surfaceZ = boardZ;
+    // The surface under the point (the map, 2026-09-28): where the track
+    // had the point last frame, else this frame's fix, else the centre.
+    if ( track.state != MAGTRACK_NONE )
+        track.surfaceZ = surfaceAt( track.tip.x, track.tip.y );
+    else if ( fix.valid )
+        track.surfaceZ = surfaceAt( fix.rawTip.x, fix.rawTip.y );
+    else
+        track.surfaceZ = boardZ;
     track.tipOffsetMm = tipOffsetMm;
     magTrackUpdate( &track, dtS, &in );
     return lastStatus;
@@ -1937,8 +1945,9 @@ void MagLocator::printFix( Stream* out ) const {
     // Two speeds: the filter's velocity (jitter over a frame at rest: 10-20
     // mm/s on a still probe) and what the smoothing takes as the speed
     // (0 at rest; see MAGLOC_SPEED_JITTER_K).
-    snprintf( line, sizeof( line ), "track: %s%s  x %.1f y %.1f z %.1f +/-%.1f %.1f %.1f mm  velocity %.0f mm/s (moving %.0f, smoothing alpha %.2f)  tilt %.0f deg  cursor %s x %.1f y %.1f (+/-%.1f mm, reach %.1f)  %lu fixes taken, %lu dropped, %lu restarts",
+    snprintf( line, sizeof( line ), "track: %s%s  x %.1f y %.1f z %.1f +/-%.1f %.1f %.1f mm  height %.1f mm (~%d; the surface here %.1f)  velocity %.0f mm/s (moving %.0f, smoothing alpha %.2f)  tilt %.0f deg  cursor %s x %.1f y %.1f (+/-%.1f mm, reach %.1f)  %lu fixes taken, %lu dropped, %lu restarts",
               stateNames[ track.state ], track.enabled ? "" : " (tracker off)", track.position.x, track.position.y, track.position.z, track.sigma.x, track.sigma.y, track.sigma.z,
+              track.heightMm, (int)lroundf( track.heightMm ), track.surfaceZ,
               sqrtf( track.velocity.x * track.velocity.x + track.velocity.y * track.velocity.y + track.velocity.z * track.velocity.z ), smoothSpeed, smoothAlpha, track.tiltDeg,
               track.cursorMode == MAGCURSOR_UNDER ? "under" : "pointed", track.cursor.x, track.cursor.y, track.cursorSigmaMm, track.reachMm,
               (unsigned long)track.accepted, (unsigned long)track.dropped, (unsigned long)track.reinits );

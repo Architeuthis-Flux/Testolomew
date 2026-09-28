@@ -21,7 +21,7 @@ The firmware's modules run on a PC against stubs of what the chip provides (`Ard
 | `@dead <i> <ms>` | sensor i not read for that long |
 | `@strength <n>` | the magnet's moment, mT*mm^3 (the locator's held value is its belief) |
 | `@reference` | the levers the scenes were written with (presence 0.04, fit chi 2, gate 4, floor 0.4, accel 10000, the filters 1/0.5, surface 17.5, the camera fixed, cursor repeat 300, the joystick's 0.25/0.15): since 2026-09-27 the firmware boots with the bench's settings, which the phantom and stale-zero scenes are not about |
-| `@tip <mm>`, `@surface <mm>` | where the magnet really sits up the shaft, where the board's top really is |
+| `@tip <mm>`, `@surface <mm> [<slope x> <slope y>]` | where the magnet really sits up the shaft, where the board's top really is - and its tilt, mm per mm (the surface map learns it from the taps) |
 | `@baselines` | print each sensor's zero and field |
 | `@noise <x> <y> <z>` | a TMAG5273's noise a frame per axis, mT (the other types by their ratio); the default 0.010 isotropic, the bench 0.012 0.012 0.006 |
 | `@place <i> <dx> <dy> <dz>` | sensor i really sits this far (mm) from where the table says |
@@ -33,6 +33,7 @@ The firmware's modules run on a PC against stubs of what the chip provides (`Ard
 
 Two verbs exist only in the simulator: `:screen:png <file>` writes what the panel shows as a PNG, and `:screen:verify` checks that the dump path the board uses (`:screen:dump` → `MagView::copyShownRow`, which un-swaps the bytes the LCD push swapped in place) gives exactly what the panel received. The exit code is 1 if any `@expect` failed; the boot line checks that loading the settings did not switch the modes and that the menu table has room.
 
+- `scenes/tilt.txt`: the twelve taps on a board tilted 3 mm along and 1.4 across, then the far corner's height reads ~0 where it read ~2 before (the surface map, 2026-09-28).
 - `make check` runs `scenes/check.txt`, the regression set: the verbs, a simulated probe seen by the tracker, the row counter and the LEDs, the dumps, the menu driven from the console, the settings written after they settle with every page's keys present.
 - `make screens` runs `scenes/screens.txt` (the probe on a row and lifted, the LED preview, paint and erase, coasting, a far probe, the menu pages, the log, the POV, top and orbited cameras) into `out/*.png` and tiles them into `docs/screens-simulated.png` with `montage.py`.
 

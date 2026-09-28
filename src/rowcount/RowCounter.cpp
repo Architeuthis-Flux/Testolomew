@@ -101,7 +101,8 @@ void RowCounter::forgetAnchors( Stream* out ) {
     grid = atBoot;
     anchorCount = 0;
     haveLastHold = false;
-    out->println( "anchors forgotten: the grid is the one the firmware boots with" );
+    surfaceMapClear( &magLocator.surfaceMap ); // flat again; "surface" stays as it is
+    out->println( "anchors forgotten: the grid is the one the firmware boots with, the surface flat" );
 }
 
 void RowCounter::restoreAnchors( const RowAnchor* list, int count ) {
@@ -116,6 +117,36 @@ void RowCounter::restoreAnchors( const RowAnchor* list, int count ) {
         out->println( line );
     }
     fitToAnchors( out );
+    fitSurface( out );
+}
+
+// The anchors' resting heights, as a map of the surface (SurfaceMap.h):
+// three or more and the locator gets a plane, six or more a quadratic;
+// "surface" (boardZ) becomes the height at the taps' centre (the median
+// tap until 2026-09-28), so the reported height is the same in every hole.
+void RowCounter::fitSurface( Stream* out ) {
+    Vec3 taps[ ROWCOUNT_MAX_ANCHORS ];
+    for ( int k = 0; k < anchorCount; k++ )
+        taps[ k ] = anchors[ k ].position;
+    SurfaceMap map;
+    int terms = surfaceMapFit( &map, taps, anchorCount );
+    magLocator.surfaceMap = map;
+    if ( terms > 0 ) {
+        touchZ = surfaceMapCentreZ( &map );
+        magLocator.boardZ = touchZ;
+    }
+    if ( out != nullptr ) {
+        char line[ 200 ];
+        if ( terms == 0 ) {
+            snprintf( line, sizeof( line ), "surface: flat at %.1f mm (%d anchor%s; three spread out learn a tilt, six a bow)", magLocator.boardZ, anchorCount, anchorCount == 1 ? "" : "s" );
+        } else {
+            float x0 = magLocator.surfaceAt( map.minX + SURFACEMAP_MARGIN_MM, map.centreY ), x1 = magLocator.surfaceAt( map.maxX - SURFACEMAP_MARGIN_MM, map.centreY );
+            float y0 = magLocator.surfaceAt( map.centreX, map.minY + SURFACEMAP_MARGIN_MM ), y1 = magLocator.surfaceAt( map.centreX, map.maxY - SURFACEMAP_MARGIN_MM );
+            snprintf( line, sizeof( line ), "surface: %s from %d anchors, %.1f mm at the centre, %+.1f along the board (%.1f to %.1f) and %+.1f across (%.1f to %.1f); the worst tap misses it by %.2f mm",
+                      terms == 3 ? "a plane" : "a quadratic", anchorCount, touchZ, x1 - x0, x0, x1, y1 - y0, y0, y1, map.worstMm );
+        }
+        out->println( line );
+    }
 }
 
 void RowCounter::fitToAnchors( Stream* out ) {
@@ -198,7 +229,7 @@ void RowCounter::watchForTap( Stream* out ) {
     }
     strayCount = 0;
     // Resting on the board (once it is known how high that is), and not still on the last hole?
-    bool down = touchZ <= 0.0f || fix.rawTip.z < touchZ + ROWCOUNT_TOUCH_MARGIN_MM;
+    bool down = touchZ <= 0.0f || fix.rawTip.z < magLocator.surfaceAt( fix.rawTip.x, fix.rawTip.y ) + ROWCOUNT_TOUCH_MARGIN_MM; // the surface under the point (the map)
     float apartSq = ( p.x - lastTap.x ) * ( p.x - lastTap.x ) + ( p.y - lastTap.y ) * ( p.y - lastTap.y );
     bool moved = !haveLastTap || apartSq > ROWCOUNT_TAP_APART_MM * ROWCOUNT_TAP_APART_MM;
     if ( !leftStart ) {
@@ -271,6 +302,7 @@ void RowCounter::finishCalibration( Stream* out ) {
     magLocator.boardZ = touchZ; // the probe now points at the board's surface, not the sensor plane
 
     fitToAnchors( out );
+    fitSurface( out ); // ...and the surface's shape (the centre's height replaces the median)
     char line[ 200 ];
     snprintf( line, sizeof( line ), "  resting on the board the magnet is %.1f mm up (taps ranged %.1f to %.1f - the spread is the fit's height error): #define ROWCOUNT_TOUCH_Z_MM %.1ff",
               touchZ, heights[ 0 ], heights[ anchorCount - 1 ], touchZ );
@@ -445,7 +477,7 @@ ServiceStatus RowCounter::service( ) {
     reading.sigmaRows = rowGridSigmaAlong( &grid, fix.sigma );
     reading.sigmaAcrossMm = rowGridSigmaAcross( &grid, fix.sigma );
     reading.confidence = rowGridConfidence( reading.place, reading.sigmaRows, reading.sigmaAcrossMm );
-    reading.touching = touchZ > 0.0f && fix.rawTip.z < touchZ + ROWCOUNT_TOUCH_MARGIN_MM;
+    reading.touching = touchZ > 0.0f && fix.rawTip.z < magLocator.surfaceAt( fix.rawTip.x, fix.rawTip.y ) + ROWCOUNT_TOUCH_MARGIN_MM;
 
     // The counted row follows the tracker's cursor (or, with the tracker off,
     // the smoothed fix) and needs a clear step to change, along the board or

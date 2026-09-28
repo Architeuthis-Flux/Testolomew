@@ -173,6 +173,7 @@ class RowCounter : public Service {
     int anchorCount = 0;
     void addAnchor( int row, int hole, Vec3 position, float sigmaMm );
     void fitToAnchors( Stream* out );
+    void fitSurface( Stream* out ); // the surface height map from the anchors' resting heights (SurfaceMap.h), into the locator
 
     // A hold: fixes collected while the probe is kept still (h, R).
     RowHoldPurpose holdPurpose = ROWHOLD_NONE;

@@ -20,6 +20,7 @@
 #include "JumperlOS.h"
 #include "MagFit.h"
 #include "MagTracker.h"
+#include "SurfaceMap.h"
 #include "ZeroAudit.h"
 #include "MagOffsetFilter.h"
 #include "Vec3.h"
@@ -479,7 +480,9 @@ class MagLocator : public Service {
     // the magnet's angle to the shaft.
     float tipOffsetMm = MAGLOC_TIP_OFFSET_MM;
     float magnetAngleDeg = MAGLOC_MAGNET_ANGLE_DEG;
-    float boardZ = MAGLOC_BOARD_Z_MM; // the breadboard's surface, mm above the sensors (the menu's "surface", saved; the row calibration sets it)
+    float boardZ = MAGLOC_BOARD_Z_MM; // the breadboard's surface at the taps' centre, mm above the sensors (the menu's "surface", saved; the row calibration sets it)...
+    SurfaceMap surfaceMap;            // ...and how much higher or lower it runs elsewhere (SurfaceMap.h; the row counter fits it to its anchors, flat until then)
+    float surfaceAt( float x, float y ) const { return boardZ + surfaceMapOffset( &surfaceMap, x, y ); } // the surface under (x, y): the height, the pointer's plane and the touch use it
     uint32_t surfaceLearned = 0; // times the surface came down to the floor
     float presentMt = MAGLOC_PRESENT_MT; // the strongest smoothed reading that counts as a magnet (menu: presence)
     float fitMaxChi = MAGLOC_FIT_MAX_CHI; // the fit's acceptance: residuals over each sensor's own expected error (menu: fit chi - loosened at the bench when its errors are not the simulator's)

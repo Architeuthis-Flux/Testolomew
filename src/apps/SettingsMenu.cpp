@@ -201,7 +201,7 @@ void settingsMenuBuild( Menu* m ) {
     menuAddChoiceAccessor( m, tracking, "cursor", getCursorMode, setCursorMode, cursorModeNames, 2,
                  "What the LED cursor marks. under: straight below the tip. aim: where the tip points on the surface, down the shaft, never further than reach." );
     menuAddNumber( m, tracking, "surface", &magLocator.boardZ, 0.0f, 60.0f, 0.5f, "mm",
-                 "How high the breadboard's surface sits above the sensors, mm. The height shown and where the aim cursor lands come from it. Also learned: when the point bottoms out below it three seconds running, it comes down to that." );
+                 "How high the breadboard's surface sits above the sensors at the taps' centre, mm. The height shown, where the aim cursor lands and the touch come from it. The 12-tap calibration also learns how the surface runs across the board (a tilt, a bow), so the height reads the same in every hole; forget anchors flattens it." );
     menuAddNumber( m, tracking, "tip", &magLocator.tipOffsetMm, 0.0f, 60.0f, 0.5f, "mm",
                  "The magnet's centre sits this far up the shaft from the probe's point, mm. Wrong here and the point lands off along the lean." );
     menuAddNumber( m, tracking, "reach", &magLocator.track.maxReachMm, 5.0f, 60.0f, 2.5f, "mm",
