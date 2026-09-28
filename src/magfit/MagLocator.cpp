@@ -1047,6 +1047,14 @@ ServiceStatus MagLocator::runFit( MagTrackInput* in, FrameScratch& f ) {
     f.hintFree = f.held > 0.0f && f.plain >= MAGLOC_LEARN_MIN_SENSORS;
     f.good = magFitSolveStep( magArray.position, smooth, f.use, magArray.sensorCount( ), MAGLOC_MAX_MISFIT, &result, steadyFit ? (int)( steadyIterations + 0.5f ) : 0, f.weights, f.hintFree ? 0.0f : f.held );
     MagFitResult freeFit = result; // the free fit's answer, kept: if only the refinement with the held strength fails, the next frame starts from it
+    // How open the direction is: the last accepted fix's 3D bar. Under
+    // MAGLOC_PRIOR_FROM_MM the readings pin it (eight TMAGs at 40 mm above
+    // the board: 8 mm), at twice that they do not (the MMC alone at 90 mm:
+    // 18 mm; the TMAGs alone at 55 mm, at their noise floor: 14) and the
+    // prior - the last near fix's pole, the lean the hand had - has its say.
+    float lastBar = wasTracking && fix.valid ? fix.errorMm : 2.0f * MAGLOC_PRIOR_FROM_MM;
+    float priorWeight = ( lastBar - MAGLOC_PRIOR_FROM_MM ) / MAGLOC_PRIOR_FROM_MM;
+    priorWeight = priorWeight < 0.0f ? 0.0f : ( priorWeight > 1.0f ? 1.0f : priorWeight );
     bool freeGood = false;
     if ( f.hintFree && f.good && result.coldStage == 0 && result.signal > 0.0f && result.strength > 0.0f ) {
         float freeMisfit = result.residual / result.signal;
@@ -1059,7 +1067,7 @@ ServiceStatus MagLocator::runFit( MagTrackInput* in, FrameScratch& f ) {
     }
     if ( f.held > 0.0f && result.coldStage == 0 && result.signal > 0.0f && result.strength > 0.0f ) {
         f.good = magFitRefineKnownStrength( magArray.position, smooth, f.use, magArray.sensorCount( ), MAGLOC_MAX_MISFIT, f.held, &result, f.weights,
-                                          haveLastGood ? &lastGoodAxis : nullptr, MAGLOC_AXIS_PRIOR_MT,
+                                          haveLastGood && priorWeight > 0.0f ? &lastGoodAxis : nullptr, MAGLOC_AXIS_PRIOR_MT * priorWeight, // the prior only where the direction is open: by the free fit's own bar (2026-09-28: at 40 mm, the MMC out, the prior bent an axis eight TMAGs pinned 11 degrees flat and the fix 5 mm low - noise or none; the aim cursor far up went "spazzy" on it)
                                           steadyFit ? (int)( steadyIterations + 0.5f ) : MAGLOC_REFINE_ITERATIONS );
     }
     fix.fitUs = micros( ) - start;

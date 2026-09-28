@@ -183,6 +183,20 @@ static void startTrack( MagTrack* t, const MagTrackInput* in, const float r[ 3 ]
     }
 }
 
+// The slowing with the point's height (MAGTRACK_HZ_HALF_MM, MAGTRACK_BETA_HALF_MM):
+// a smooth gradient, flat at the board and easing through the halving
+// height - 1 / (1 + (lift / half)^2) - on the SMOOTHED height of the last
+// frame, so the factors never jump with a noisy fix. For the cursor's, the
+// height's, the view's and the shaft's filters alike (2026-09-28 afternoon:
+// the shaft's ran unscaled, 3.6 Hz on the bench, and far up its noisy axis
+// times the drop was the aim cursor going "spazzy").
+static void heightSlowing( const MagTrack* t, float* kHz, float* kBeta ) {
+    float lift = t->heightMm > 0.0f ? t->heightMm : 0.0f;
+    float hz = t->hzHalfMm > 0.0f ? lift / t->hzHalfMm : 0.0f, bz = t->betaHalfMm > 0.0f ? lift / t->betaHalfMm : 0.0f;
+    *kHz = 1.0f / ( 1.0f + hz * hz );
+    *kBeta = 1.0f / ( 1.0f + bz * bz );
+}
+
 static void finishFrame( MagTrack* t, float dtS, bool roughHeld ) {
     t->position = { t->axis[ 0 ].p, t->axis[ 1 ].p, t->axis[ 2 ].p };
     t->velocity = { t->axis[ 0 ].v, t->axis[ 1 ].v, t->axis[ 2 ].v };
@@ -230,10 +244,8 @@ static void finishFrame( MagTrack* t, float dtS, bool roughHeld ) {
     // it - on the SMOOTHED height of the last frame, so the factor never
     // jumps with a noisy fix (2026-09-28: 1 / (1 + lift / half) was steepest
     // right at the board, on the raw height, and read as a switch).
-    float lift = t->heightMm > 0.0f ? t->heightMm : 0.0f;
-    float hz = t->hzHalfMm > 0.0f ? lift / t->hzHalfMm : 0.0f, bz = t->betaHalfMm > 0.0f ? lift / t->betaHalfMm : 0.0f;
-    float kHz = 1.0f / ( 1.0f + hz * hz );
-    float kBeta = 1.0f / ( 1.0f + bz * bz );
+    float kHz, kBeta;
+    heightSlowing( t, &kHz, &kBeta );
     float cursorCutoff = t->oneEuroMinCutoff * kHz, cursorBeta = t->oneEuroBeta * kBeta;
     float viewCutoff = t->viewMinCutoff * kHz, viewBeta = t->viewBeta * kBeta;
     if ( !t->smooth ) {
@@ -481,18 +493,31 @@ void magTrackUpdate( MagTrack* t, float dtS, const MagTrackInput* in ) {
         } else {
             float dot = s.x * t->shaft.x + s.y * t->shaft.y + s.z * t->shaft.z;
             float swingDeg = acosf( dot > 1.0f ? 1.0f : ( dot < -1.0f ? -1.0f : dot ) ) * 180.0f / (float)M_PI;
-            if ( swingDeg > MAGTRACK_SHAFT_FLIP_DEG && ++t->shaftSwings < TRACK_SHAFT_CONFIRM ) {
+            // A big swing is believed only from a sharp fix: far up the
+            // axis swings past 45 degrees on noise alone (two dozen times in
+            // six seconds at 55 mm in the sim), and each believed swing
+            // snapped the shaft and emptied its filter (2026-09-28 afternoon).
+            float bar = in->sigma.x > in->sigma.y ? in->sigma.x : in->sigma.y;
+            bar = bar > in->sigma.z ? bar : in->sigma.z;
+            bool sharp = bar < MAGTRACK_FAR_BAR_MM;
+            if ( sharp && swingDeg > MAGTRACK_SHAFT_FLIP_DEG && ++t->shaftSwings < TRACK_SHAFT_CONFIRM ) {
                 // wait
             } else {
-                if ( t->shaftSwings >= TRACK_SHAFT_CONFIRM || !t->smooth ) {
+                if ( ( sharp && t->shaftSwings >= TRACK_SHAFT_CONFIRM ) || !t->smooth ) {
                     t->shaft = s; // it meant it
                     for ( int a = 0; a < 3; a++ ) {
                         OneEuroAxis e = { false, 0.0f, 0.0f };
                         t->shaftEuro[ a ] = e;
                     }
                 } else {
-                    Vec3 m = { oneEuro( &t->shaftEuro[ 0 ], s.x, dtS, t->shaftMinCutoff, t->shaftBeta ), oneEuro( &t->shaftEuro[ 1 ], s.y, dtS, t->shaftMinCutoff, t->shaftBeta ),
-                               oneEuro( &t->shaftEuro[ 2 ], s.z, dtS, t->shaftMinCutoff, t->shaftBeta ) };
+                    // The shaft's filter slows with the height like the
+                    // cursor's - its beta by the square: a far axis's noise
+                    // reads as speed, and beta opened the filter on it (at
+                    // 40 mm the raw 9 degrees of jitter came through whole).
+                    float kHz, kBeta;
+                    heightSlowing( t, &kHz, &kBeta );
+                    float cutoff = t->shaftMinCutoff * kHz, beta = t->shaftBeta * kBeta * kBeta;
+                    Vec3 m = { oneEuro( &t->shaftEuro[ 0 ], s.x, dtS, cutoff, beta ), oneEuro( &t->shaftEuro[ 1 ], s.y, dtS, cutoff, beta ), oneEuro( &t->shaftEuro[ 2 ], s.z, dtS, cutoff, beta ) };
                     t->shaft = normalised( m );
                 }
                 t->shaftSwings = 0;

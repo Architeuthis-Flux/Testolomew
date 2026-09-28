@@ -205,7 +205,8 @@
 // of direction - about a TMAG's smoothed noise, so it only ever decides
 // what the readings leave open. (The sim: a probe 90 mm up comes back
 // within 3.4 mm with the prior right, 25 mm off with it 40 degrees wrong.)
-#define MAGLOC_AXIS_PRIOR_MT 0.02f
+#define MAGLOC_AXIS_PRIOR_MT 0.02f // ...only where the direction is open, by the free fit's own bar (2026-09-28): none under MAGLOC_PRIOR_FROM_MM of 3D bar (eight TMAGs at 40 mm above the board, 8 mm, pin it - and the prior bent that axis 11 degrees flat and the fix 5 mm low with no noise at all, the far aim cursor's wander), all of it from twice that (the MMC alone at 90 mm, 18 mm; the TMAGs alone at 55 mm, at their noise floor, 14: the lean the hand last had is the best there is)
+#define MAGLOC_PRIOR_FROM_MM 8.0f
 // ...and how many iterations that refinement may spend a frame (the steady
 // load's "fit iters" when that is on): from the free fit's answer it needs
 // two or three, and a frame's fit must not run long (the supply shows it).
