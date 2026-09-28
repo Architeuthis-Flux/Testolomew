@@ -164,6 +164,8 @@ void probeLedDefaultStyle( ProbeLedStyle* s ) {
     s->minSigmaAcrossMm = 0.9f;
     s->spot = 0.9f;         // (1.0)
     s->spotByHeight = 3.5f; // (0)
+    s->errorWidth = 1.0f;   // the bar as it is
+    s->falloff = 1.0f;      // a Gaussian
     s->liftFullMm = 60.0f; // (15)
     s->attackS = 0.02f;
     s->decayS = 0.35f;                  // (0.12)
@@ -216,6 +218,8 @@ static void blendColour( uint8_t* c, uint8_t a, uint8_t b, float t ) {
 // with fullPeak). Held at the widest allowed (PROBELED_MAX_SIGMA_*). Returns
 // the amplitude it drew with (what the bell's centre shows: the tail
 // follows it).
+static float bellPower = 1.0f; // the style's falloff, set per frame: exp( -q^power / 2 ), q the squared distance in sigmas
+
 static float splat( const LedLayout* layout, ProbeLedFrame* frame, float along, float acrossMm, float sigmaRows, float sigmaAcrossMm, float peak, float floor, float minSigmaRows,
                     float minSigmaAcrossMm, float maxSigmaRows, float maxSigmaAcrossMm, uint8_t r, uint8_t g, uint8_t b ) {
     if ( sigmaRows < minSigmaRows )
@@ -247,7 +251,7 @@ static float splat( const LedLayout* layout, ProbeLedFrame* frame, float along, 
         q += dc * dc;
         if ( q > 16.0f )
             continue; // beyond 4 sigma
-        float v = amplitude * expf( -0.5f * q );
+        float v = amplitude * expf( -0.5f * ( bellPower == 1.0f ? q : powf( q, bellPower ) ) );
         if ( v <= frame->target[ i ] )
             continue;
         // The brighter of the two marks colours the LED.
@@ -467,9 +471,20 @@ void probeLedRender( const LedLayout* layout, const ProbeLedInput* in, const Pro
             lift = PROBELED_SPOT_HEIGHT_MAX;
         float grow = ( style->spot > 0.0f ? style->spot : 1.0f ) * ( 1.0f + style->spotByHeight * lift );
         float minRows = style->minSigmaRows * grow, minAcross = style->minSigmaAcrossMm * grow;
-        float sigRows = ( in->sigmaRows > style->minSigmaRows ? in->sigmaRows : style->minSigmaRows ) * grow;
-        float sigAcross = ( in->sigmaAcrossMm > style->minSigmaAcrossMm ? in->sigmaAcrossMm : style->minSigmaAcrossMm ) * grow;
+        // ...and the fix's error bar, by "error width", is the other floor.
+        float barRows = in->sigmaRows * style->errorWidth, barAcross = in->sigmaAcrossMm * style->errorWidth;
+        float sigRows = barRows > minRows ? barRows : minRows, sigAcross = barAcross > minAcross ? barAcross : minAcross;
+        bellPower = style->falloff > 0.1f ? style->falloff : 0.1f;
         float shown = splat( layout, frame, in->along, in->acrossMm, sigRows, sigAcross, peak, floor, minRows, minAcross, PROBELED_MAX_SIGMA_ROWS, PROBELED_MAX_SIGMA_ACROSS_MM, r, g, b );
+        // At least one pixel: the LED nearest the cursor at the bell's peak,
+        // so a pin between two holes lights the nearer one, never nothing.
+        int nearest = ledLayoutNearest( layout, in->along, in->acrossMm, PROBELED_ONE_PIXEL_ROWS );
+        if ( nearest >= 0 && frame->target[ nearest ] < shown ) {
+            frame->target[ nearest ] = shown;
+            frame->r[ nearest ] = r;
+            frame->g[ nearest ] = g;
+            frame->b[ nearest ] = b;
+        }
         if ( style->bloom > 0.0f ) {
             // The halo: three times as wide, a fraction as bright, the same
             // colour; the max rule in splat() keeps it under the cursor.

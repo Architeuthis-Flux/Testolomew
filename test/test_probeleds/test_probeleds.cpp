@@ -37,6 +37,8 @@ void setUp( void ) {
     style.tailLength = 0.5f;
     style.tailBright = 0.5f;
     style.tailHueDeg = 25.0f;
+    style.errorWidth = 1.0f;
+    style.falloff = 1.0f;
     probeLedClear( &frame, v6.count );
 }
 void tearDown( void ) {}
@@ -658,9 +660,9 @@ void test_spot_widens_with_height( void ) {
     style.spotByHeight = 4.0f;
     probeLedRender( &v6, &high, &style, 1.0f, &frame );
     TEST_ASSERT_TRUE( frame.target[ brightest( &frame ) ] <= style.peak + 0.001f );
-    // "spot" scales the fix's error bar too (2026-09-28: it scaled the floor
-    // only, and a wide bar won - "let's allow the spot to be even smaller"):
-    // a bar a row wide lights a patch at spot 1 and a pin at 0.3.
+    // The fix's error bar widens the spot by "error width" (2026-09-28): a
+    // bar a row wide is a patch at 1, a pin at 0 whatever the bar says, and
+    // wider at 2.
     style.spot = 1.0f;
     style.spotByHeight = 0.0f;
     ProbeLedInput wide = at( 14.0f, 6.35f, 1.0f, 2.5f );
@@ -668,13 +670,50 @@ void test_spot_widens_with_height( void ) {
     int litWide = 0;
     for ( int i = 0; i < frame.count; i++ )
         litWide += frame.target[ i ] > 0.1f;
-    style.spot = 0.3f;
+    style.errorWidth = 0.0f;
     probeLedRender( &v6, &wide, &style, 1.0f, &frame );
     int litPin = 0;
     for ( int i = 0; i < frame.count; i++ )
         litPin += frame.target[ i ] > 0.1f;
+    style.errorWidth = 2.0f;
+    probeLedRender( &v6, &wide, &style, 1.0f, &frame );
+    int litWider = 0;
+    for ( int i = 0; i < frame.count; i++ )
+        litWider += frame.target[ i ] > 0.1f;
     TEST_ASSERT_TRUE( litWide > 8 );
-    TEST_ASSERT_TRUE( litPin <= 2 );
+    TEST_ASSERT_TRUE( litPin <= 3 );
+    TEST_ASSERT_TRUE( litWider > litWide );
+    style.errorWidth = 1.0f;
+}
+
+// At least one pixel (2026-09-28): a pin of a spot between two holes lights
+// the nearer one at the bell's peak, never nothing; and "falloff" shapes the
+// bell - higher a flatter top and a sharper edge, lower a peak with a skirt.
+void test_one_pixel_at_least_and_the_falloff( void ) {
+    style.fullPeak = true;
+    style.spot = 0.1f;
+    ProbeLedInput between = at( 14.4f, 6.35f, 0.05f, 0.2f ); // 0.4 rows from row 14's hole: at sigma 0.033 rows the bell gives it nothing
+    probeLedRender( &v6, &between, &style, 1.0f, &frame );
+    int nearest = find( &v6, 14, 3 );
+    TEST_ASSERT_FLOAT_WITHIN( 0.02f, style.peak, frame.target[ nearest ] );
+    TEST_ASSERT_TRUE( frame.target[ find( &v6, 15, 3 ) ] < 0.02f );
+    // The falloff, on a bell two rows wide: the LED a row out (half a
+    // sigma) brighter with a flat top, the one three rows out (1.5 sigma)
+    // dimmer with a sharp edge; the centre the peak either way. (At exactly
+    // one sigma every falloff gives the same, q^p with q = 1.)
+    style.spot = 1.0f;
+    ProbeLedInput wide = at( 14.0f, 6.35f, 2.0f, 5.0f );
+    probeLedRender( &v6, &wide, &style, 1.0f, &frame );
+    float halfSigma = frame.target[ find( &v6, 15, 3 ) ], edge = frame.target[ find( &v6, 17, 3 ) ];
+    style.falloff = 3.0f;
+    probeLedRender( &v6, &wide, &style, 1.0f, &frame );
+    TEST_ASSERT_TRUE( frame.target[ find( &v6, 15, 3 ) ] > halfSigma );
+    TEST_ASSERT_TRUE( frame.target[ find( &v6, 17, 3 ) ] < edge );
+    TEST_ASSERT_FLOAT_WITHIN( 0.02f, style.peak, frame.target[ find( &v6, 14, 3 ) ] );
+    style.falloff = 0.5f;
+    probeLedRender( &v6, &wide, &style, 1.0f, &frame );
+    TEST_ASSERT_TRUE( frame.target[ find( &v6, 15, 3 ) ] < halfSigma );
+    TEST_ASSERT_TRUE( frame.target[ find( &v6, 20, 3 ) ] > 0.02f ); // the skirt reaches three sigma
 }
 
 // The touch ring rings when the point lands; sliding on to another hole
@@ -721,6 +760,7 @@ int main( int argc, char** argv ) {
     RUN_TEST( test_leds_fade_rather_than_snap );
     RUN_TEST( test_a_moving_cursor_sweeps_the_rows_between );
     RUN_TEST( test_spot_widens_with_height );
+    RUN_TEST( test_one_pixel_at_least_and_the_falloff );
     RUN_TEST( test_touch_ring_repeats_only_when_asked );
     return UNITY_END( );
 }

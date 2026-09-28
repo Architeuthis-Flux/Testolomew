@@ -303,9 +303,13 @@ void settingsMenuBuild( Menu* m ) {
     menuAddToggle( m, leds, "full peak", &probeLeds.style.fullPeak,
                  "On: the brightest LED is always the peak, whatever the spot's width. Off: the total light is held, so a wide spot is a dim one." );
     menuAddNumber( m, leds, "spot", &probeLeds.style.spot, 0.1f, 4.0f, 0.1f, "",
-                 "The size of the spot: it scales the whole width, the fix's error bar included, so a small spot stays small. 1 is one hole lit with its neighbours faint, 0.3 a pin, 2 twice as wide." );             // the spot's size, 1 = one hole
+                 "The size of the spot: 1 is one hole lit with its neighbours faint, 0.3 a pin, 2 twice as wide. The fix's error bar can widen it (error width). The LED nearest the cursor is always lit." );             // the spot's size, 1 = one hole
     menuAddNumber( m, leds, "spot by height", &probeLeds.style.spotByHeight, 0.0f, 4.0f, 0.1f, "",
-                 "How much wider the spot grows per 10 mm of the point's lift: at 1 it is twice as wide 10 mm up and three times at 20. 0: the same at any height. A cone, the peak kept." ); // ...and how much wider at the height scale
+                 "How much wider the spot grows per 10 mm of the point's lift: at 1 it is twice as wide 10 mm up and three times at 20. 0: the same at any height. A cone, the peak kept." );
+    menuAddNumber( m, leds, "error width", &probeLeds.style.errorWidth, 0.0f, 3.0f, 0.1f, "",
+                   "How much of the fix's error bar shows as the spot's width: 0 none (the spot is always spot wide, whatever the fit knows), 1 the bar as it is, 2 twice. The wider of this and spot is drawn." );
+    menuAddNumber( m, leds, "falloff", &probeLeds.style.falloff, 0.3f, 3.0f, 0.1f, "",
+                   "The spot's edge: 1 is a Gaussian bell; higher a flatter top with a sharper edge (3 is nearly a disc); lower a bright centre with a wide dim skirt." ); // ...and how much wider at the height scale
     menuAddNumber( m, leds, "bloom", &probeLeds.style.bloom, 0.0f, 1.0f, 0.1f, "",
                  "A soft halo three times as wide as the spot, at this fraction of its light." );
     menuAddNumber( m, leds, "sparkle", &probeLeds.style.sparkle, 0.0f, 1.0f, 0.1f, "",

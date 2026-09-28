@@ -204,6 +204,7 @@ extern const char* const probeLedDataNames[ PROBELED_DATA_COUNT ];
 #define PROBELED_MAX_SIGMA_ACROSS_MM 7.0f
 #define PROBELED_TOUCH_MM 2.0f     // the point is "on the board" below this (as the paint's touch, 2026-09-19)
 #define PROBELED_SPOT_HEIGHT_MM 10.0f // "spot by height" counts the point's lift in these (up to PROBELED_SPOT_HEIGHT_MAX of them)
+#define PROBELED_ONE_PIXEL_ROWS 1.0f  // the LED nearest the cursor (within this) is always lit at the bell's peak: a pin between two holes lights the nearer one, never nothing (2026-09-28)
 #define PROBELED_SPOT_HEIGHT_MAX 6.0f
 #define PROBELED_SWEEP_S 0.25f     // a cursor seen this recently is swept to the new one (a fast hand's refused frames are a few; a cold start across the board is a jump)
 #define PROBELED_SWEEP_TAIL 0.6f   // the sweep's old end, as a fraction of the head (it was lit last frame, and has decayed since: a comet)
@@ -220,7 +221,9 @@ struct ProbeLedStyle {
     float peak;                     // brightest any LED gets, 0..1
     float minSigmaRows;             // the bell is never narrower than this (one hole lights, neighbours faint)...
     float minSigmaAcrossMm;
-    float spot;         // ...times this - the fix's error bar too, so a small spot is small whatever the bar says (the menu's "spot": 1 = one hole lit, its neighbours faint; 0.3 a pin; 2026-09-28: it scaled the floor only, and a wide bar won)...
+    float spot;         // ...times this (the menu's "spot": the floor's size, 1 = one hole lit, its neighbours faint; 0.3 a pin)...
+    float errorWidth;   // the fix's error bar times this is the other floor of the width: 0 = the bar is not shown, the spot is "spot" wide whatever the fit knows; 1 = the bar as it is; 2 = twice (the menu's "error width", 2026-09-28)
+    float falloff;      // the bell's shape: 1 a Gaussian; higher a flatter top and a sharper edge (3 near a disc); lower a peaked centre with a wide skirt (the menu's "falloff", 2026-09-28)
     float spotByHeight; // ...and this much wider again per PROBELED_SPOT_HEIGHT_MM of the point's lift (the menu's "spot by height": 0 = the same size at any height, 1 = twice as wide 10 mm up and three times at 20 - a flashlight's cone, the peak kept; over the colours page's height scale until 2026-09-28, 60 mm on the bench: nothing to see at working heights)
     float liftFullMm;      // the height scale: where the height's wheel ends (and classic's colour is all "lift"), mm
     float attackS, decayS; // per-LED smoothing time constants
