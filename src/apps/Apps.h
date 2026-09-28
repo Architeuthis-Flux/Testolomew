@@ -79,6 +79,7 @@ void rowsDraw( GFXcanvas16* canvas );
 bool rowsEvent( const InputEvent* e );
 uint32_t rowsGeneration( );
 // Calibrate (AppCalibrate.cpp): the twelve taps.
+void calibrateSetKind( int kind ); // 0 the rows (the twelve taps), 1 the lean (2026-09-28): what going to the app starts
 void calibrateEnter( );
 void calibrateExit( );
 void calibrateDraw( GFXcanvas16* canvas );

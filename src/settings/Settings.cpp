@@ -138,6 +138,15 @@ int SettingsService::record( int step, char* out, int size ) {
         return snprintf( out, size, "strength=%.0f %s\n", (double)magLocator.strengthSaved, magLocator.strengthSavedMeasured ? "measured" : "unconfirmed" );
     }
     step--;
+    if ( step == 0 ) {
+        // The lean calibration's tip model (TipModel.h): the horizontal 2 x 2 and dz.
+        const TipModel& t = magLocator.tipModel;
+        if ( !t.valid ) {
+            return 0;
+        }
+        return snprintf( out, size, "tipmodel=%.3f,%.3f,%.3f,%.3f,%.3f\n", (double)t.a[ 0 ], (double)t.a[ 1 ], (double)t.a[ 2 ], (double)t.a[ 3 ], (double)t.dz );
+    }
+    step--;
 #if MODULE_ROW_COUNT
     const RowAnchor* anchors;
     int count = rowCounter.anchorList( &anchors );
@@ -257,6 +266,17 @@ int SettingsService::apply( const char* text ) {
                     magLocator.haveLastGood = true;
                     applied++;
                 }
+            } else if ( keyLength == 8 && strncmp( line, "tipmodel", 8 ) == 0 ) {
+                char* next = nullptr;
+                TipModel t;
+                t.a[ 0 ] = strtof( value, &next );
+                t.a[ 1 ] = strtof( next + 1, &next );
+                t.a[ 2 ] = strtof( next + 1, &next );
+                t.a[ 3 ] = strtof( next + 1, &next );
+                t.dz = strtof( next + 1, &next );
+                t.valid = true;
+                magLocator.learnTipModel( t, 0.5f * ( t.a[ 0 ] + t.a[ 3 ] ) );
+                applied++;
             } else if ( keyLength == 8 && strncmp( line, "strength", 8 ) == 0 ) {
                 char* end = nullptr;
                 float strength = strtof( value, &end );

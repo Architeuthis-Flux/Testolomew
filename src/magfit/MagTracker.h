@@ -49,6 +49,7 @@
 #include <stdbool.h>
 #include <stdint.h>
 
+#include "TipModel.h"
 #include "Vec3.h"
 
 #define MAGTRACK_ACCEL_SIGMA 20000.0f     // mm/s^2: how jerky a hand's motion may be (process noise). 3000 lagged 20 ms; this lags 10 with the same rest jitter after the 1-Euro (tools/hostsim/pencil.cpp) (the bench's setting on 2026-09-27, taken as the default: 10000 until then)
@@ -170,7 +171,8 @@ struct MagTrack {
     bool smooth;  // the cursor's, view's and shaft's 1-Euro filters; off = what is shown is the track's own output, and with the tracker off too that is the bare fix - RAW, for comparing (2026-09-27 evening: with the filters in both modes the tracker toggle changed nothing to see)
     MagCursorMode cursorMode;
     float surfaceZ;    // the breadboard's surface, mm above the sensors
-    float tipOffsetMm; // the point is this far down the shaft from the magnet
+    float tipOffsetMm; // the point is this far down the shaft from the magnet...
+    TipModel tipModel; // ...or, learned by the lean calibration, where it is for a leaning shaft (TipModel.h; the locator copies it in each frame)
     float accelSigma;
     float sigmaFloorMm;
     float gate;

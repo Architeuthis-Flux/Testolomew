@@ -125,6 +125,11 @@ static void screenExtra( Stream* out ) {
         snprintf( line, sizeof( line ), "calibrating: tap row %d hole %d, step %d/%d, %.0f%%", row, hole, rowCounter.calibrationStepNumber( ) + 1, ROWGRID_CALIBRATION_TARGETS, 100.0f * rowCounter.tapProgress( ) );
         out->println( line );
     }
+    if ( rowCounter.leanCalibrating( ) ) {
+        snprintf( line, sizeof( line ), "lean: %d/%d %s, %.0f%%%s%s", rowCounter.leanStepNumber( ) + 1, ROWCOUNT_LEAN_STEPS, rowCounter.leanPrompt( ), 100.0f * rowCounter.tapProgress( ),
+                  rowCounter.leanInAir ? ", in the air" : "", rowCounter.leanWaitingForSwing( ) ? ", waiting for the swing" : "" );
+        out->println( line );
+    }
 #endif
     snprintf( line, sizeof( line ), "camera: %s target %.1f %.1f %.1f yaw %.0f el %.0f zoom %.2f", cameraModeNames[ viewCamera.mode ], viewCamera.target.x, viewCamera.target.y, viewCamera.target.z,
               viewCamera.yawDeg, viewCamera.elevationDeg, viewCamera.zoom );

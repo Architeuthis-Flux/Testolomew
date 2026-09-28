@@ -1,0 +1,56 @@
+# The lean calibration (2026-09-28): the world's magnet 3 mm up the shaft,
+# the locator believing 0. With the cursor UNDER the tip (u), resting in row
+# 15 at a 40 degree lean along +x the point reads 2 mm on - row 16. (In aim
+# mode a point on the surface hides an uncalibrated tip: the magnet
+# projected down the shaft lands on the point whatever the tip - until the
+# lean is steep enough for the contact rule to take the magnet itself.) The
+# lean calibration from the tools page: six holds in the one hole (upright,
+# then five leans), the tip model is learned (tip 3.0), and the same lean
+# reads row 15, the other way too.
+@reference
+@strength 4232
+@tip 3
+@seed 5
+@run 2000
+u
+@expect "under"
+@magnet row 15 3 0 40 0
+@run 2500
+:screen
+@expect "row: 16 hole 3"
+:ui root
+:ui go tools
+:ui go calibrate lean
+@run 300
+:screen
+@expect "app: Calibrate"
+@seen "calibrating the lean"
+# Held in the air: not counted, and the screen says so.
+@magnet row 15 3 14 0
+@run 2000
+:screen
+@expect "lean: 1/6 straight up, 0%, in the air"
+@magnet row 15 3 0 0
+@run 4000
+@seen "1/6"
+@magnet row 15 3 0 40 0
+@run 4000
+@magnet row 15 3 0 40 180
+@run 4000
+@magnet row 15 3 0 40 90
+@run 4000
+@magnet row 15 3 0 40 270
+@run 4000
+@magnet row 15 3 0 40 45
+@run 4000
+@seen "lean learned: tip 3."
+@magnet row 15 3 0 40 0
+@run 2500
+:screen
+@expect "row: 15 hole 3"
+@magnet row 20 3 0 40 180
+@run 2500
+:screen
+@expect "row: 20 hole 3"
+s
+@expect "tipmodel="

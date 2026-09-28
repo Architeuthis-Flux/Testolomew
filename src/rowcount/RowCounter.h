@@ -49,6 +49,7 @@
 
 #include "JumperlOS.h"
 #include "RowGrid.h"
+#include "TipModel.h"
 #include "Vec3.h"
 
 // The grid the firmware boots with: { ax, ay, a0, cx, cy, c0 } (RowGrid.h). As
@@ -94,6 +95,14 @@
 #define ROWCOUNT_TAP_STILL_MIN_MM 1.0f
 #define ROWCOUNT_TAP_STILL_MAX_MM 4.0f
 #define ROWCOUNT_TAP_APART_MM 5.0f
+// The lean calibration: this many samples (upright, then leaning five ways),
+// the next needing the shaft swung this far from the last sample's; a
+// sample is "still" when the magnet stays put as a tap does and the shaft
+// within ROWCOUNT_LEAN_STILL_DEG of its mean.
+#define ROWCOUNT_LEAN_STEPS 6
+#define ROWCOUNT_LEAN_SWING_DEG 15.0f
+#define ROWCOUNT_LEAN_STILL_DEG 3.0f
+#define ROWCOUNT_LEAN_MAX_UP_MM 15.0f // a sample whose magnet is higher than this over the surface was taken in the air, not resting: not taken (the hole unknowns would absorb it and the fit look fine)
 
 struct RowReading {
     bool valid;
@@ -148,7 +157,15 @@ class RowCounter : public Service {
     bool calibrating( ) const { return calibrationStep >= 0; }
     int calibrationStepNumber( ) const { return calibrationStep; }
     void calibrationTarget( int* row, int* hole ) const { rowGridCalibrationTarget( calibrationStep, row, hole ); }
-    float tapProgress( ) const { return (float)stillCount / ROWCOUNT_TAP_FIXES; } // 0..1 while a tap is being taken
+    float tapProgress( ) const { return (float)stillCount / ROWCOUNT_TAP_FIXES; } // 0..1 while a tap (or a lean sample) is being taken
+    // The lean calibration, for the console and the Calibrate app.
+    void startLeanCalibration( Stream* out ); // again = cancel
+    bool leanCalibrating( ) const { return leanStep >= 0; }
+    int leanStepNumber( ) const { return leanStep; }
+    const char* leanPrompt( ) const;          // what is wanted now ("straight up", "lean toward row 1" ...)
+    bool leanWaitingForSwing( ) const { return leanCalibrating( ) && leanCount > 0 && stillCount == 0 && !leanSwung; }
+    bool leanSwung = false;                    // the shaft has swung from the last sample: counting may start
+    bool leanInAir = false;                    // the magnet is over ROWCOUNT_LEAN_MAX_UP_MM above the surface: not resting, not counted (the screen says so)
 
     // The anchors as they stand (for saving), and anchors put back from a
     // save: they replace what there is and the grid is fitted to them.
@@ -204,6 +221,19 @@ class RowCounter : public Service {
 
     void watchForTap( Stream* out );
     void finishCalibration( Stream* out );
+
+    // The lean calibration (2026-09-28): the point resting in one hole, the
+    // probe held still straight up and then leaning five ways; each sample
+    // the mean magnet and shaft over the tap window; the tip model fitted
+    // (TipModel.h) into the locator. -1 = not running.
+    int leanStep = -1;
+    TipSample leanSamples[ ROWCOUNT_LEAN_STEPS ];
+    int leanCount = 0;
+    Vec3 leanShaftSum;  // the shaft over the still run (for "still")...
+    Vec3 leanShaftMeas; // ...and over the measurement
+    Vec3 lastLeanShaft; // the last sample's: the next needs a swing of ROWCOUNT_LEAN_SWING_DEG
+    void watchForLean( Stream* out );
+    void finishLean( Stream* out );
 
     void collect( );
     void finishHold( Stream* out );

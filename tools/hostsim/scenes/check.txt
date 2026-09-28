@@ -464,7 +464,8 @@ q
 @run 2500
 q
 Q
-@expect "mm from 3 angles (the points then agree to 0."
+@expect "mm from 3 angles ("
+@expect "the plain tip only"
 @magnet row 20 2 0 40
 @run 3000
 :screen

@@ -397,10 +397,11 @@ static bool directive( const std::vector<std::string>& w, int lineNo ) {
             int row = atoi( w[ 2 ].c_str( ) ), hole = atoi( w[ 3 ].c_str( ) );
             float up = w.size( ) >= 5 ? atof( w[ 4 ].c_str( ) ) : 0.0f;
             float lean = ( w.size( ) >= 6 ? atof( w[ 5 ].c_str( ) ) : 0.0f ) * (float)M_PI / 180.0f;
+            float dir = ( w.size( ) >= 7 ? atof( w[ 6 ].c_str( ) ) : 0.0f ) * (float)M_PI / 180.0f; // which way it leans, degrees round the board (0 = +x, along the rows)
             RowPlace place = rowGridHolePlace( row, hole );
             Vec3 tip = rowGridToBoard( &rowCounter.grid, place.along, place.acrossMm );
             tip.z = world.surfaceZ + world.slopeX * tip.x + world.slopeY * tip.y + up;
-            world.shaft = { sinf( lean ), 0.0f, cosf( lean ) };
+            world.shaft = { sinf( lean ) * cosf( dir ), sinf( lean ) * sinf( dir ), cosf( lean ) };
             { float tt = world.tipMm >= 0.0f ? world.tipMm : magLocator.tipOffsetMm; world.magnet = { tip.x + tt * world.shaft.x, tip.y + tt * world.shaft.y, tip.z + tt * world.shaft.z }; }
             world.on = true;
             world.moving = false;

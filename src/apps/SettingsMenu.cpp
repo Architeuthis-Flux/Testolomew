@@ -165,8 +165,24 @@ static void runConsoleKeyWithNumber( int key, float argument ) {
 }
 
 // An app from the menu (the menu closes over it).
+static void runForgetLean( int, float ) {
+    magLocator.forgetTipModel( );
+    uiStream.println( "lean forgotten: the point is the magnet less tracking/tip along the shaft, whatever the lean" );
+    ui.showResult( "forget lean" );
+}
+
 static void runOpenApp( int app, float ) {
     appsOpen( app );
+}
+
+static void runOpenRows( int app, float arg ) {
+    calibrateSetKind( 0 );
+    runOpenApp( app, arg );
+}
+
+static void runOpenLean( int app, float arg ) {
+    calibrateSetKind( 1 );
+    runOpenApp( app, arg );
 }
 
 static void runResetView( int, float ) {
@@ -203,7 +219,7 @@ void settingsMenuBuild( Menu* m ) {
     menuAddNumber( m, tracking, "surface", &magLocator.boardZ, 0.0f, 60.0f, 0.5f, "mm",
                  "How high the breadboard's surface sits above the sensors at the taps' centre, mm. The height shown, where the aim cursor lands and the touch come from it. The 12-tap calibration also learns how the surface runs across the board (a tilt, a bow), so the height reads the same in every hole; forget anchors flattens it." );
     menuAddNumber( m, tracking, "tip", &magLocator.tipOffsetMm, 0.0f, 60.0f, 0.5f, "mm",
-                 "The magnet's centre sits this far up the shaft from the probe's point, mm. Wrong here and the point lands off along the lean." );
+                 "The magnet's centre sits this far up the shaft from the probe's point, mm. Wrong here and the point lands off along the lean - a row off at 40 degrees for 3 mm. The lean calibration (tools) measures it, with the fix's own lean bias; editing this by hand drops that model." );
     menuAddNumber( m, tracking, "reach", &magLocator.track.maxReachMm, 5.0f, 60.0f, 2.5f, "mm",
                  "The aim cursor never lands further from under the tip than this, mm. Lower it if a flat lean throws the cursor across the board." ); // (5-100 until 2026-09-25: the reach is the drop x tan 70 deg at most - 55 mm from a 20 mm hover - so 60 is the useful end)
     // The smoothing, the levers that are felt first (tools/hostsim/pencil.cpp,
@@ -376,7 +392,9 @@ void settingsMenuBuild( Menu* m ) {
                  "Which breadboard row the probe is over, on the LCD and the console. A mode: not saved." );
     menuAddInfo( m, tools, "row", rowInfo,
                  "The counted row and how sure. Info only." );
-    menuAddAction( m, tools, "calibrate 12 taps", APP_CALIBRATE, runOpenApp, false );
+    menuAddAction( m, tools, "calibrate 12 taps", APP_CALIBRATE, runOpenRows, false );
+    menuAddAction( m, tools, "calibrate lean", APP_CALIBRATE, runOpenLean, false ); // the point in one hole, six holds: the tip model (2026-09-28)
+    menuAddAction( m, tools, "forget lean", 0, runForgetLean, true );
     menuAddNumberAction( m, tools, "anchor at row", 'R', runConsoleKeyWithNumber, 1.0f, 60.0f, 1.0f, 1.0f );
     menuAddAction( m, tools, "forget anchors", 'C', runConsoleKey, true );
     menuAddAction( m, tools, "hold-still test", 'h', runConsoleKey, false );

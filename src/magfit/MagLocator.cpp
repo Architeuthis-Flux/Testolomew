@@ -135,53 +135,26 @@ static void onTipSample( Stream* out ) {
 }
 
 static void onTipSolve( Stream* out ) {
-    if ( tipCalCount < 3 ) {
-        char line[ 100 ];
-        snprintf( line, sizeof( line ), "%d sample%s: q takes one at each angle, 3 or more (the samples are cleared)", tipCalCount, tipCalCount == 1 ? "" : "s" );
+    // The samples q took, through the lean calibration's solver (TipModel.h,
+    // 2026-09-28): one hole, the model learned when the leans allow it.
+    TipSample samples[ TIP_CAL_MAX ];
+    for ( int k = 0; k < tipCalCount; k++ ) {
+        samples[ k ].magnet = tipCalMagnet[ k ];
+        samples[ k ].shaft = tipCalShaft[ k ];
+        samples[ k ].hole = 0;
+    }
+    TipModel m;
+    TipFitReport report;
+    char line[ 240 ];
+    if ( !tipModelFit( samples, tipCalCount, &m, &report ) ) {
+        snprintf( line, sizeof( line ), "%d sample%s: %s (the samples are cleared; q takes one at each angle)", tipCalCount, tipCalCount == 1 ? "" : "s", report.refused );
         out->println( line );
         tipCalCount = 0;
         return;
     }
-    int n = tipCalCount;
-    Vec3 mm = { 0, 0, 0 }, ms = { 0, 0, 0 };
-    for ( int k = 0; k < n; k++ ) {
-        mm = { mm.x + tipCalMagnet[ k ].x, mm.y + tipCalMagnet[ k ].y, mm.z + tipCalMagnet[ k ].z };
-        ms = { ms.x + tipCalShaft[ k ].x, ms.y + tipCalShaft[ k ].y, ms.z + tipCalShaft[ k ].z };
-    }
-    mm = { mm.x / n, mm.y / n, mm.z / n };
-    ms = { ms.x / n, ms.y / n, ms.z / n };
-    float num = 0.0f, den = 0.0f;
-    for ( int k = 0; k < n; k++ ) {
-        Vec3 dm = { tipCalMagnet[ k ].x - mm.x, tipCalMagnet[ k ].y - mm.y, tipCalMagnet[ k ].z - mm.z };
-        Vec3 ds = { tipCalShaft[ k ].x - ms.x, tipCalShaft[ k ].y - ms.y, tipCalShaft[ k ].z - ms.z };
-        num += dm.x * ds.x + dm.y * ds.y + dm.z * ds.z;
-        den += ds.x * ds.x + ds.y * ds.y + ds.z * ds.z;
-    }
-    if ( den < 0.05f ) {
-        out->println( "the angles were too alike to tell: spread them (upright, leaning one way, leaning another), q at each, then Q" );
-        tipCalCount = 0;
-        return;
-    }
-    float t = num / den;
-    // The points with that t, and their spread about the hole.
-    Vec3 c = { mm.x - t * ms.x, mm.y - t * ms.y, mm.z - t * ms.z };
-    float rms = 0.0f;
-    for ( int k = 0; k < n; k++ ) {
-        Vec3 p = { tipCalMagnet[ k ].x - t * tipCalShaft[ k ].x - c.x, tipCalMagnet[ k ].y - t * tipCalShaft[ k ].y - c.y, tipCalMagnet[ k ].z - t * tipCalShaft[ k ].z - c.z };
-        rms += p.x * p.x + p.y * p.y + p.z * p.z;
-    }
-    rms = sqrtf( rms / n );
-    char line[ 220 ];
-    if ( t < -1.0f || t > 60.0f ) {
-        snprintf( line, sizeof( line ), "the solve says %.1f mm, which is not a probe: the samples are cleared, try again with the point kept in the one hole", t );
-        out->println( line );
-        tipCalCount = 0;
-        return;
-    }
-    if ( t < 0.0f )
-        t = 0.0f;
-    magLocator.tipOffsetMm = t;
-    snprintf( line, sizeof( line ), "tip offset %.1f mm from %d angles (the points then agree to %.2f mm rms about the hole at %.1f %.1f %.1f): in use, and saved as tracking/tip", t, n, rms, c.x, c.y, c.z );
+    magLocator.learnTipModel( m, report.tipMm );
+    snprintf( line, sizeof( line ), "tip %.1f mm from %d angles (%.0f-%.0f deg; the points agree to %.2f mm rms, worst %.2f): %s - in use and saved as tracking/tip", report.tipMm, tipCalCount,
+              report.leanMinDeg, report.leanMaxDeg, report.rmsMm, report.worstMm, report.scalar ? report.note : "the lean model, bias and all" );
     out->println( line );
     tipCalCount = 0;
 }
@@ -273,7 +246,7 @@ ServiceStatus MagLocator::simFrame( MagTrackInput* in ) {
     fix.seenBy = magArray.sensorCount( );
     fix.faintBy = 0;
     fix.fitUs = 0;
-    fix.tip = { fix.magnet.x - tipOffsetMm * fix.shaft.x, fix.magnet.y - tipOffsetMm * fix.shaft.y, fix.magnet.z - tipOffsetMm * fix.shaft.z };
+    fix.tip = pointOf( fix.magnet, fix.shaft );
     fix.rawTip = fix.tip;
     fix.pointer = pointerOf( fix.tip, fix.shaft );
     fix.rawPointer = fix.pointer;
@@ -380,6 +353,7 @@ static void onAuditVerb( int argc, char** argv, Stream* out ); // below, with th
 void MagLocator::begin( ) {
     magTrackInit( &track, boardZ, tipOffsetMm );
     surfaceMapClear( &surfaceMap );
+    tipModelClear( &tipModel );
     consoleAddVerb( "probe", "<x> <y> <z> [ms] [sigma s] [shaft dx dy dz] [rough] | row <r> <h> [up mm] [ms] [lean deg] | off", "a simulated probe fed to the tracker in place of the fit", CONSOLE_CHANGES,
                     onProbeVerb );
     consoleAddCommand( 'd', "stream probe fixes as CSV (toggle)", onStream );
@@ -608,7 +582,10 @@ ServiceStatus MagLocator::service( ) {
         track.surfaceZ = surfaceAt( fix.rawTip.x, fix.rawTip.y );
     else
         track.surfaceZ = boardZ;
+    if ( tipModel.valid && fabsf( tipOffsetMm - tipModelD ) > 0.01f )
+        forgetTipModel( ); // "tip" edited by hand: the plain scalar is what was asked for
     track.tipOffsetMm = tipOffsetMm;
+    track.tipModel = tipModel;
     magTrackUpdate( &track, dtS, &in );
     return lastStatus;
 }
@@ -1261,8 +1238,8 @@ ServiceStatus MagLocator::publishFix( MagTrackInput* in, const FrameScratch& f )
     Vec3 other = { -c * pole.x + s * up.x, -c * pole.y + s * up.y, -c * pole.z + s * up.z };
     fix.shaft = one.z >= other.z ? one : other;
     fix.tiltDeg = acosf( fix.shaft.z > 1.0f ? 1.0f : fix.shaft.z ) * 180.0f / (float)M_PI;
-    fix.tip = { fix.magnet.x - tipOffsetMm * fix.shaft.x, fix.magnet.y - tipOffsetMm * fix.shaft.y, fix.magnet.z - tipOffsetMm * fix.shaft.z };
-    fix.rawTip = { fix.rawMagnet.x - tipOffsetMm * fix.shaft.x, fix.rawMagnet.y - tipOffsetMm * fix.shaft.y, fix.rawMagnet.z - tipOffsetMm * fix.shaft.z };
+    fix.tip = pointOf( fix.magnet, fix.shaft );
+    fix.rawTip = pointOf( fix.rawMagnet, fix.shaft );
     fix.pointer = pointerOf( fix.tip, fix.shaft );
     fix.rawPointer = pointerOf( fix.rawTip, fix.shaft );
     fix.count++;
@@ -1686,6 +1663,17 @@ float MagLocator::chiSmoothed( const MagFitResult& r, const bool* use, float alp
 }
 
 // k: hold the strength (again), and measure it from scratch.
+void MagLocator::learnTipModel( const TipModel& m, float tipMm ) {
+    tipModel = m;
+    tipOffsetMm = tipMm;
+    tipModelD = tipMm;
+}
+
+void MagLocator::forgetTipModel( ) {
+    tipModelClear( &tipModel );
+    tipModelD = tipOffsetMm;
+}
+
 void MagLocator::startLearningStrength( ) {
     strengthRingCount = 0;
     strengthRingAt = 0;

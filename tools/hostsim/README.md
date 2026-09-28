@@ -12,7 +12,7 @@ The firmware's modules run on a PC against stubs of what the chip provides (`Ard
 | `e`, `\t`, `\e[A`, `` ` ``, `/`, `S23\r` | typed keys (escapes `\e \r \n \t`), then a moment for them to play |
 | `@run <ms>` | let the loop run |
 | `@magnet <x> <y> <z> <sx> <sy> <sz>` | the magnet's centre (mm) and axis |
-| `@magnet row <r> <h> [up mm] [lean deg]` | the probe's point in that hole, leaning toward +x |
+| `@magnet row <r> <h> [up mm] [lean deg] [dir deg]` | the probe's point in that hole, leaning toward +x (or `dir` degrees round the board: 90 = +y) |
 | `@magnet off` | no magnet |
 | `@move <dx> <dy> <dz> <ms>` | glide the magnet by that much over that long |
 | `@dropout <ms>` | no readings for that long |
@@ -33,6 +33,7 @@ The firmware's modules run on a PC against stubs of what the chip provides (`Ard
 
 Two verbs exist only in the simulator: `:screen:png <file>` writes what the panel shows as a PNG, and `:screen:verify` checks that the dump path the board uses (`:screen:dump` → `MagView::copyShownRow`, which un-swaps the bytes the LCD push swapped in place) gives exactly what the panel received. The exit code is 1 if any `@expect` failed; the boot line checks that loading the settings did not switch the modes and that the menu table has room.
 
+- `scenes/lean.txt`: a magnet 3 mm up an uncalibrated shaft reads a row off at a 40 degree lean; the lean calibration (six holds in one hole, through the menu) learns it and the row reads right leaning either way (2026-09-28).
 - `scenes/tilt.txt`: the twelve taps on a board tilted 3 mm along and 1.4 across, then the far corner's height reads ~0 where it read ~2 before (the surface map, 2026-09-28).
 - `make check` runs `scenes/check.txt`, the regression set: the verbs, a simulated probe seen by the tracker, the row counter and the LEDs, the dumps, the menu driven from the console, the settings written after they settle with every page's keys present.
 - `make screens` runs `scenes/screens.txt` (the probe on a row and lifted, the LED preview, paint and erase, coasting, a far probe, the menu pages, the log, the POV, top and orbited cameras) into `out/*.png` and tiles them into `docs/screens-simulated.png` with `montage.py`.

@@ -28,6 +28,7 @@ void magTrackInit( MagTrack* t, float surfaceZ, float tipOffsetMm ) {
     t->smooth = true;
     t->cursorMode = MAGCURSOR_POINTED;
     t->surfaceZ = surfaceZ;
+    tipModelClear( &t->tipModel );
     t->tipOffsetMm = tipOffsetMm;
     t->accelSigma = MAGTRACK_ACCEL_SIGMA;
     t->sigmaFloorMm = MAGTRACK_SIGMA_FLOOR_MM;
@@ -217,7 +218,7 @@ static void finishFrame( MagTrack* t, float dtS, bool roughHeld ) {
         t->shaft = up;
     }
     t->tiltDeg = acosf( t->shaft.z > 1.0f ? 1.0f : ( t->shaft.z < -1.0f ? -1.0f : t->shaft.z ) ) * 180.0f / (float)M_PI;
-    t->tip = { t->position.x - t->tipOffsetMm * t->shaft.x, t->position.y - t->tipOffsetMm * t->shaft.y, t->position.z - t->tipOffsetMm * t->shaft.z };
+    t->tip = tipModelPoint( &t->tipModel, t->tipOffsetMm, t->position, t->shaft );
     t->rawCursor = magTrackCursorOf( t, t->tip, t->shaft, &t->reachMm );
     // The filters slow with the point's height (MAGTRACK_HZ_HALF_MM, the
     // Hz; MAGTRACK_BETA_HALF_MM, the betas): a far fix is a noisy one, and
@@ -253,7 +254,7 @@ static void finishFrame( MagTrack* t, float dtS, bool roughHeld ) {
         t->viewPosition.y = oneEuro( &t->viewEuro[ 1 ], t->position.y, dtS, viewCutoff, viewBeta );
         t->viewPosition.z = oneEuro( &t->viewEuro[ 2 ], t->position.z, dtS, viewCutoff, viewBeta );
     }
-    t->viewTip = { t->viewPosition.x - t->tipOffsetMm * t->shaft.x, t->viewPosition.y - t->tipOffsetMm * t->shaft.y, t->viewPosition.z - t->tipOffsetMm * t->shaft.z };
+    t->viewTip = tipModelPoint( &t->tipModel, t->tipOffsetMm, t->viewPosition, t->shaft );
     // The cursor's bar: the track's, plus what a few degrees of shaft error do
     // over the reach, plus the tip offset's share of the same.
     float xy = sqrtf( t->sigma.x * t->sigma.x + t->sigma.y * t->sigma.y );

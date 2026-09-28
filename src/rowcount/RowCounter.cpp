@@ -186,6 +186,7 @@ void RowCounter::startCalibration( Stream* out ) {
         out->println( "calibration cancelled: nothing changed" );
         return;
     }
+    leanStep = -1; // one calibration at a time
     calibrationStep = 0;
     anchorCount = 0;
     stillCount = 0;
@@ -282,6 +283,138 @@ void RowCounter::watchForTap( Stream* out ) {
     }
     calibrationTarget( &row, &hole );
     snprintf( line, sizeof( line ), "  %d/%d: row %d, %s", calibrationStep + 1, ROWGRID_CALIBRATION_TARGETS, row, holeName( hole ) );
+    out->println( line );
+}
+
+// ---- the lean calibration ------------------------------------------------------
+
+static const char* const leanPrompts[ ROWCOUNT_LEAN_STEPS ] = { "straight up", "lean toward row 1", "lean toward row 30", "lean toward you", "lean away from you", "lean any other way" };
+
+const char* RowCounter::leanPrompt( ) const {
+    return leanStep >= 0 && leanStep < ROWCOUNT_LEAN_STEPS ? leanPrompts[ leanStep ] : "";
+}
+
+void RowCounter::startLeanCalibration( Stream* out ) {
+    if ( leanCalibrating( ) ) {
+        leanStep = -1;
+        out->println( "lean calibration cancelled: nothing changed" );
+        return;
+    }
+    calibrationStep = -1; // one calibration at a time
+    leanStep = 0;
+    leanInAir = false;
+    leanCount = 0;
+    stillCount = 0;
+    strayCount = 0;
+    leanSwung = true; // the first sample needs no swing
+    out->println( "calibrating the lean: rest the probe's point in one hole and keep it there the whole time. Hold still straight up until it says got it, then lean it about 30-45 degrees each way it asks. c again = cancel." );
+    char line[ 80 ];
+    snprintf( line, sizeof( line ), "  1/%d: %s", ROWCOUNT_LEAN_STEPS, leanPrompts[ 0 ] );
+    out->println( line );
+}
+
+void RowCounter::watchForLean( Stream* out ) {
+    const MagProbeFix& fix = magLocator.fix;
+    if ( !fix.valid || fix.rough ) {
+        return; // the run goes on: a missed frame is not a move
+    }
+    // The next sample wants a new lean: the shaft swung from the last one.
+    if ( !leanSwung ) {
+        float dot = fix.shaft.x * lastLeanShaft.x + fix.shaft.y * lastLeanShaft.y + fix.shaft.z * lastLeanShaft.z;
+        if ( dot > cosf( ROWCOUNT_LEAN_SWING_DEG * (float)M_PI / 180.0f ) )
+            return;
+        leanSwung = true;
+    }
+    // Resting, not held in the air: the magnet no higher over the surface
+    // than a tip could put it. In the air nothing is counted (a hover that
+    // held still would calibrate garbage the hole's unknowns absorb).
+    Vec3 p = fix.rawMagnet;
+    leanInAir = p.z - magLocator.surfaceAt( p.x, p.y ) > ROWCOUNT_LEAN_MAX_UP_MM;
+    if ( leanInAir ) {
+        stillCount = 0;
+        return;
+    }
+    // Still: the magnet stays put (as a tap judges it) and the shaft too.
+    float tolerance = 3.0f * fix.errorXyMm;
+    tolerance = tolerance < ROWCOUNT_TAP_STILL_MIN_MM ? ROWCOUNT_TAP_STILL_MIN_MM : tolerance;
+    tolerance = tolerance > ROWCOUNT_TAP_STILL_MAX_MM ? ROWCOUNT_TAP_STILL_MAX_MM : tolerance;
+    if ( stillCount > 0 ) {
+        float dx = p.x - stillSum.x / stillCount, dy = p.y - stillSum.y / stillCount, dz = p.z - stillSum.z / stillCount;
+        float sl = sqrtf( leanShaftSum.x * leanShaftSum.x + leanShaftSum.y * leanShaftSum.y + leanShaftSum.z * leanShaftSum.z );
+        float dot = sl > 0.0f ? ( fix.shaft.x * leanShaftSum.x + fix.shaft.y * leanShaftSum.y + fix.shaft.z * leanShaftSum.z ) / sl : 1.0f;
+        bool moved = dx * dx + dy * dy + dz * dz > tolerance * tolerance || dot < cosf( ROWCOUNT_LEAN_STILL_DEG * (float)M_PI / 180.0f );
+        if ( moved ) {
+            if ( ++strayCount > ROWCOUNT_TAP_STRAYS ) {
+                stillCount = 0; // it moved: start over
+            }
+            return;
+        }
+        strayCount = 0;
+    }
+    if ( stillCount == 0 ) {
+        stillSum = { 0, 0, 0 };
+        leanShaftSum = { 0, 0, 0 };
+    }
+    if ( stillCount <= ROWCOUNT_TAP_SETTLE_FIXES ) { // the measurement starts over until the settling second is done
+        tapSum = { 0, 0, 0 };
+        leanShaftMeas = { 0, 0, 0 };
+        tapCount = 0;
+    }
+    stillCount++;
+    stillSum = { stillSum.x + p.x, stillSum.y + p.y, stillSum.z + p.z };
+    leanShaftSum = { leanShaftSum.x + fix.shaft.x, leanShaftSum.y + fix.shaft.y, leanShaftSum.z + fix.shaft.z };
+    tapSum = { tapSum.x + p.x, tapSum.y + p.y, tapSum.z + p.z };
+    leanShaftMeas = { leanShaftMeas.x + fix.shaft.x, leanShaftMeas.y + fix.shaft.y, leanShaftMeas.z + fix.shaft.z };
+    tapCount++;
+    if ( stillCount < ROWCOUNT_TAP_FIXES ) {
+        return;
+    }
+    // A sample - if the point is resting: a magnet high over the surface
+    // was held in the air, which the hole's unknowns would absorb and the
+    // fit call good (the review, 2026-09-28).
+    Vec3 magnet = { tapSum.x / tapCount, tapSum.y / tapCount, tapSum.z / tapCount };
+    float sl = sqrtf( leanShaftMeas.x * leanShaftMeas.x + leanShaftMeas.y * leanShaftMeas.y + leanShaftMeas.z * leanShaftMeas.z );
+    Vec3 shaft = sl > 0.0f ? Vec3 { leanShaftMeas.x / sl, leanShaftMeas.y / sl, leanShaftMeas.z / sl } : Vec3 { 0, 0, 1 };
+    float over = magnet.z - magLocator.surfaceAt( magnet.x, magnet.y );
+    if ( over > ROWCOUNT_LEAN_MAX_UP_MM ) {
+        char why[ 120 ];
+        snprintf( why, sizeof( why ), "       that was in the air (the magnet %.0f mm over the surface): rest the point in the hole and hold still again", over );
+        out->println( why );
+        stillCount = 0;
+        return;
+    }
+    leanSamples[ leanCount ] = { magnet, shaft, 0 };
+    leanCount++;
+    lastLeanShaft = shaft;
+    leanSwung = false;
+    stillCount = 0;
+    char line[ 160 ];
+    float tilt = acosf( shaft.z > 1.0f ? 1.0f : shaft.z ) * 180.0f / (float)M_PI;
+    snprintf( line, sizeof( line ), "       got it: magnet at %.2f %.2f %.2f, tilt %.0f deg", magnet.x, magnet.y, magnet.z, tilt );
+    out->println( line );
+    leanStep++;
+    if ( leanStep >= ROWCOUNT_LEAN_STEPS ) {
+        finishLean( out );
+        return;
+    }
+    snprintf( line, sizeof( line ), "  %d/%d: %s", leanStep + 1, ROWCOUNT_LEAN_STEPS, leanPrompts[ leanStep ] );
+    out->println( line );
+}
+
+void RowCounter::finishLean( Stream* out ) {
+    leanStep = -1;
+    TipModel m;
+    TipFitReport report;
+    char line[ 240 ];
+    if ( !tipModelFit( leanSamples, leanCount, &m, &report ) ) {
+        snprintf( line, sizeof( line ), "lean not learned: %s", report.refused );
+        out->println( line );
+        return;
+    }
+    magLocator.learnTipModel( m, report.tipMm );
+    snprintf( line, sizeof( line ), "lean learned: tip %.1f mm (the magnet up the shaft), the fix's lean bias %+.1f/%+.1f mm along and %+.1f/%+.1f across per unit of lean, dz %.1f; from %d samples at %.0f-%.0f deg the points agree to %.2f mm rms (worst %.2f). In use and saved.%s%s",
+              report.tipMm, m.a[ 0 ] - report.tipMm, m.a[ 1 ], m.a[ 2 ], m.a[ 3 ] - report.tipMm, m.dz, report.samples, report.leanMinDeg, report.leanMaxDeg, report.rmsMm, report.worstMm,
+              report.scalar ? " " : "", report.scalar ? report.note : "" );
     out->println( line );
 }
 
@@ -493,6 +626,8 @@ ServiceStatus RowCounter::service( ) {
     if ( out != nullptr ) {
         if ( calibrating( ) ) {
             watchForTap( out );
+        } else if ( leanCalibrating( ) ) {
+            watchForLean( out );
         } else if ( holdPurpose != ROWHOLD_NONE ) {
             collect( );
             if ( holdCount >= ROWCOUNT_HOLD_FIXES ) {

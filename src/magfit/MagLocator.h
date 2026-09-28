@@ -21,6 +21,7 @@
 #include "MagFit.h"
 #include "MagTracker.h"
 #include "SurfaceMap.h"
+#include "TipModel.h"
 #include "ZeroAudit.h"
 #include "MagOffsetFilter.h"
 #include "Vec3.h"
@@ -479,6 +480,11 @@ class MagLocator : public Service {
     // How far the magnet's centre is up the shaft from the probe's point, and
     // the magnet's angle to the shaft.
     float tipOffsetMm = MAGLOC_TIP_OFFSET_MM;
+    TipModel tipModel;       // the point for a leaning shaft, learned by the lean calibration (TipModel.h); invalid = the scalar tip above
+    float tipModelD = 0.0f;  // the tip the model was learned with: "tip" edited by hand away from it drops the model (a hand-set tip is the plain one)
+    Vec3 pointOf( Vec3 magnet, Vec3 shaft ) const { return tipModelPoint( &tipModel, tipOffsetMm, magnet, shaft ); }
+    void learnTipModel( const TipModel& m, float tipMm ); // the calibration's result, in use and remembered
+    void forgetTipModel( );
     float magnetAngleDeg = MAGLOC_MAGNET_ANGLE_DEG;
     float boardZ = MAGLOC_BOARD_Z_MM; // the breadboard's surface at the taps' centre, mm above the sensors (the menu's "surface", saved; the row calibration sets it)...
     SurfaceMap surfaceMap;            // ...and how much higher or lower it runs elsewhere (SurfaceMap.h; the row counter fits it to its anchors, flat until then)
