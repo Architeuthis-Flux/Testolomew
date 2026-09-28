@@ -47,6 +47,7 @@
 #define SETTINGS_CHECK_MS 100
 #define SETTINGS_STEPS_PER_RUN 16
 #define SETTINGS_SETTLE_MS 2000
+#define SETTINGS_SETTLE_OPEN_MS 30000 // ...but while the menu or a tweak is open a change waits this long instead: the write holds the loop ~70 ms, a hitch on the LEDs that read as "the setting applying later" while a lever was being tuned (2026-09-28); the panes closing writes it after the plain settle
 #define SETTINGS_MAGIC 0x54534554u // "TSET"
 // Bumped when the compile-time defaults of the tuning pages (tracker,
 // smoothing, and play/touch) change for the better: saved values of those from an

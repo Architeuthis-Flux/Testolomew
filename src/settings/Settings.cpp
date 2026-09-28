@@ -13,6 +13,7 @@
 #if MODULE_ROW_COUNT
 #include "RowCounter.h"
 #endif
+#include "Ui.h" // whether a pane is open (the write waits while a lever is being tuned)
 
 SettingsService& settings = SettingsService::getInstance( );
 
@@ -463,7 +464,11 @@ ServiceStatus SettingsService::service( ) {
         // is never written until it stands still.
         strncpy( pending, current, sizeof( pending ) );
         changedSinceMs = now == 0 ? 1 : now;
-    } else if ( now - changedSinceMs >= SETTINGS_SETTLE_MS ) {
+    } else if ( now - changedSinceMs >= ( ui.overlayOpen( ) ? SETTINGS_SETTLE_OPEN_MS : SETTINGS_SETTLE_MS ) ) {
+        // A value applies the moment it is changed (the modules read the
+        // variable the menu binds); only this write is deferred, and not
+        // while the menu or a tweak is open: its ~70 ms hold of the loop
+        // showed on the LEDs as a hitch in the middle of tuning a lever.
         if ( !saveNow( ) ) {
             writeFailures++;
             changedSinceMs = now; // try again after another settle time
