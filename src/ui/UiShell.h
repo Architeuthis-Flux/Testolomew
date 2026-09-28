@@ -62,7 +62,7 @@
 
 #define UISHELL_MAX_DEPTH 4
 #define UISHELL_IDLE_MS 20000
-#define UISHELL_STEP_REPEAT_MS 300.0f // a held direction steps the cursor no faster than this (the menu's "cursor repeat"; the raw repeat is every 80 ms: "way less touchy", Kevin 2026-09-25)
+#define UISHELL_STEP_REPEAT_MS 100.0f // a held direction steps the cursor no faster than this (the menu's "cursor repeat"; the raw repeat is every 80 ms: "way less touchy", Kevin 2026-09-25) (the bench's setting on 2026-09-27, taken as the default: 300 until then)
 #define UISHELL_RESULT_TITLE 24
 
 enum PaneKind {

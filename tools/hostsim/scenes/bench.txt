@@ -3,6 +3,8 @@
 # strength.txt are the clean regression; this scene carries the bench's
 # numbers, and each change to the estimator tightens the expectation it
 # moves. `make check` runs it last.
+@reference
+:strength 1839
 :mmc off
 @strength 1839
 @seed 3

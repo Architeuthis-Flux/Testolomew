@@ -5,6 +5,7 @@
 # parked probe while each TMAG's zero drifts its own way by up to 0.006 mT:
 # the fix stays (the doubt grows at the drift rate while a zero is held, to
 # a cap). Runs with the bench's 1839 magnet.
+@reference
 @bias 2 0.03 0 0
 @bias 6 0 0.03 0
 @magnet row 15 3

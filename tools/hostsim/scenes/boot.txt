@@ -10,6 +10,7 @@
 # zero holds under the probe. Runs with the bench's 1839 magnet.
 # (The stale zeros first: a console command runs frames, and the board has
 # its stale zeros from its first frame.)
+@reference
 @bias 0 0.05 0 0
 @bias 3 0 -0.05 0
 @bias 1 0.02 0 0

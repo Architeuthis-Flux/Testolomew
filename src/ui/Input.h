@@ -56,7 +56,7 @@
 #define INPUT_PERIOD_US 5000
 #define INPUT_DEBOUNCE_MS BUTTON_DEBOUNCE_MS
 #define INPUT_HOLD_MS BUTTON_HOLD_MS
-#define INPUT_JOY_DEAD 0.10f  // the inner dead zone: this much of the travel round the centre is nothing (a scaled radial one: no step at its edge); the menu's "joy dead" (0.04 until 2026-09-25: Kevin, "increase the default deadzone")
+#define INPUT_JOY_DEAD 0.06f  // the inner dead zone: this much of the travel round the centre is nothing (a scaled radial one: no step at its edge); the menu's "joy dead" (0.04 until 2026-09-25: Kevin, "increase the default deadzone") (the bench's setting on 2026-09-27, taken as the default: 0.10 until then)
 #define INPUT_JOY_CENTRE_WITHIN 0.3f // the centre follows a stick that sits still this close to it...
 #define INPUT_JOY_CENTRE_STILL_MS 1500 // ...for this long (a hand holding a direction is not still that long at that little)
 #define INPUT_JOY_CENTRE_TAU_S 4.0f    // ...with this time constant
@@ -78,8 +78,8 @@
 // the tracker's debounce on top; 20/50 (2026-09-19) is the fast end that
 // still passes navtest - a wobble past 50 ms is a step, the trade Kevin
 // took. 10/20 was tried and decodes tilts as presses.
-#define INPUT_NAV_DIRECTION_MS 20
-#define INPUT_NAV_DIRECTION_WITH_PUSH_MS 50
+#define INPUT_NAV_DIRECTION_MS 25 // (the bench's setting on 2026-09-27, taken as the default: 20 until then)
+#define INPUT_NAV_DIRECTION_WITH_PUSH_MS 55 // (the bench's setting on 2026-09-27, taken as the default: 50 until then)
 #define INPUT_NAV_TRACE 32          // nav pattern changes remembered for `J`
 #define INPUT_EVENTS 32             // the event ring; a full one drops its oldest (counted: `j`)
 

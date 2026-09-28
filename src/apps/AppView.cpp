@@ -72,7 +72,7 @@
 #define VIEW_TRAIL_PERIOD_MS 40 // a trail point this often, ~2 s of history
 
 Camera viewCamera;
-ViewStyle viewStyle = { true, MAGNET_HALF_LENGTH_MM, 3.0f, 225.0f, 1.0f }; // the colours page: the poles shown, the bar half length, the hues of COLOR_NORTH / COLOR_SOUTH as they were, the field arrows at full
+ViewStyle viewStyle = { true, 14.0f, 325.0f, 210.0f, 1.0f }; // the colours page: the poles shown, the bar half length, the poles' hues, the field arrows at full (the bench's settings on 2026-09-27, taken as the defaults: 5 mm, 3 and 225 - COLOR_NORTH / COLOR_SOUTH - until then)
 
 static GFXcanvas16* canvas = nullptr; // the frame being drawn
 // The projection's copy of the camera, taken each frame.

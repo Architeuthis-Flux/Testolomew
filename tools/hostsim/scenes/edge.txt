@@ -8,6 +8,8 @@
 # the presence hysteresis's lower bar (three quarters of 0.04): present or
 # not is a coin flip there and not asserted; nothing is offered either way.
 # The lattice's memoryless offer is gone with the rough class.
+@reference
+:strength 1839
 :mmc off
 @strength 1839
 @seed 3

@@ -54,7 +54,7 @@
 // moving/at-rest latch with hysteresis was tried and fed on itself the
 // same way the old rule did.
 #define MAGLOC_SPEED_WINDOW 10
-#define MAGLOC_SPEED_JITTER_K 0.4f
+#define MAGLOC_SPEED_JITTER_K 3.0f // (the bench's setting on 2026-09-27, taken as the default: 0.4 until then)
 
 // A magnet is "present" when the strongest smoothed reading passes this. A fix
 // is then attempted once three sensors notice it at all - and noticing means
@@ -64,7 +64,7 @@
 // however little it reads - "almost nothing here" pins a magnet down too - and
 // what decides whether the answer is any good is its error bar.) So a weak
 // magnet close to two sensors, with its neighbours down at 0.02 mT, locks.
-#define MAGLOC_PRESENT_MT 0.04f // the menu's "presence" lever starts here (0.02-0.20); its corroboration - two TMAGs reading plainly - is at the lever too, below MAGLOC_SEEN_MT, so a strong magnet can be met further out where the zeros allow it (2026-09-26; the absent run's toggles say whether they do)
+#define MAGLOC_PRESENT_MT 0.02f // the menu's "presence" lever starts here (0.02-0.20); its corroboration - two TMAGs reading plainly - is at the lever too, below MAGLOC_SEEN_MT, so a strong magnet can be met further out where the zeros allow it (2026-09-26; the absent run's toggles say whether they do) (the bench's setting on 2026-09-27, taken as the default: 0.04 until then)
 #define MAGLOC_PRESENT_LOW 0.5f // ...and once present it stays so down to this fraction of it (hysteresis) - while a fix has been made in the last MAGLOC_PRESENT_HOLD_MS; with nothing fitting, presence needs the full level again (2026-09-22: a TMAG's 0.028 mT zero error after a boot held presence on at the half level for minutes, and the lattice ran twice a second for nothing)
 #define MAGLOC_PRESENT_HOLD_MS 2000
 // Presence takes the MMC56x3's word, or two TMAG5273s': no probe can be seen
@@ -156,7 +156,7 @@
 // would give them) - and the bar under MAGLOC_MAX_ERROR_MM (30: the far
 // probe at 90 mm has an 18 mm bar; a fix wider than 5, ROUGH_ABOVE_MM, is
 // rough). ASSUMPTION: the simulator's world; section 8's captures re-tune it.
-#define MAGLOC_FIT_MAX_CHI 2.0f
+#define MAGLOC_FIT_MAX_CHI 6.0f // (the bench's setting on 2026-09-27, taken as the default: 2.0 until then)
 // ...and a fix beyond the array's footprint by more than this needs to be
 // seen plainly by MAGLOC_OUTSIDE_MIN_SEEN sensors: a planar array cannot tell
 // a source past its edge from its mirror (the same readings from a magnet on
@@ -191,7 +191,7 @@
 // the row calibration never took a tap: the fitted height failed its
 // on-the-board test. Held at 2900 the taps took, 3 mm high and up to 6 mm
 // off.) 0 = never hold it (the console's K).
-#define MAGLOC_MAGNET_STRENGTH 1839.0f // the probe's, MEASURED on the bench 2026-09-22 23:50 (263 frames at 6 places); the 2026-09-18 probe's was 4232 (magcal 4213 +/- 4.5 %). A wiped board starts here; the learning takes over from the first near fixes
+#define MAGLOC_MAGNET_STRENGTH 3480.0f // the probe's, MEASURED on the bench 2026-09-22 23:50 (263 frames at 6 places); the 2026-09-18 probe's was 4232 (magcal 4213 +/- 4.5 %). A wiped board starts here; the learning takes over from the first near fixes (the bench's magnet as learned on 2026-09-27, taken as the default: 1839 until then)
 // Why it is held from boot rather than learned (2026-09-21): far from the
 // array only the MMC56x3 reads the magnet plainly, and its three numbers
 // are fitted EXACTLY by a weak magnet just over it or the real one far up -
@@ -275,7 +275,7 @@
 // (`c`) sets it from the height the point rests at; `S` types it. On the
 // bench the breadboard sits 17.5 mm over the sensors; on V6 the surface is
 // 7.1 mm above the base PCB (plus wherever the sensors sit below that).
-#define MAGLOC_BOARD_Z_MM 17.5f
+#define MAGLOC_BOARD_Z_MM 14.5f // (the bench's setting on 2026-09-27, taken as the default: 17.5 until then)
 
 // A fix goes to the tracker as a ROUGH one ("somewhere about here", the wide
 // glow on the LEDs, no row counted) rather than a proper one when its error

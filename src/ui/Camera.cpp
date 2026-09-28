@@ -22,7 +22,7 @@ static float wrapDeg( float a ) {
 void cameraInit( Camera* c, Vec3 target, float yawDeg, float elevationDeg, float distance, float zoom ) {
     Camera empty = { };
     *c = empty;
-    c->mode = CAMERA_FIXED;
+    c->mode = CAMERA_FOLLOW; // (the bench's setting on 2026-09-27, taken as the default: fixed until then)
     c->homeTarget = target;
     c->homeYawDeg = yawDeg;
     c->homeElevationDeg = elevationDeg;

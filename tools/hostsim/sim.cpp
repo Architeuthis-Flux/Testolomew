@@ -52,6 +52,7 @@
 #include "JumperlOS.h"
 #include "MagArray.h"
 #include "MagFit.h"
+#include "Camera.h"
 #include "MagLocator.h"
 #include "Apps.h"
 #include "Menu.h"
@@ -442,6 +443,36 @@ static bool directive( const std::vector<std::string>& w, int lineNo ) {
         int i = atoi( w[ 1 ].c_str( ) );
         if ( i >= 0 && i < MAG_SENSOR_COUNT )
             world.deadUntilUs[ i ] = simMicros + (uint64_t)atol( w[ 2 ].c_str( ) ) * 1000u;
+    } else if ( d == "@reference" ) {
+        // The levers the scenes were written with (2026-09-25's defaults),
+        // whatever the firmware boots with: on 2026-09-27 every default
+        // became the bench's setting (presence 0.02, chi 6, gate 2 ...), which
+        // the phantom and stale-zero scenes are not about. The world's
+        // surface follows the locator's belief, as it did.
+        extern Camera viewCamera;
+        magLocator.presentMt = 0.04f;
+        magLocator.fitMaxChi = 2.0f;
+        magLocator.speedJitterK = 0.4f;
+        magLocator.boardZ = 17.5f;
+        world.surfaceZ = 17.5f;
+        magLocator.track.accelSigma = 10000.0f;
+        magLocator.track.sigmaFloorMm = 0.4f;
+        magLocator.track.gate = 4.0f;
+        magLocator.track.maxReachMm = 40.0f;
+        magLocator.track.roughHoldS = 1.0f;
+        magLocator.track.oneEuroMinCutoff = 1.0f;
+        magLocator.track.oneEuroBeta = 0.5f;
+        magLocator.track.viewMinCutoff = 1.5f;
+        magLocator.track.viewBeta = 0.5f;
+        magLocator.track.shaftMinCutoff = 1.0f;
+        magLocator.track.shaftBeta = 10.0f;
+        magLocator.track.hzHalfMm = 40.0f;
+        viewCamera.mode = CAMERA_FIXED;
+        viewCamera.tauS = 0.18f;
+        ui.shell.stepRepeatMs = 300.0f;
+        input.joyMenuAt = 0.25f;
+        input.joyMenuOff = 0.15f;
+        input.joyDead = 0.10f;
     } else if ( d == "@surface" && w.size( ) >= 2 ) {
         world.surfaceZ = (float)atof( w[ 1 ].c_str( ) );
     } else if ( d == "@tip" && w.size( ) >= 2 ) {

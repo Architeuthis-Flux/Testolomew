@@ -28,8 +28,8 @@
 #include <stdbool.h>
 #include <stdint.h>
 
-#define STICK_DPAD_ON 0.25f     // a direction past this much of the raw travel (the setting "joy menu at")
-#define STICK_DPAD_OFF 0.15f    // ...and over once back inside this (the setting "joy menu off")
+#define STICK_DPAD_ON 0.55f     // a direction past this much of the raw travel (the setting "joy menu at") (the bench's setting on 2026-09-27, taken as the default: 0.25 until then)
+#define STICK_DPAD_OFF 0.4f    // ...and over once back inside this (the setting "joy menu off") (the bench's setting on 2026-09-27, taken as the default: 0.15 until then)
 #define STICK_DPAD_HOLD_MS 30   // a crossing has to last this long (a click's tilt does not)
 #define STICK_DPAD_REARM_MS 80  // after a direction ends, that axis has to rest inside the off band this long
 

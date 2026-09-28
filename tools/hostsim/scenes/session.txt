@@ -5,6 +5,7 @@
 # thousandth and nothing else - a quiet far sensor's real share of the
 # probe is held, not followed into its zero and then put back by the audit
 # (a flash write every window at 997e74b).
+@reference
 :mmc on
 :strength 4232
 @seed 4

@@ -19,6 +19,24 @@ void setUp( void ) {
     ledLayoutV6( &v6 );
     ledLayoutV5( &v5 );
     probeLedDefaultStyle( &style );
+    // The look these tests were written against (the defaults are the
+    // bench's settings since 2026-09-27: the height scheme from 240 deg,
+    // a wide spot by height, no dimming, a long tail, the ring on).
+    style.scheme = PROBELED_SCHEME_CLASSIC;
+    style.hueTurns = 0.667f;
+    style.hueStartDeg = 0.0f;
+    style.liftFullMm = 15.0f;
+    style.colourByMm = 6.0f;
+    style.brightBy = PROBELED_DATA_SURE;
+    style.brightAmount = 0.5f;
+    style.sparkleBy = PROBELED_DATA_HEIGHT;
+    style.spot = 1.0f;
+    style.spotByHeight = 0.0f;
+    style.decayS = 0.12f;
+    style.touchRing = false;
+    style.tailLength = 0.5f;
+    style.tailBright = 0.5f;
+    style.tailHueDeg = 25.0f;
     probeLedClear( &frame, v6.count );
 }
 void tearDown( void ) {}

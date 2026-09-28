@@ -15,6 +15,7 @@
 # the board was then followed too). After a minute: still no usable fix,
 # nothing offered, the zeros untouched; back over row 15 the probe is a fix
 # in its hole.
+@reference
 :mmc on
 :strength 4232
 @seed 3

@@ -736,6 +736,7 @@ static float length( Vec3 v ) {
 
 void test_camera_glides_and_orbits( void ) {
     cameraInit( &cam, { 27, 22, 8 }, -25.0f, 32.0f, 300.0f, 2.0f );
+    cam.tauS = 0.18f; // the glide this test was written against (the default is the bench's 0.4 since 2026-09-27)
     Vec3 none = { 0, 0, 0 };
     cameraOrbit( &cam, 40.0f, 10.0f );
     cameraUpdate( &cam, 0.01f, 0.0f, false, none, none );

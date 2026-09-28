@@ -19,9 +19,9 @@
 // ---------------------------------------------------------------------------
 #include "Vec3.h"
 
-#define CAMERA_TAU_S 0.18f           // smoothing time constant (glide of every change; menu: camera)
-#define CAMERA_POV_TURN_TAU_S 0.6f   // POV: the direction follows the shaft this slowly (a probe's angle is noisy; menu: POV turn)
-#define CAMERA_POV_MOVE_TAU_S 0.3f   // POV: the position follows the point this slowly (menu: POV move)
+#define CAMERA_TAU_S 0.4f           // smoothing time constant (glide of every change; menu: camera) (the bench's setting on 2026-09-27, taken as the default: 0.18 until then)
+#define CAMERA_POV_TURN_TAU_S 0.9f   // POV: the direction follows the shaft this slowly (a probe's angle is noisy; menu: POV turn) (the bench's setting on 2026-09-27, taken as the default: 0.6 until then)
+#define CAMERA_POV_MOVE_TAU_S 1.2f   // POV: the position follows the point this slowly (menu: POV move) (the bench's setting on 2026-09-27, taken as the default: 0.3 until then)
 #define CAMERA_POV_AHEAD_MM 25.0f    // POV: the target is this far down the shaft from the point
 #define CAMERA_POV_ZOOM 5.0f         // POV: pixels per mm at the target (wide view)
 #define CAMERA_POV_MIN_TILT_DEG 4.0f // below this the shaft's yaw is meaningless: keep the last

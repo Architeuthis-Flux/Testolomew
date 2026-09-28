@@ -20,6 +20,7 @@ The firmware's modules run on a PC against stubs of what the chip provides (`Ard
 | `@gain <i> <f>` | sensor i reads this much of the true field |
 | `@dead <i> <ms>` | sensor i not read for that long |
 | `@strength <n>` | the magnet's moment, mT*mm^3 (the locator's held value is its belief) |
+| `@reference` | the levers the scenes were written with (presence 0.04, fit chi 2, gate 4, floor 0.4, accel 10000, the filters 1/0.5, surface 17.5, the camera fixed, cursor repeat 300, the joystick's 0.25/0.15): since 2026-09-27 the firmware boots with the bench's settings, which the phantom and stale-zero scenes are not about |
 | `@tip <mm>`, `@surface <mm>` | where the magnet really sits up the shaft, where the board's top really is |
 | `@baselines` | print each sensor's zero and field |
 | `@noise <x> <y> <z>` | a TMAG5273's noise a frame per axis, mT (the other types by their ratio); the default 0.010 isotropic, the bench 0.012 0.012 0.006 |

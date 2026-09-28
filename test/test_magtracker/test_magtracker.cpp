@@ -18,8 +18,28 @@
 
 static MagTrack track;
 
+// The levers these tests were written against (the defaults are the bench's
+// settings since 2026-09-27: accel 20000, floor 0.2, gate 2, the filters
+// 3.2 / 0.12 and 2.7 / 0.04, the shaft 3.6 / 1, far hold 3; the reach is
+// left at the define, which the cursor-modes test reads).
+static void referenceLevers( MagTrack* t ) {
+    t->accelSigma = 10000.0f;
+    t->sigmaFloorMm = 0.4f;
+    t->gate = 4.0f;
+    t->roughHoldS = 1.0f;
+    t->oneEuroMinCutoff = 1.0f;
+    t->oneEuroBeta = 0.5f;
+    t->viewMinCutoff = 1.5f;
+    t->viewBeta = 0.5f;
+    t->shaftMinCutoff = 1.0f;
+    t->shaftBeta = 10.0f;
+    t->hzHalfMm = 40.0f;
+    t->betaHalfMm = 20.0f;
+}
+
 void setUp( void ) {
     magTrackInit( &track, 17.5f, 0.0f );
+    referenceLevers( &track );
 }
 void tearDown( void ) {}
 
@@ -435,6 +455,7 @@ void test_smoothing_slows_with_height( void ) {
     for ( int run = 0; run < 4; run++ ) {
         srand( 7 );
         magTrackInit( &track, 17.5f, 0.0f );
+        referenceLevers( &track );
         float z = run == 0 ? 17.5f + 2.0f : 17.5f + track.hzHalfMm;
         if ( run == 2 )
             track.hzHalfMm = track.betaHalfMm = 0.0f; // both levers off
@@ -460,6 +481,7 @@ void test_smoothing_slows_with_height( void ) {
     // The tracker off: the fix is the track, and the cursor is that through the filter.
     srand( 7 );
     magTrackInit( &track, 17.5f, 0.0f );
+    referenceLevers( &track );
     track.enabled = false;
     Vec3 p = { 20.0f, 20.0f, 19.5f };
     float sumRaw = 0.0f, sumCursor = 0.0f;

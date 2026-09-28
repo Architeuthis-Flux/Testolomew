@@ -78,7 +78,7 @@ class PlayService : public Service {
 
     // Settings (the menu's play page; saved but for the mode and erase).
     int mode = PLAY_OFF;
-    float paintHue = 0.0f;         // degrees round the wheel
+    float paintHue = 324.0f;       // degrees round the wheel (the bench's on 2026-09-27; 0 until then)
     float paintSat = 1.0f;         // 0 = white at the centre, 1 = the rim
     float paintBright = 0.5f;      // the paint's level (the LEDs' own brightness levers still apply)
     float brushSize = 0.0f;        // rows around the LED under the point (a number item, whole)

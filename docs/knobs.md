@@ -35,7 +35,7 @@ A and B never reach an app. A control still held when a pane closes (a nav-left 
 
 From the console the same is driven with `:ui open|menu|root|close|back|enter|hold|up|down|left|right|go <label>` (`menu`: where it was last used; `root`: the top page; `hold`: the select held, a value tweaked over the app), `:key <control> [tap|down|up|hold]` and `:joy`; `:screen` prints the app, the panes, the menu page with its items and values, and the probe/play/camera state; `:screen:ascii` and `tools/screendump.py` show the picture.
 
-The pages, item by item. Items marked *(saved)* persist; *(mode)* does not. Every label is the settings module's key, so it stays as it is.
+The pages, item by item. Items marked *(saved)* persist; *(mode)* does not. Every label is the settings module's key, so it stays as it is. **The default columns below are as of 2026-09-25; on 2026-09-27 every default became the bench's setting** (Kevin: "grab the settings off the board right now and set those all as defaults") - section 4's table of that day lists them.
 
 ### tracking
 One page for everything continuous about the probe's pose (2026-09-25; the tracker, smoothing and cursor pages until then - their saved values fell back to the defaults with the move, the keys being page/label): what the cursor is, then the smoothing from the most felt lever to the least, then the fit's acceptance and load.
@@ -154,6 +154,33 @@ The contacts settle 10 ms before any of this; nothing is debounced twice. `j` pr
 ## 4. Compile-time knobs changed in this session, and why
 
 Values are the ones in the tree now. "Where" is the header.
+
+**2026-09-27, the bench's settings as the defaults** (Kevin: "grab the settings off the board right now and set those all as defaults"; read with `s` at 21:47). Every compile-time default is now what the board had, noted in the source where it differs from before; `SETTINGS_TUNING_VERSION` 5, so a board with the older tracking levers saved takes these. The host tests pin the look and the levers they were written against (test_probeleds' and test_magtracker's setUp), and the scenes start with the sim's new `@reference` directive (the 2026-09-25 levers: presence 0.04, chi 2, gate 4 ...), since the phantom and stale-zero scenes are about those levels; `screens.txt` renders the defaults as they are. The zeros (`sensorzero=`, the sensor's own frame) were not pasted: `MAG_ZERO_AT_BOOT` is board-frame, and the boot audit adopts the live zero anyway.
+
+| item | was | now |
+|---|---|---|
+| tracker on / smoothing / cursor | on / on / aim | the same |
+| surface / tip / reach | 17.5 / 0 / 40 | 14.5 / 0 / 60 |
+| accel / rest jitter | 10000 / 0.4 | 20000 / 3 |
+| view Hz / view beta | 1.5 / 0.5 | 2.7 / 0.04 |
+| cursor Hz / cursor beta | 1.0 / 0.5 | 3.2 / 0.12 |
+| Hz height / beta height | 40 / 20 | 25 / 20 |
+| shaft Hz / shaft beta | 1.0 / 10 | 3.6 / 1 |
+| floor / gate / presence / fit chi / far hold | 0.4 / 4 / 0.04 / 2 / 1 | 0.2 / 2 / 0.02 / 6 / 3 |
+| fit load / fit iters | burst / 2 | the same |
+| camera mode / glide / POV turn / POV move | fixed / 0.18 / 0.6 / 0.3 | follow / 0.4 / 0.9 / 1.2 |
+| LEDs bright / strip / budget mA / full peak | 1 / 1 / 600 / on | 1 / 0.62 / 800 / on |
+| spot / spot by height / bloom / sparkle / pulse / fade | 1 / 0 / 0 / 0 / 0 / 0.12 | 0.9 / 3.5 / 0 / 0 / 0 / 0.35 |
+| touch ring / ring repeat | off / off | on / off |
+| scheme / turns / hue start / height scale / colour from | classic / 0.667 / 0 / 15 / 6 | height / 1.05 / 240 / 60 / 2.5 |
+| bright by / bright amount / sparkle by | unsure / 0.5 / height | none / 1 / none |
+| tail / tail length / tail bright / tail hue | off / 0.5 / 0.5 / 25 | off / 1 / 1 / 30 |
+| poles / pole size / north hue / south hue / field arrows | on / 5 / 3 / 225 / 1 | on / 14 / 325 / 210 / 1 |
+| use MMC | off | off |
+| play hue / sat / paint bright / brush / touch | 0 / 1 / 0.5 / 0 / 2 | 324 / 1 / 0.5 / 0 / 2 |
+| direction ms / push guard ms | 20 / 50 | 25 / 55 |
+| joy menu at / joy menu off / joy dead / cursor repeat / joystick | 0.25 / 0.15 / 0.10 / 300 / relative | 0.55 / 0.4 / 0.06 / 100 / relative |
+| magnet strength a wiped board starts with | 1839 | 3480 |
 
 **2026-09-27, help on every setting, and beta by height** (Kevin: "let's make clicking each setting show a help text about what that setting controls and how it affects the output. And we need a beta vs height setting, so it can be responsive with the probe close but very smooth at a distance"). Every value item (a toggle, a number, a choice, an info line) carries a help text (`MenuItem::help`, the trailing argument of the builders in `SettingsMenu.cpp`); its CLICK shows it in the Result panel, wrapped to the panel's 37 columns into a buffer of its own (`Ui::showHelp`, `helpLines`; not the log, which a stream printing meanwhile would scroll away), titled with the label - and a toggle or a choice no longer flips or cycles on the click: left/right and the tweak do that, the hold tweaks, nothing acts on the press. The shell (`UiShell::helpItem`) asks, the Ui shows. Beta by height: `MAGTRACK_BETA_HALF_MM` 20 (`beta height`) beside the Hz lever (`Hz height`, `MAGTRACK_HZ_HALF_MM` 40, "smooth height" for a few hours): the betas divided by (1 + height / it), so the filters open with speed near the board and hardly at all far up, where the speed estimate is noise. test_magtracker: the beta lever alone calms a far rest; test_ui: the tap asks for the help and leaves the toggle, left flips it; check.txt reads the help of "tracker on" through the real button tracker.
 

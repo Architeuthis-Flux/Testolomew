@@ -152,29 +152,33 @@ void probeLedDefaultStyle( ProbeLedStyle* s ) {
     s->liftG = 120;
     s->liftB = 255; // blue in the air
     s->tail = false;       // no tail unless asked
-    s->tailHueDeg = 25.0f; // amber at the tail's far end
-    s->tailLength = 0.5f;  // halfway back toward the point
-    s->tailBright = 0.5f;
+    // The defaults are the bench's settings as they stood on 2026-09-27 (Kevin:
+    // "grab the settings off the board right now and set those all as
+    // defaults"); what they were before is noted where it differs. The tests
+    // pin the look they were written against (test_probeleds setUp).
+    s->tailHueDeg = 30.0f; // (25)
+    s->tailLength = 1.0f;  // the whole way back to the point (0.5)
+    s->tailBright = 1.0f;  // (0.5)
     s->peak = 1.0f;
     s->minSigmaRows = 0.33f;
     s->minSigmaAcrossMm = 0.9f;
-    s->spot = 1.0f;
-    s->spotByHeight = 0.0f;
-    s->liftFullMm = 15.0f;
+    s->spot = 0.9f;         // (1.0)
+    s->spotByHeight = 3.5f; // (0)
+    s->liftFullMm = 60.0f; // (15)
     s->attackS = 0.02f;
-    s->decayS = 0.12f;
-    s->scheme = PROBELED_SCHEME_CLASSIC;
-    s->hueTurns = 0.667f; // two thirds of the wheel: red to blue (the height scheme as it was)
-    s->hueStartDeg = 0.0f;
-    s->colourByMm = 6.0f;
-    s->brightBy = PROBELED_DATA_SURE;
-    s->brightAmount = 0.5f; // a coin-toss row at half
-    s->sparkleBy = PROBELED_DATA_HEIGHT;
+    s->decayS = 0.35f;                  // (0.12)
+    s->scheme = PROBELED_SCHEME_HEIGHT; // (classic)
+    s->hueTurns = 1.05f;                // (0.667: two thirds of the wheel, red to blue)
+    s->hueStartDeg = 240.0f;            // (0)
+    s->colourByMm = 2.5f;               // (6)
+    s->brightBy = PROBELED_DATA_NONE;   // (sure)
+    s->brightAmount = 1.0f;             // (0.5: a coin-toss row at half)
+    s->sparkleBy = PROBELED_DATA_NONE;  // (height)
     s->fullPeak = true;
     s->bloom = 0.0f;
     s->sparkle = 0.0f;
     s->pulse = 0.0f;
-    s->touchRing = false;
+    s->touchRing = true; // (off)
     s->ringRepeat = false;
 }
 
