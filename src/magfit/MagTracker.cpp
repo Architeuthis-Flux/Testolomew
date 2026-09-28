@@ -303,7 +303,13 @@ void magTrackUpdate( MagTrack* t, float dtS, const MagTrackInput* in ) {
     // rough track (12 mm fixes from far away) is asked for "about here",
     // not for following a hand: it averages more, with its own smaller
     // process noise.
-    float accel = t->state == MAGTRACK_ROUGH ? MAGTRACK_ROUGH_ACCEL_SIGMA : t->accelSigma;
+    // The process noise falls with the last fix's bar (MAGTRACK_FAR_BAR_MM):
+    // far up the fixes' scatter is not a hand's motion.
+    float widestBar = t->lastFixSigma.x > t->lastFixSigma.y ? t->lastFixSigma.x : t->lastFixSigma.y;
+    widestBar = widestBar > t->lastFixSigma.z ? widestBar : t->lastFixSigma.z;
+    float farness = t->hadProperFix ? widestBar / MAGTRACK_FAR_BAR_MM : 0.0f;
+    float trust = 1.0f / ( 1.0f + farness * farness );
+    float accel = t->state == MAGTRACK_ROUGH ? MAGTRACK_ROUGH_ACCEL_SIGMA : t->accelSigma * trust;
     float q = accel * accel;
     if ( t->state != MAGTRACK_NONE ) {
         for ( int a = 0; a < 3; a++ ) {
@@ -440,7 +446,12 @@ void magTrackUpdate( MagTrack* t, float dtS, const MagTrackInput* in ) {
         // held much longer (roughHoldS): rough fixes come at the cold-start
         // pace and not every attempt lands, and "about here" stays true for
         // seconds while the probe hovers at the edge of the array's reach.
-        uint32_t limit = t->state == MAGTRACK_ROUGH ? (uint32_t)( t->roughHoldS * 1000.0f ) : MAGTRACK_COAST_MS;
+        // ...or, for a track whose last fix was a wide one (a far probe: the
+        // fit's next answer comes at the cold start's pace), the far hold.
+        float widest = t->lastFixSigma.x > t->lastFixSigma.y ? t->lastFixSigma.x : t->lastFixSigma.y;
+        widest = widest > t->lastFixSigma.z ? widest : t->lastFixSigma.z;
+        bool farFix = t->hadProperFix && widest > MAGTRACK_FAR_BAR_MM;
+        uint32_t limit = t->state == MAGTRACK_ROUGH || farFix ? (uint32_t)( t->roughHoldS * 1000.0f ) : MAGTRACK_COAST_MS;
         if ( t->sinceAnyMs > limit ) {
             t->state = MAGTRACK_NONE;
         }

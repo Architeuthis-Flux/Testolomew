@@ -61,6 +61,17 @@
 #define MAGTRACK_REINIT_AFTER 3           // dropped fixes in a row that agree = the track was wrong
 #define MAGTRACK_REINIT_AGREE_MM 6.0f     // ...agree = within this of each other
 #define MAGTRACK_COAST_MS 400             // how long a track outlives its last fix
+// A fix's bar against this says how far the probe is, continuously (2026-09-28;
+// until then a bar over MAGLOC_ROUGH_ABOVE_MM made the fix ROUGH, a state the
+// track switched into and out of - no shaft, no velocity, a calmer process
+// noise, the far hold - and the LEDs jumped at the switch): with trust =
+// 1 / (1 + (bar / this)^2) the process noise is accelSigma x trust (a 12 mm
+// bar's scatter is not a hand's motion: 20000 -> 3000), a track whose last
+// fix was wider than this coasts for roughHoldS rather than MAGTRACK_COAST_MS
+// (the fit's next far answer comes at the cold start's pace), and the locator
+// leans the shaft it hands in toward vertical by the same trust (a far fix's
+// axis is noise, and the aim cursor would swing by its whole reach on it).
+#define MAGTRACK_FAR_BAR_MM 5.0f
 #define MAGTRACK_ROUGH_HOLD_S 3.0f        // ...and how long a ROUGH one (the far glow) outlives its last rough fix (menu: far hold; 2.5 until 2026-09-23: a stale glow for two seconds after the probe had gone) (the bench's setting on 2026-09-27, taken as the default: 1.0 until then)
 #define MAGTRACK_ROUGH_SPREAD_MM_S 8.0f   // while it is held its bar widens this fast (the glow spreads and dims, honestly)
 #define MAGTRACK_COAST_TAU_S 0.15f        // velocity dies away with this time constant while coasting

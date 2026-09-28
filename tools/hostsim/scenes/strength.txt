@@ -64,7 +64,9 @@ l
 l
 @expect "no magnet"
 :load
-@expect "presence toggled 6 times"
+@expect "presence toggled 4 times"
+# (6 until 2026-09-28 midday: a far fix now keeps the track alive, so the fit
+# warm-starts from it rather than cold-starting, and presence flaps less)
 :load
 @bias 8 0 0 0
 z

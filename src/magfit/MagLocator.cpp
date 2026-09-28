@@ -1246,12 +1246,29 @@ ServiceStatus MagLocator::publishFix( MagTrackInput* in, const FrameScratch& f )
     auditZeros( f );
 
     fix.rough = fix.errorMm > MAGLOC_ROUGH_ABOVE_MM;
-    in->valid = !fix.rough;
-    in->rough = fix.rough;
+    // Every accepted fix is a fix to the tracker, its bar the weight (2026-09-28:
+    // a fix wider than MAGLOC_ROUGH_ABOVE_MM went in as ROUGH - no shaft, no
+    // velocity, a calmer process noise, held still for the far hold - and the
+    // LEDs jumped where the fix sharpened past that line: the shaft snapping
+    // in moved the aim cursor by the whole reach). fix.rough is for the
+    // screen and the log; the tracker's rough path is the sim's (:probe).
+    in->valid = true;
+    in->rough = false;
     in->position = fix.rawMagnet;
     in->sigma = fix.sigma;
     in->shaft = fix.shaft;
-    in->haveShaft = !fix.rough;
+    in->haveShaft = true;
+    {
+        // A far fix's axis is noise, and the aim cursor would swing by its
+        // whole reach on it: the shaft handed in leans toward vertical by the
+        // fix's bar, continuously (MAGTRACK_FAR_BAR_MM) - straight up for a
+        // 12 mm bar, itself for a sharp one, and nothing steps between.
+        float farness = fix.errorMm / MAGTRACK_FAR_BAR_MM;
+        float trust = 1.0f / ( 1.0f + farness * farness );
+        Vec3 s = { fix.shaft.x * trust, fix.shaft.y * trust, fix.shaft.z * trust + ( 1.0f - trust ) };
+        float len = sqrtf( s.x * s.x + s.y * s.y + s.z * s.z );
+        in->shaft = len > 1e-3f ? Vec3 { s.x / len, s.y / len, s.z / len } : Vec3 { 0, 0, 1 };
+    }
 
     Stream* out = console.port( );
     if ( streaming && out != nullptr && ++streamTick % STREAM_EVERY_N_FIXES == 0 ) {

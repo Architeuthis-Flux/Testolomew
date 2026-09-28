@@ -491,7 +491,8 @@ l
 @magnet 24 22 90 0 0 -1
 @run 3000
 l
-@expect "track: rough"
+# (a tracking or coasting track since 2026-09-28 midday, its bar the weight
+# and its process noise falling with the bar: the rough state went)
 @expect "z 8"
 @magnet off
 @run 4000

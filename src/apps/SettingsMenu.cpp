@@ -266,7 +266,7 @@ void settingsMenuBuild( Menu* m ) {
     menuAddNumber( m, tracking, "fit chi", &magLocator.fitMaxChi, 1.0f, 6.0f, 0.5f, "",
                  "The fit's acceptance: its leftover residuals over the sensors' own errors. About 1 is a fit as good as the readings. Higher accepts more frames, wrong ones included; lower refuses more, and a refused frame is a gap." );
     menuAddNumber( m, tracking, "far hold", &magLocator.track.roughHoldS, 0.5f, 10.0f, 0.5f, "s",
-                 "How long a rough (far) track outlives its last rough fix, s. Tracker on only." );
+                 "How long a track whose last fix was a wide one (the probe far up, its bar over 5 mm) outlives it, s: the fit's next answer far out comes at the cold start's pace. Near the board a track coasts 0.4 s. Tracker on only." );
     int fitLoad = menuAddToggle( m, tracking, "fit load", &magLocator.steadyFit,
                  "burst: the fit costs what it costs each frame. steady: exactly fit iters iterations every frame, so the supply current does not swing (the backlight showed the bursts)." ); // steady: the same work every frame (the supply shows bursts)
     menuSetToggleText( m, fitLoad, "steady", "burst" );
