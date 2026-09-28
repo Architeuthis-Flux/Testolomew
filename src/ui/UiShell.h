@@ -87,9 +87,11 @@ struct UiShell {
     Menu menu;
     int confirmItem; // the ACTION the Confirm pane asks about
     int selectPressItem; // the menu item a select was pressed on (-1 none): its hold tweaks that item, not what the press led to
+    int helpItem;        // a value item whose click asked for its help (-1 none): the Ui shows it in the Result panel and clears this
     char resultTitle[ UISHELL_RESULT_TITLE ];
     int resultScroll; // lines back from the newest
     int resultLines;  // how many lines the result has
+    int resultLimit;  // the panel shows only the newest this many log lines, all in the text colour (a help text); 0 = the log's tail, live, the newest line bright
     int resultVisible;
     bool held[ IN_CONTROL_COUNT ];    // down, as the events say
     bool swallow[ IN_CONTROL_COUNT ]; // ...and dropped until released

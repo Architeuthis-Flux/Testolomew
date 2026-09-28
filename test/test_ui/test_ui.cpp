@@ -481,10 +481,10 @@ void test_shell_tweak_edits_a_value_over_the_app( void ) {
     tap( IN_BTN_B ); // the menu again, where the cursor is
     TEST_ASSERT_EQUAL( PANE_MENU, uiShellTop( &shell ) );
     TEST_ASSERT_EQUAL( 0, shell.menu.cursor );
-    // A toggle (and a choice) flips on the CLICK, not the press, so a hold
-    // never touches it - an accessor's setter with side effects (the
-    // tracker reset, the chain darkened) must not run twice for a look
-    // at the value (the review, 2026-09-25).
+    // A value item never flips on the press, the click or the hold: the
+    // click asks for its HELP (2026-09-27), the hold tweaks it, left/right
+    // change it - so an accessor's setter with side effects (the tracker
+    // reset, the chain darkened) never runs for a look at the value.
     TEST_ASSERT_TRUE( flag );
     send( IN_NAV_PRESS, IN_PRESS );
     TEST_ASSERT_TRUE( flag );
@@ -493,10 +493,16 @@ void test_shell_tweak_edits_a_value_over_the_app( void ) {
     TEST_ASSERT_EQUAL( PANE_TWEAK, uiShellTop( &shell ) );
     send( IN_NAV_PRESS, IN_RELEASE );
     TEST_ASSERT_TRUE( flag );
-    tap( IN_NAV_PRESS ); // a press: the menu again (the tap's click does not flip: it closed the tweak)
+    tap( IN_NAV_PRESS ); // a press: the menu again (the tap's click does not ask for help: it closed the tweak)
     TEST_ASSERT_EQUAL( PANE_MENU, uiShellTop( &shell ) );
     TEST_ASSERT_TRUE( flag );
-    tap( IN_NAV_PRESS ); // ...and a tap on the menu flips it, on the click
+    TEST_ASSERT_EQUAL( -1, shell.helpItem );
+    tap( IN_NAV_PRESS ); // ...and a tap on the menu asks for the item's help; the toggle stays
+    TEST_ASSERT_TRUE( flag );
+    TEST_ASSERT_EQUAL( menuCursorItem( &shell.menu ), shell.helpItem );
+    shell.helpItem = -1; // (the Ui shows it and clears this)
+    send( IN_NAV_LEFT, IN_PRESS ); // left flips it
+    send( IN_NAV_LEFT, IN_RELEASE );
     TEST_ASSERT_FALSE( flag );
     send( IN_NAV_PRESS, IN_PRESS );
     send( IN_NAV_PRESS, IN_HOLD );

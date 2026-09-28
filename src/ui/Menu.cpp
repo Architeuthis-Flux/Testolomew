@@ -54,9 +54,10 @@ int menuAddNumberAction( Menu* m, int parent, const char* label, int tag, MenuCa
     return add( m, item );
 }
 
-int menuAddToggle( Menu* m, int parent, const char* label, bool* flag ) {
+int menuAddToggle( Menu* m, int parent, const char* label, bool* flag, const char* help ) {
     MenuItem item = { };
     item.label = label;
+    item.help = help;
     item.kind = MENU_TOGGLE;
     item.parent = parent;
     item.flag = flag;
@@ -65,9 +66,10 @@ int menuAddToggle( Menu* m, int parent, const char* label, bool* flag ) {
     return add( m, item );
 }
 
-int menuAddToggleAccessor( Menu* m, int parent, const char* label, MenuGetFlag get, MenuSetFlag set ) {
+int menuAddToggleAccessor( Menu* m, int parent, const char* label, MenuGetFlag get, MenuSetFlag set, const char* help ) {
     MenuItem item = { };
     item.label = label;
+    item.help = help;
     item.kind = MENU_TOGGLE;
     item.parent = parent;
     item.getFlag = get;
@@ -84,9 +86,10 @@ void menuSetToggleText( Menu* m, int index, const char* onText, const char* offT
     }
 }
 
-int menuAddNumber( Menu* m, int parent, const char* label, float* value, float min, float max, float step, const char* unit ) {
+int menuAddNumber( Menu* m, int parent, const char* label, float* value, float min, float max, float step, const char* unit, const char* help ) {
     MenuItem item = { };
     item.label = label;
+    item.help = help;
     item.kind = MENU_NUMBER;
     item.parent = parent;
     item.value = value;
@@ -97,9 +100,10 @@ int menuAddNumber( Menu* m, int parent, const char* label, float* value, float m
     return add( m, item );
 }
 
-int menuAddChoice( Menu* m, int parent, const char* label, int* choice, const char* const* names, int count ) {
+int menuAddChoice( Menu* m, int parent, const char* label, int* choice, const char* const* names, int count, const char* help ) {
     MenuItem item = { };
     item.label = label;
+    item.help = help;
     item.kind = MENU_CHOICE;
     item.parent = parent;
     item.choice = choice;
@@ -108,9 +112,10 @@ int menuAddChoice( Menu* m, int parent, const char* label, int* choice, const ch
     return add( m, item );
 }
 
-int menuAddChoiceAccessor( Menu* m, int parent, const char* label, MenuGetChoice get, MenuSetChoice set, const char* const* names, int count ) {
+int menuAddChoiceAccessor( Menu* m, int parent, const char* label, MenuGetChoice get, MenuSetChoice set, const char* const* names, int count, const char* help ) {
     MenuItem item = { };
     item.label = label;
+    item.help = help;
     item.kind = MENU_CHOICE;
     item.parent = parent;
     item.getChoice = get;
@@ -120,13 +125,21 @@ int menuAddChoiceAccessor( Menu* m, int parent, const char* label, MenuGetChoice
     return add( m, item );
 }
 
-int menuAddInfo( Menu* m, int parent, const char* label, MenuInfoText info ) {
+int menuAddInfo( Menu* m, int parent, const char* label, MenuInfoText info, const char* help ) {
     MenuItem item = { };
     item.label = label;
+    item.help = help;
     item.kind = MENU_INFO;
     item.parent = parent;
     item.info = info;
     return add( m, item );
+}
+
+bool menuIsValue( const Menu* m, int index ) {
+    if ( index < 0 || index >= m->count )
+        return false;
+    MenuKind k = m->items[ index ].kind;
+    return k == MENU_TOGGLE || k == MENU_NUMBER || k == MENU_CHOICE || k == MENU_INFO;
 }
 
 int menuFree( const Menu* m ) {

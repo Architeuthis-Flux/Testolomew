@@ -84,6 +84,9 @@ struct MenuItem {
     int choiceCount;
     // INFO
     MenuInfoText info;
+    // Any value item: what it controls and how it affects the output, shown
+    // in a panel on its click (2026-09-27; nullptr = none).
+    const char* help;
 };
 
 struct Menu {
@@ -106,13 +109,16 @@ void menuInit( Menu* m );
 int menuAddSubmenu( Menu* m, int parent, const char* label );
 int menuAddAction( Menu* m, int parent, const char* label, int tag, MenuCallback run, bool confirm );
 int menuAddNumberAction( Menu* m, int parent, const char* label, int tag, MenuCallback run, float min, float max, float step, float start );
-int menuAddToggle( Menu* m, int parent, const char* label, bool* flag );
-int menuAddToggleAccessor( Menu* m, int parent, const char* label, MenuGetFlag get, MenuSetFlag set );
+int menuAddToggle( Menu* m, int parent, const char* label, bool* flag, const char* help = nullptr );
+int menuAddToggleAccessor( Menu* m, int parent, const char* label, MenuGetFlag get, MenuSetFlag set, const char* help = nullptr );
 void menuSetToggleText( Menu* m, int index, const char* onText, const char* offText );
-int menuAddNumber( Menu* m, int parent, const char* label, float* value, float min, float max, float step, const char* unit );
-int menuAddChoice( Menu* m, int parent, const char* label, int* choice, const char* const* names, int count );
-int menuAddChoiceAccessor( Menu* m, int parent, const char* label, MenuGetChoice get, MenuSetChoice set, const char* const* names, int count );
-int menuAddInfo( Menu* m, int parent, const char* label, MenuInfoText info );
+int menuAddNumber( Menu* m, int parent, const char* label, float* value, float min, float max, float step, const char* unit, const char* help = nullptr );
+int menuAddChoice( Menu* m, int parent, const char* label, int* choice, const char* const* names, int count, const char* help = nullptr );
+int menuAddChoiceAccessor( Menu* m, int parent, const char* label, MenuGetChoice get, MenuSetChoice set, const char* const* names, int count, const char* help = nullptr );
+int menuAddInfo( Menu* m, int parent, const char* label, MenuInfoText info, const char* help = nullptr );
+// A value item (a toggle, a number, a choice, an info line): its click shows
+// its help rather than acting on it - left/right change it (the tweak too).
+bool menuIsValue( const Menu* m, int index );
 int menuFree( const Menu* m ); // items the table has room for
 
 // The toggle and choice values, whichever way the item is bound. The

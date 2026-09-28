@@ -169,9 +169,10 @@
 @expect "menu: /tracking cursor 4/"
 :ui back
 # ...and through the real button tracker (a 40 ms tap, a 700 ms hold): a
-# toggle flips on the tap's CLICK, and a hold on it tweaks it without
-# touching it (the review, 2026-09-25: the undo had run an accessor's
-# setter twice - the tracker reset for a look at the value).
+# tap on a value item shows its HELP in the Result panel (2026-09-27) and
+# leaves the toggle alone, a hold on it tweaks it without touching it (the
+# review, 2026-09-25: the undo had run an accessor's setter twice - the
+# tracker reset for a look at the value), and left flips it.
 :ui go tracking
 :ui down
 :ui down
@@ -180,19 +181,28 @@
 :key press tap
 @run 400
 :screen
-@expect "panes: menu"
-@expect "> tracker on               off"
-:key press hold
-@run 1200
-:screen
-@expect "panes: menu tweak"
-@expect "tweak: tracker on off"
+@expect "panes: menu result"
+@expect "result: tracker on scroll 0 of 8 lines (help): The Kalman tracker between the fits"
 :key b tap
 @run 400
 :screen
 @expect "panes: menu"
+@expect "> tracker on               on"
+:key press hold
+@run 1200
+:screen
+@expect "panes: menu tweak"
+@expect "tweak: tracker on on"
+:key b tap
+@run 400
+:screen
+@expect "panes: menu"
+@expect "> tracker on               on"
+:key left tap
+@run 400
+:screen
 @expect "> tracker on               off"
-:key press tap
+:key left tap
 @run 400
 :screen
 @expect "> tracker on               on"
@@ -343,7 +353,8 @@
 @expect "play: off"
 
 # Absolute joystick (controls / joystick): the stick's position is the
-# Home cell while it is deflected; relative again afterwards.
+# Home cell while it is deflected; relative again afterwards. (go stops on
+# a value item since 2026-09-27 - a tap shows its help - so right flips it.)
 :key a
 @run 300
 :ui go settings
@@ -351,7 +362,8 @@
 :ui go controls
 @expect "ok{go controls}"
 :ui go joystick
-@expect "ok{go joystick}"
+@expect "ok{go joystick (a value"
+:ui right
 :screen
 @expect "> joystick                 absolute"
 :ui back
@@ -372,6 +384,7 @@
 :ui go settings
 # (opens on the controls page, where it was)
 :ui go joystick
+:ui right
 :screen
 @expect "> joystick                 relative"
 :ui back

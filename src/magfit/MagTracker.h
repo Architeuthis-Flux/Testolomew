@@ -88,14 +88,18 @@
 #define MAGTRACK_ONE_EURO_BETA 0.5f       // per mm/s: how fast the cutoff opens with speed (pencil.cpp: 20 ms behind at writing speed, 0.02 mm jitter at rest)
 #define MAGTRACK_ONE_EURO_D_CUTOFF 1.0f   // Hz: smoothing of the speed estimate itself
 // The cursor's and the view's filters slow with the point's height above the
-// surface: their cutoffs and betas are divided by (1 + height / this), so at
-// this height they run at half the pace, at twice it a third (menu: smooth
-// height; 0 = the same at any height). A far fix is a noisy one - its bar
-// grows with the fourth power of the distance - and one lever at rest cannot
-// serve both the board and a hover (Kevin, 2026-09-27: "better ways to scale
-// beta vs height"). The rough fix's own calmer filter (0.5 Hz, no beta) went
-// with it: this is continuous where that was a step at the 5 mm bar.
-#define MAGTRACK_SMOOTH_HALF_MM 40.0f
+// surface: their cutoffs (Hz) are divided by (1 + height / HZ_HALF) and their
+// betas by (1 + height / BETA_HALF), so at those heights each runs at half
+// the pace, at twice them a third (menu: Hz height, beta height; 0 = the
+// same at any height). A far fix is a noisy one - its bar grows with the
+// fourth power of the distance - and one lever at rest cannot serve both the
+// board and a hover; the beta's own lever is what makes it "responsive with
+// the probe close but very smooth at a distance" (Kevin, 2026-09-27): the
+// speed estimate's noise is what opens the filter at rest, and far out that
+// noise is all there is. The rough fix's own calmer filter (0.5 Hz, no beta)
+// went with these: continuous where that was a step at the 5 mm bar.
+#define MAGTRACK_HZ_HALF_MM 40.0f
+#define MAGTRACK_BETA_HALF_MM 20.0f
 
 enum MagTrackState {
     MAGTRACK_NONE,     // nothing tracked
@@ -165,7 +169,8 @@ struct MagTrack {
     float oneEuroMinCutoff, oneEuroBeta;
     float viewMinCutoff, viewBeta; // the scene's smoothing of the magnet
     float shaftMinCutoff, shaftBeta; // the shaft direction's own 1-Euro (a turn is followed at once, a resting shaft stays put)
-    float smoothHalfMm;            // the height at which the cursor's and the view's filters run at half the pace (0 = the same at any height)
+    float hzHalfMm;                // the height at which the cursor's and the view's Hz are halved (0 = the same at any height)...
+    float betaHalfMm;              // ...and their betas
     float roughHoldS;              // how long the far glow is held after its last rough fix
 
     // private-ish

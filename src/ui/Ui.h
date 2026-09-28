@@ -30,6 +30,7 @@
 
 #include "JumperlOS.h"
 #include "UiApp.h"
+#include "UiLayout.h"
 #include "UiShell.h"
 
 #define UI_PERIOD_US 10000
@@ -64,6 +65,12 @@ class Ui : public Service {
     // After an action ran and printed: its output, the log's tail, over
     // whatever is open (until B).
     void showResult( const char* title );
+    // A value item's help (Menu.h), wrapped to the panel's width into a
+    // buffer of its own (not the log: a stream printing meanwhile would
+    // scroll it away), as a Result titled with its label.
+    void showHelp( int item );
+    char helpLines[ UI_HELP_LINES ][ UI_RESULT_COLS + 1 ];
+    int helpCount = 0; // lines in use while a help result is open (shell.resultLimit says so)
 
     // :screen - what the screen shows, as text. screenExtra (may be null)
     // adds the modules' lines (the probe, the play state...).

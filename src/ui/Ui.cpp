@@ -41,6 +41,58 @@ void Ui::runAction( int index ) {
 
 void Ui::showResult( const char* title ) {
     uiShellShowResult( &shell, title, uiStream.logCount( ), UI_RESULT_ROWS );
+    shell.resultLimit = 0; // an action's output: the log's tail, live
+}
+
+// The help as lines the panel can show whole: broken at spaces to its width
+// (UI_RESULT_COLS), a word longer than that cut.
+void Ui::showHelp( int item ) {
+    if ( item < 0 || item >= shell.menu.count )
+        return;
+    const MenuItem& it = shell.menu.items[ item ];
+    const char* text = it.help != nullptr ? it.help : "(no help written for this one yet)";
+    // Broken at spaces to the panel's width, a word longer than that cut.
+    helpCount = 0;
+    int n = 0;
+    char* line = helpLines[ 0 ];
+    const char* p = text;
+    while ( *p != '\0' && helpCount < UI_HELP_LINES ) {
+        const char* end = p;
+        while ( *end != '\0' && *end != ' ' )
+            end++;
+        int len = (int)( end - p );
+        if ( n > 0 && n + 1 + len > UI_RESULT_COLS ) {
+            line[ n ] = '\0';
+            n = 0;
+            if ( ++helpCount >= UI_HELP_LINES )
+                break;
+            line = helpLines[ helpCount ];
+        }
+        if ( n > 0 )
+            line[ n++ ] = ' ';
+        while ( len > 0 ) {
+            int take = len < UI_RESULT_COLS - n ? len : UI_RESULT_COLS - n;
+            memcpy( line + n, p, take );
+            n += take;
+            p += take;
+            len -= take;
+            if ( len > 0 ) {
+                line[ n ] = '\0';
+                n = 0;
+                if ( ++helpCount >= UI_HELP_LINES )
+                    break;
+                line = helpLines[ helpCount ];
+            }
+        }
+        while ( *p == ' ' )
+            p++;
+    }
+    if ( n > 0 && helpCount < UI_HELP_LINES ) {
+        line[ n ] = '\0';
+        helpCount++;
+    }
+    uiShellShowResult( &shell, it.label, helpCount, UI_RESULT_ROWS );
+    shell.resultLimit = helpCount; // the help's own lines, not the log
 }
 
 ServiceStatus Ui::service( ) {
@@ -57,6 +109,11 @@ ServiceStatus Ui::service( ) {
         int action = uiShellEvent( &shell, e, now );
         if ( action >= 0 ) {
             runAction( action );
+        }
+        if ( shell.helpItem >= 0 ) {
+            int item = shell.helpItem;
+            shell.helpItem = -1;
+            showHelp( item );
         }
     }
     bool heldNow[ IN_CONTROL_COUNT ];
@@ -269,18 +326,19 @@ void Ui::drawResult( GFXcanvas16* canvas ) {
     fastFillRect( canvas, x0, y0, w, h, UI_COLOR_PANEL );
     fastRect( canvas, x0, y0, w, h, UI_COLOR_FRAME );
     fastText( canvas, x0 + 4, y0 + 3, UI_TEXT, UI_COLOR_FRAME, shell.resultTitle );
-    int count = uiStream.logCount( );
+    bool fixed = shell.resultLimit > 0; // a help text: its own lines (helpLines), all in the text colour
+    int count = fixed ? helpCount : uiStream.logCount( );
     int rows = count < UI_RESULT_ROWS ? count : UI_RESULT_ROWS;
     int most = count - rows;
     int scroll = shell.resultScroll > most ? most : shell.resultScroll;
     for ( int r = 0; r < rows; r++ ) {
         int back = rows - 1 - r + scroll;
-        const char* line = uiStream.logLine( back );
+        const char* line = fixed ? helpLines[ count - 1 - back ] : uiStream.logLine( back );
         if ( line == nullptr )
             continue;
         char text[ 40 ];
         snprintf( text, sizeof( text ), "%.*s", ( w - 8 ) / ( 6 * T ), line );
-        fastText( canvas, x0 + 4, y0 + UI_LINE_H + 4 + r * H, T, back == 0 ? UI_COLOR_TEXT : UI_COLOR_DIM, text );
+        fastText( canvas, x0 + 4, y0 + UI_LINE_H + 4 + r * H, T, fixed || back == 0 ? UI_COLOR_TEXT : UI_COLOR_DIM, text );
     }
     fastText( canvas, x0 + 4, y0 + h - 10, 1, UI_COLOR_DIM, scroll > 0 ? "up/down: scroll (older)  B: back" : "up/down: scroll  B: back" );
 }
@@ -405,7 +463,10 @@ void Ui::printScreen( Stream* out ) {
             snprintf( line, sizeof( line ), "confirm: %s", shell.confirmItem >= 0 ? shell.menu.items[ shell.confirmItem ].label : "?" );
             out->println( line );
         } else if ( shell.stack[ d ] == PANE_RESULT ) {
-            snprintf( line, sizeof( line ), "result: %s scroll %d of %d lines", shell.resultTitle, shell.resultScroll, uiStream.logCount( ) );
+            if ( shell.resultLimit > 0 )
+                snprintf( line, sizeof( line ), "result: %s scroll %d of %d lines (help): %s", shell.resultTitle, shell.resultScroll, helpCount, helpLines[ 0 ] );
+            else
+                snprintf( line, sizeof( line ), "result: %s scroll %d of %d lines", shell.resultTitle, shell.resultScroll, uiStream.logCount( ) );
             out->println( line );
         }
     }
@@ -553,6 +614,13 @@ static void onUiVerb( int argc, char** argv, Stream* out ) {
                 int index = menuVisibleItem( m, n );
                 if ( index >= 0 && labelMatches( m->items[ index ].label, wanted ) ) {
                     m->cursor = n;
+                    menuRemember( m );
+                    if ( menuIsValue( m, index ) ) {
+                        // A value: the cursor on it, and nothing more (a tap would show its help; left/right change it).
+                        snprintf( line, sizeof( line ), "go %s (a value: left/right change it, enter shows its help)", m->items[ index ].label );
+                        consoleOk( out, line );
+                        return;
+                    }
                     snprintf( line, sizeof( line ), "go %s", m->items[ index ].label );
                     shellTap( IN_NAV_PRESS, false );
                     consoleOk( out, line );

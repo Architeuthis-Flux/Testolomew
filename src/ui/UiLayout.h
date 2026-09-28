@@ -15,6 +15,8 @@
 #define UI_LOG_TEXT 1    // the terminal's text size: 1 = 6 x 8 px characters, 40 to a line
 #define UI_LOG_ROWS 28   // lines of it above the footer
 #define UI_RESULT_ROWS 12 // size-1 lines in the result panel
+#define UI_RESULT_COLS 37 // ...of this many characters ((LCD_WIDTH - 16) / 6)
+#define UI_HELP_LINES 20  // the most lines a setting's help wraps to (the longest is about nine)
 #define UI_HOME_CELL 72  // px per Home cell (three across)
 #define UI_ICON_SCALE 2  // a 24 x 24 icon drawn 48 x 48
 

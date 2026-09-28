@@ -431,13 +431,15 @@ void test_a_rough_fix_inside_the_gate_keeps_a_fresh_track_tracking( void ) {
 // is still the fix through that filter, steadier than the fixes themselves
 // (2026-09-27: raw mode bypassed it, and the levers did nothing there).
 void test_smoothing_slows_with_height( void ) {
-    float jitter[ 3 ];
-    for ( int run = 0; run < 3; run++ ) {
+    float jitter[ 4 ];
+    for ( int run = 0; run < 4; run++ ) {
         srand( 7 );
         magTrackInit( &track, 17.5f, 0.0f );
-        float z = run == 0 ? 17.5f + 2.0f : 17.5f + track.smoothHalfMm;
+        float z = run == 0 ? 17.5f + 2.0f : 17.5f + track.hzHalfMm;
         if ( run == 2 )
-            track.smoothHalfMm = 0.0f;
+            track.hzHalfMm = track.betaHalfMm = 0.0f; // both levers off
+        if ( run == 3 )
+            track.hzHalfMm = 0.0f; // the beta lever alone (at twice its half height: a third of the beta)
         Vec3 p = { 20.0f, 20.0f, z };
         float sum = 0.0f;
         int n = 0;
@@ -451,9 +453,10 @@ void test_smoothing_slows_with_height( void ) {
         }
         jitter[ run ] = sqrtf( sum / n );
     }
-    printf( "  cursor jitter: on the board %.3f mm, at the half-pace height %.3f, with the lever off %.3f\n", jitter[ 0 ], jitter[ 1 ], jitter[ 2 ] );
+    printf( "  cursor jitter: on the board %.3f mm, at the half-pace height %.3f, with the levers off %.3f, the beta lever alone %.3f\n", jitter[ 0 ], jitter[ 1 ], jitter[ 2 ], jitter[ 3 ] );
     TEST_ASSERT_TRUE( jitter[ 1 ] < 0.8f * jitter[ 0 ] );
     TEST_ASSERT_FLOAT_WITHIN( 0.1f * jitter[ 0 ], jitter[ 0 ], jitter[ 2 ] );
+    TEST_ASSERT_TRUE( jitter[ 3 ] < jitter[ 2 ] ); // the beta alone calms a far rest
     // The tracker off: the fix is the track, and the cursor is that through the filter.
     srand( 7 );
     magTrackInit( &track, 17.5f, 0.0f );
