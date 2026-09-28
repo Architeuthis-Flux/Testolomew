@@ -457,18 +457,24 @@ void probeLedRender( const LedLayout* layout, const ProbeLedInput* in, const Pro
         // what keeps that off a breadboard's 5 V rail, by dimming the frame
         // as a whole - not a dimmer glow of its own (that went 2026-09-27).
         float floor = style->fullPeak ? peak : 0.08f;
-        // The spot's size: the narrowest bell times "spot", and wider again
-        // with the point's lift by "spot by height" (a cone; the floor above
-        // keeps the peak, so it is a wider spot and not a dimmer one).
-        float lift = style->liftFullMm > 0.0f ? clamp01( in->heightMm / style->liftFullMm ) : 0.0f;
+        // The spot's size: "spot" scales the whole width - the narrowest bell
+        // and the fix's error bar alike, so a small spot is small whatever
+        // the bar says - and "spot by height" widens it by that much per
+        // PROBELED_SPOT_HEIGHT_MM of the point's lift (a cone; the floor
+        // above keeps the peak, so it is a wider spot and not a dimmer one).
+        float lift = in->heightMm > 0.0f ? in->heightMm / PROBELED_SPOT_HEIGHT_MM : 0.0f;
+        if ( lift > PROBELED_SPOT_HEIGHT_MAX )
+            lift = PROBELED_SPOT_HEIGHT_MAX;
         float grow = ( style->spot > 0.0f ? style->spot : 1.0f ) * ( 1.0f + style->spotByHeight * lift );
         float minRows = style->minSigmaRows * grow, minAcross = style->minSigmaAcrossMm * grow;
-        float shown = splat( layout, frame, in->along, in->acrossMm, in->sigmaRows, in->sigmaAcrossMm, peak, floor, minRows, minAcross, PROBELED_MAX_SIGMA_ROWS, PROBELED_MAX_SIGMA_ACROSS_MM, r, g, b );
+        float sigRows = ( in->sigmaRows > style->minSigmaRows ? in->sigmaRows : style->minSigmaRows ) * grow;
+        float sigAcross = ( in->sigmaAcrossMm > style->minSigmaAcrossMm ? in->sigmaAcrossMm : style->minSigmaAcrossMm ) * grow;
+        float shown = splat( layout, frame, in->along, in->acrossMm, sigRows, sigAcross, peak, floor, minRows, minAcross, PROBELED_MAX_SIGMA_ROWS, PROBELED_MAX_SIGMA_ACROSS_MM, r, g, b );
         if ( style->bloom > 0.0f ) {
             // The halo: three times as wide, a fraction as bright, the same
             // colour; the max rule in splat() keeps it under the cursor.
             float wide = 3.0f;
-            splat( layout, frame, in->along, in->acrossMm, in->sigmaRows * wide, in->sigmaAcrossMm * wide, 0.3f * style->bloom * peak, 0.0f, minRows * wide, minAcross * wide,
+            splat( layout, frame, in->along, in->acrossMm, sigRows * wide, sigAcross * wide, 0.3f * style->bloom * peak, 0.0f, minRows * wide, minAcross * wide,
                    PROBELED_MAX_SIGMA_ROWS * wide, PROBELED_MAX_SIGMA_ACROSS_MM * wide, r, g, b );
         }
 
@@ -485,7 +491,7 @@ void probeLedRender( const LedLayout* layout, const ProbeLedInput* in, const Pro
             for ( int k = 1; k < steps; k++ ) {
                 float f = (float)k / ( steps - 1 ); // 0 at the head, 1 at the old end
                 float fade = 1.0f - ( 1.0f - PROBELED_SWEEP_TAIL ) * f;
-                splat( layout, frame, in->along + f * dAlong, in->acrossMm + f * dAcross, in->sigmaRows, in->sigmaAcrossMm, peak * fade, floor * fade, minRows, minAcross,
+                splat( layout, frame, in->along + f * dAlong, in->acrossMm + f * dAcross, sigRows, sigAcross, peak * fade, floor * fade, minRows, minAcross,
                        PROBELED_MAX_SIGMA_ROWS, PROBELED_MAX_SIGMA_ACROSS_MM, r, g, b );
             }
         }

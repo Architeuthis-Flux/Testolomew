@@ -627,13 +627,13 @@ void test_spot_widens_with_height( void ) {
     for ( int i = 0; i < frame.count; i++ )
         litLow += frame.target[ i ] > 0.1f;
     ProbeLedInput high = low;
-    high.heightMm = style.liftFullMm;
+    high.heightMm = PROBELED_SPOT_HEIGHT_MM; // the lever counts the lift in these (2026-09-28: over the colours page's height scale until then)
     probeLedRender( &v6, &high, &style, 1.0f, &frame );
     int litHigh = 0;
     for ( int i = 0; i < frame.count; i++ )
         litHigh += frame.target[ i ] > 0.1f;
     TEST_ASSERT_EQUAL( litLow, litHigh ); // the lever at 0: the height changes nothing
-    style.spotByHeight = 2.0f;           // three times as wide at the height scale
+    style.spotByHeight = 2.0f;           // three times as wide 10 mm up
     probeLedRender( &v6, &high, &style, 1.0f, &frame );
     litHigh = 0;
     for ( int i = 0; i < frame.count; i++ )
@@ -652,12 +652,29 @@ void test_spot_widens_with_height( void ) {
     for ( int i = 0; i < frame.count; i++ )
         litBig += frame.target[ i ] > 0.1f;
     TEST_ASSERT_TRUE( litBig > litLow );
-    // Both levers at their ends, lifted to the scale: a spot grown past the
-    // widest bell allowed is held at it, never brighter than the peak.
+    // Both levers at their ends, lifted: a spot grown past the widest bell
+    // allowed is held at it, never brighter than the peak.
     style.spot = 4.0f;
-    style.spotByHeight = 8.0f;
+    style.spotByHeight = 4.0f;
     probeLedRender( &v6, &high, &style, 1.0f, &frame );
     TEST_ASSERT_TRUE( frame.target[ brightest( &frame ) ] <= style.peak + 0.001f );
+    // "spot" scales the fix's error bar too (2026-09-28: it scaled the floor
+    // only, and a wide bar won - "let's allow the spot to be even smaller"):
+    // a bar a row wide lights a patch at spot 1 and a pin at 0.3.
+    style.spot = 1.0f;
+    style.spotByHeight = 0.0f;
+    ProbeLedInput wide = at( 14.0f, 6.35f, 1.0f, 2.5f );
+    probeLedRender( &v6, &wide, &style, 1.0f, &frame );
+    int litWide = 0;
+    for ( int i = 0; i < frame.count; i++ )
+        litWide += frame.target[ i ] > 0.1f;
+    style.spot = 0.3f;
+    probeLedRender( &v6, &wide, &style, 1.0f, &frame );
+    int litPin = 0;
+    for ( int i = 0; i < frame.count; i++ )
+        litPin += frame.target[ i ] > 0.1f;
+    TEST_ASSERT_TRUE( litWide > 8 );
+    TEST_ASSERT_TRUE( litPin <= 2 );
 }
 
 // The touch ring rings when the point lands; sliding on to another hole
