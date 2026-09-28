@@ -35,6 +35,8 @@ void magTrackInit( MagTrack* t, float surfaceZ, float tipOffsetMm ) {
     t->maxReachMm = MAGTRACK_MAX_REACH_MM;
     t->oneEuroMinCutoff = MAGTRACK_ONE_EURO_MIN_CUTOFF;
     t->oneEuroBeta = MAGTRACK_ONE_EURO_BETA;
+    t->heightMinCutoff = MAGTRACK_HEIGHT_MIN_CUTOFF;
+    t->heightBeta = MAGTRACK_HEIGHT_BETA;
     t->viewMinCutoff = MAGTRACK_VIEW_MIN_CUTOFF;
     t->viewBeta = MAGTRACK_VIEW_BETA;
     t->shaftMinCutoff = MAGTRACK_SHAFT_MIN_CUTOFF;
@@ -232,12 +234,19 @@ static void finishFrame( MagTrack* t, float dtS, bool roughHeld ) {
         // the tracker off), and the filters start afresh when switched on.
         t->cursor = t->rawCursor;
         t->viewPosition = t->position;
+        t->heightMm = height;
         for ( int a = 0; a < 3; a++ ) {
             OneEuroAxis e = { false, 0.0f, 0.0f };
             t->euro[ a ] = e;
             t->viewEuro[ a ] = e;
         }
+        OneEuroAxis e = { false, 0.0f, 0.0f };
+        t->heightEuro = e;
     } else {
+        // The height on its own levers (what the LEDs colour and size by).
+        t->heightMm = oneEuro( &t->heightEuro, height, dtS, t->heightMinCutoff * kHz, t->heightBeta * kBeta );
+        if ( t->heightMm < 0.0f )
+            t->heightMm = 0.0f;
         t->cursor.x = oneEuro( &t->euro[ 0 ], t->rawCursor.x, dtS, cursorCutoff, cursorBeta );
         t->cursor.y = oneEuro( &t->euro[ 1 ], t->rawCursor.y, dtS, cursorCutoff, cursorBeta );
         t->cursor.z = t->rawCursor.z;

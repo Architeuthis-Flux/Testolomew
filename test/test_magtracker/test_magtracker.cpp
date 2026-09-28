@@ -29,6 +29,8 @@ static void referenceLevers( MagTrack* t ) {
     t->roughHoldS = 1.0f;
     t->oneEuroMinCutoff = 1.0f;
     t->oneEuroBeta = 0.5f;
+    t->heightMinCutoff = 1.0f;
+    t->heightBeta = 0.5f;
     t->viewMinCutoff = 1.5f;
     t->viewBeta = 0.5f;
     t->shaftMinCutoff = 1.0f;
@@ -508,6 +510,49 @@ void test_smoothing_slows_with_height( void ) {
     }
 }
 
+// The height has a filter of its own (2026-09-28): the same noisy fixes give
+// a steadier height than the raw z, its levers move it and not the cursor,
+// and with the smoothing off it is the raw one.
+void test_height_has_its_own_filter( void ) {
+    float heightJitter[ 2 ], cursorJitter[ 2 ], rawJitter = 0.0f;
+    for ( int run = 0; run < 2; run++ ) {
+        srand( 11 );
+        magTrackInit( &track, 17.5f, 0.0f );
+        referenceLevers( &track );
+        track.enabled = false; // the raw fix, so the filters alone show
+        if ( run == 1 ) {
+            track.heightMinCutoff = 0.2f; // the height calmer, the cursor as it was
+            track.heightBeta = 0.0f;
+        }
+        Vec3 p = { 20.0f, 20.0f, 17.5f + 12.0f };
+        float sumH = 0.0f, sumC = 0.0f, sumRaw = 0.0f;
+        int n = 0;
+        for ( int frame = 0; frame < 600; frame++ ) {
+            MagTrackInput in = noisyFixAt( p, 0.5f );
+            magTrackUpdate( &track, DT, &in );
+            if ( frame >= 200 ) {
+                sumH += ( track.heightMm - 12.0f ) * ( track.heightMm - 12.0f );
+                sumC += ( track.cursor.x - p.x ) * ( track.cursor.x - p.x );
+                sumRaw += ( in.position.z - p.z ) * ( in.position.z - p.z );
+                n++;
+            }
+        }
+        heightJitter[ run ] = sqrtf( sumH / n );
+        cursorJitter[ run ] = sqrtf( sumC / n );
+        rawJitter = sqrtf( sumRaw / n );
+    }
+    printf( "  height jitter %.3f mm (raw z %.3f), calmer lever %.3f; the cursor's %.3f and %.3f\n", heightJitter[ 0 ], rawJitter, heightJitter[ 1 ], cursorJitter[ 0 ], cursorJitter[ 1 ] );
+    TEST_ASSERT_TRUE( heightJitter[ 0 ] < 0.6f * rawJitter );
+    TEST_ASSERT_TRUE( heightJitter[ 1 ] < 0.5f * heightJitter[ 0 ] );
+    TEST_ASSERT_FLOAT_WITHIN( 0.001f, cursorJitter[ 0 ], cursorJitter[ 1 ] );
+    track.smooth = false;
+    for ( int frame = 0; frame < 20; frame++ ) {
+        MagTrackInput in = noisyFixAt( { 20.0f, 20.0f, 29.5f }, 0.5f );
+        magTrackUpdate( &track, DT, &in );
+        TEST_ASSERT_FLOAT_WITHIN( 0.001f, in.position.z - 17.5f, track.heightMm );
+    }
+}
+
 int main( int argc, char** argv ) {
     (void)argc;
     (void)argv;
@@ -523,5 +568,6 @@ int main( int argc, char** argv ) {
     RUN_TEST( test_cursor_modes_and_the_surface_plane );
     RUN_TEST( test_whole_chain_on_a_simulated_hand );
     RUN_TEST( test_smoothing_slows_with_height );
+    RUN_TEST( test_height_has_its_own_filter );
     return UNITY_END( );
 }

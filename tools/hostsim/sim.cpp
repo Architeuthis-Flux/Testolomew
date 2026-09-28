@@ -462,6 +462,8 @@ static bool directive( const std::vector<std::string>& w, int lineNo ) {
         magLocator.track.roughHoldS = 1.0f;
         magLocator.track.oneEuroMinCutoff = 1.0f;
         magLocator.track.oneEuroBeta = 0.5f;
+        magLocator.track.heightMinCutoff = 1.0f;
+        magLocator.track.heightBeta = 0.5f;
         magLocator.track.viewMinCutoff = 1.5f;
         magLocator.track.viewBeta = 0.5f;
         magLocator.track.shaftMinCutoff = 1.0f;

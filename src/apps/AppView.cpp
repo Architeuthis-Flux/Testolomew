@@ -444,8 +444,7 @@ static void drawText( ) {
     bool live = track.enabled ? track.state != MAGTRACK_NONE : fix.valid;
     if ( live ) {
         // The point's height above the surface (what the LEDs colour by), top right.
-        Vec3 tip = track.tip;
-        float heightMm = tip.z - magLocator.boardZ;
+        float heightMm = track.heightMm; // through the height's own filter (2026-09-28)
         snprintf( line, sizeof( line ), "%.1fmm", heightMm < 0.0f ? 0.0f : heightMm );
         textAt( canvas, LCD_WIDTH - (int)strlen( line ) * UI_CHAR_W - 2, 2, T, COLOR_TEXT, line );
     }

@@ -98,6 +98,13 @@
 // speed estimate's noise is what opens the filter at rest, and far out that
 // noise is all there is. The rough fix's own calmer filter (0.5 Hz, no beta)
 // went with these: continuous where that was a step at the 5 mm bar.
+// The point's HEIGHT above the surface has a 1-Euro of its own (menu: height
+// Hz / height beta; 2026-09-28, Kevin: "we should have the height on its own
+// smoothing setting"): the cursor's filter is x and y, and the height - what
+// the LEDs colour and size by, and the View shows - came straight from the
+// position's z, unfiltered. It starts at the cursor's levers.
+#define MAGTRACK_HEIGHT_MIN_CUTOFF 3.2f
+#define MAGTRACK_HEIGHT_BETA 0.12f
 #define MAGTRACK_HZ_HALF_MM 25.0f // (the bench's setting on 2026-09-27, taken as the default: 40 until then)
 #define MAGTRACK_BETA_HALF_MM 20.0f
 
@@ -149,6 +156,7 @@ struct MagTrack {
     Vec3 rawCursor;      // before the 1-Euro filter
     Vec3 viewPosition;   // the magnet for the scene: the position through its own 1-Euro filter (viewMinCutoff, viewBeta)
     Vec3 viewTip;        // ...and the point from it
+    float heightMm;      // the point's height above the surface, through its own 1-Euro (heightMinCutoff, heightBeta); tip.z - surfaceZ is the raw one
     float cursorSigmaMm; // about how far the cursor may be off, across the board
     float reachMm;       // how far the cursor sits from under the tip (0 in UNDER mode)
     uint32_t ageMs;      // since the last accepted proper fix
@@ -168,7 +176,8 @@ struct MagTrack {
     float gate;
     float maxReachMm;
     float oneEuroMinCutoff, oneEuroBeta;
-    float viewMinCutoff, viewBeta; // the scene's smoothing of the magnet
+    float heightMinCutoff, heightBeta; // the height's own smoothing
+    float viewMinCutoff, viewBeta;     // the scene's smoothing of the magnet
     float shaftMinCutoff, shaftBeta; // the shaft direction's own 1-Euro (a turn is followed at once, a resting shaft stays put)
     float hzHalfMm;                // the height at which the cursor's and the view's Hz are halved (0 = the same at any height)...
     float betaHalfMm;              // ...and their betas
@@ -178,6 +187,7 @@ struct MagTrack {
     MagTrackAxis axis[ 3 ];
     OneEuroAxis euro[ 3 ];
     OneEuroAxis viewEuro[ 3 ];
+    OneEuroAxis heightEuro;
     OneEuroAxis shaftEuro[ 3 ];
     Vec3 roughSigma; // the bar the far glow is held at (the last rough fix's, spreading)
     int shaftSwings; // frames in a row the shaft wanted to swing far

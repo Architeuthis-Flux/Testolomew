@@ -229,10 +229,14 @@ void settingsMenuBuild( Menu* m ) {
                  "How fast the cursor's filter opens with speed, per mm/s. Higher: a fast hand is followed with less lag - but the rest jitter's own speed opens it too, so more jitter at rest." );
     menuAddToggle( m, tracking, "smoothing", &magLocator.track.smooth,
                  "The cursor's, the scene's and the shaft's smoothing filters (the Hz, beta and height levers around it). Off: what is shown is the track's own output - with the tracker off too, the bare fix, raw, for comparing." );
-    menuAddNumber( m, tracking, "Hz height", &magLocator.track.hzHalfMm, 0.0f, 150.0f, 5.0f, "mm",
-                 "The height above the surface, mm, at which the cursor's and the scene's Hz are halved; a third at twice it. A far fix is a noisy one. 0: the same at any height." ); // the cursor's and view's Hz halved at this height (0 = the same at any height)...
-    menuAddNumber( m, tracking, "beta height", &magLocator.track.betaHalfMm, 0.0f, 150.0f, 5.0f, "mm",
-                 "The height, mm, at which the cursor's and the scene's beta is halved; a third at twice it. Low: responsive close to the board, very smooth far up. 0: the same at any height." ); // ...and their betas: responsive close, smooth far
+    menuAddNumber( m, tracking, "height Hz", &magLocator.track.heightMinCutoff, 0.1f, 5.0f, 0.1f, "",
+                   "The height's own smoothing (what the LEDs colour and size by, and the View shows): where its filter sits at rest, Hz. Lower: a calmer height that lags more." );
+    menuAddNumber( m, tracking, "height beta", &magLocator.track.heightBeta, 0.0f, 2.0f, 0.02f, "",
+                   "How fast the height's filter opens with speed, per mm/s. Higher follows a lift or a landing at once; more jitter at rest." );
+    menuAddNumber( m, tracking, "Hz halved at", &magLocator.track.hzHalfMm, 0.0f, 150.0f, 5.0f, "mm",
+                 "The height above the surface, mm, at which the cursor's, the height's and the scene's Hz are halved; a third at twice it. A far fix is a noisy one. 0: the same at any height." ); // the cursor's and view's Hz halved at this height (0 = the same at any height)...
+    menuAddNumber( m, tracking, "beta halved at", &magLocator.track.betaHalfMm, 0.0f, 150.0f, 5.0f, "mm",
+                 "The height, mm, at which the cursor's, the height's and the scene's beta is halved; a third at twice it. Low: responsive close to the board, very smooth far up. 0: the same at any height." ); // ...and their betas: responsive close, smooth far
     menuAddNumber( m, tracking, "shaft Hz", &magLocator.track.shaftMinCutoff, 0.1f, 5.0f, 0.1f, "",
                  "The shaft direction's own filter at rest, Hz. The aim cursor and the tail follow the shaft; lower is calmer and later." );
     menuAddNumber( m, tracking, "shaft beta", &magLocator.track.shaftBeta, 0.0f, 10.0f, 0.25f, "",
