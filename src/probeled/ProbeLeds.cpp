@@ -198,7 +198,8 @@ void probeLedClear( ProbeLedFrame* frame, int count ) {
     frame->ringAgeS = -1.0f;
     frame->ringHole = -1;
     for ( int i = 0; i < PROBELED_MAX; i++ )
-        frame->ringLit[ i ] = 0;
+        frame->ring[ i ] = 0.0f;
+    frame->ringR = frame->ringG = frame->ringB = 0;
     frame->ringAlong = frame->ringAcrossMm = 0.0f;
     frame->haveLast = false;
     frame->lastAlong = frame->lastAcrossMm = frame->lastTimeS = 0.0f;
@@ -544,7 +545,16 @@ void probeLedRender( const LedLayout* layout, const ProbeLedInput* in, const Pro
     }
 
     // The touch ring: a thin ring a row wide spreading from where the point
-    // landed, fading as it goes, in the cursor's colour.
+    // landed, fading as it goes, in the cursor's colour - in a layer of its
+    // own OVER the LEDs (probeLedShown composites it), decaying at its own
+    // pace so it stays a ring, and leaving what it passes over as it was.
+    float ringKeep = expf( -dtS / PROBELED_RING_DECAY_S );
+    float ringUp = style->attackS > 0.0f ? 1.0f - expf( -dtS / style->attackS ) : 1.0f; // it rises as an LED does
+    for ( int i = 0; i < layout->count; i++ ) {
+        frame->ring[ i ] *= ringKeep;
+        if ( frame->ring[ i ] < 0.002f )
+            frame->ring[ i ] = 0.0f;
+    }
     if ( frame->ringAgeS >= 0.0f && !asBrush ) {
         frame->ringAgeS += dtS;
         if ( frame->ringAgeS > PROBELED_RING_S ) {
@@ -552,8 +562,7 @@ void probeLedRender( const LedLayout* layout, const ProbeLedInput* in, const Pro
         } else {
             float radius = frame->ringAgeS * PROBELED_RING_ROWS_PER_S;
             float amp = style->peak * 0.6f * ( 1.0f - frame->ringAgeS / PROBELED_RING_S );
-            uint8_t r, g, b;
-            schemeColour( style, in, frame->timeS, &r, &g, &b );
+            schemeColour( style, in, frame->timeS, &frame->ringR, &frame->ringG, &frame->ringB );
             for ( int i = 0; i < layout->count; i++ ) {
                 float da = layout->along[ i ] - frame->ringAlong;
                 float dc = ( layout->acrossMm[ i ] - frame->ringAcrossMm ) / PITCH_MM;
@@ -561,13 +570,8 @@ void probeLedRender( const LedLayout* layout, const ProbeLedInput* in, const Pro
                 if ( d < -PROBELED_RING_WIDTH_ROWS || d > PROBELED_RING_WIDTH_ROWS )
                     continue;
                 float v = amp * ( 1.0f - fabsf( d ) / PROBELED_RING_WIDTH_ROWS ); // full on the ring, fading to nothing a row and a half out
-                if ( v > frame->target[ i ] ) {
-                    frame->target[ i ] = v;
-                    frame->r[ i ] = r;
-                    frame->g[ i ] = g;
-                    frame->b[ i ] = b;
-                    frame->ringLit[ i ] = 2; // lit by the ring this frame
-                }
+                if ( v > frame->ring[ i ] )
+                    frame->ring[ i ] += ringUp * ( v - frame->ring[ i ] );
             }
         }
     }
@@ -623,22 +627,26 @@ void probeLedRender( const LedLayout* layout, const ProbeLedInput* in, const Pro
     // ruler, not a glow).
     float up = style->attackS > 0.0f && !asBrush ? 1.0f - expf( -dtS / style->attackS ) : 1.0f;
     float down = style->decayS > 0.0f && !asBrush ? 1.0f - expf( -dtS / style->decayS ) : 1.0f;
-    float ringDown = 1.0f - expf( -dtS / PROBELED_RING_DECAY_S ); // an LED the ring passed: dark again at once, so the ring stays a ring
     for ( int i = 0; i < layout->count; i++ ) {
         float t = frame->target[ i ], l = frame->level[ i ];
-        if ( t >= l ) {
-            l += up * ( t - l );
-            frame->ringLit[ i ] = frame->ringLit[ i ] == 2 ? 1 : 0; // the ring's this frame stays the ring's; anything else's is not
-        } else {
-            if ( frame->ringLit[ i ] == 2 )
-                frame->ringLit[ i ] = 1;
-            l += ( frame->ringLit[ i ] ? ringDown : down ) * ( t - l );
-        }
-        if ( l < 0.002f ) {
+        l += ( t >= l ? up : down ) * ( t - l );
+        if ( l < 0.002f )
             l = 0.0f;
-            frame->ringLit[ i ] = 0;
-        }
         frame->level[ i ] = l;
+    }
+}
+
+void probeLedShown( const ProbeLedFrame* frame, int i, float* level, uint8_t* r, uint8_t* g, uint8_t* b ) {
+    if ( frame->ring[ i ] > frame->level[ i ] ) {
+        *level = frame->ring[ i ];
+        *r = frame->ringR;
+        *g = frame->ringG;
+        *b = frame->ringB;
+    } else {
+        *level = frame->level[ i ];
+        *r = frame->r[ i ];
+        *g = frame->g[ i ];
+        *b = frame->b[ i ];
     }
 }
 
@@ -658,9 +666,12 @@ void probeLedRgb( const ProbeLedFrame* frame, int i, uint8_t* r, uint8_t* g, uin
         }
         made = true;
     }
-    float v = clamp01( frame->level[ i ] );
+    float level;
+    uint8_t cr, cg, cb;
+    probeLedShown( frame, i, &level, &cr, &cg, &cb );
+    float v = clamp01( level );
     float k = curve[ (int)( v * 256.0f + 0.5f ) ];
-    *r = (uint8_t)( frame->r[ i ] * k + 0.5f );
-    *g = (uint8_t)( frame->g[ i ] * k + 0.5f );
-    *b = (uint8_t)( frame->b[ i ] * k + 0.5f );
+    *r = (uint8_t)( cr * k + 0.5f );
+    *g = (uint8_t)( cg * k + 0.5f );
+    *b = (uint8_t)( cb * k + 0.5f );
 }

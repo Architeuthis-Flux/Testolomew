@@ -86,7 +86,7 @@ The smoothing defaults were set on the bench (`tools/hostsim/pencil.cpp`): a han
 | sparkle | random near-white flashes in the glow; what the density follows is the colours page's `sparkle by` (the height by default: few on the board, all of it lifted) | 0 |
 | pulse | breathing of the peak | 0 |
 | fade | `decayS` - how long a lit LED takes to go dark (s); the attack is 20 ms. A moving cursor is also SWEPT from where it was last frame to where it is (half-row steps, full at the head, 0.6 at the old end; `PROBELED_SWEEP_S` 0.25: a cursor seen more than that ago is a jump, not a stroke) - a hand at writing speed moves a row and a half a frame, and the bell alone left the LED between at 6 %, a dotted line (2026-09-26). With the tracker off the last raw cursor is held 250 ms as "coasting" over a frame with no fix (`PROBELED_RAW_HOLD_MS`), and the fit keeps a refused answer as its next start for ten frames (`MAGLOC_RAW_WARM_FRAMES`) before a cold start | 0.12 |
-| touch ring | a ring runs out from the point when it lands | off |
+| touch ring | a ring runs out from the point when it lands - in a layer of its own over the LEDs since 2026-09-28, so what it passes over (the comet behind a cursor, the paint) is left as it was (it lit the LEDs themselves and cut them down at its own fast decay: "it clears the leds under it") | off (on since the bench's defaults) |
 | ring repeat | ...and again at every new hole it slides to while down (2026-09-27: it always did) | off |
 | V5 stream *(mode)* | the cursor as CSV on the console for a V5 to follow (`L`) | off |
 
@@ -157,6 +157,8 @@ The contacts settle 10 ms before any of this; nothing is debounced twice. `j` pr
 ## 4. Compile-time knobs changed in this session, and why
 
 Values are the ones in the tree now. "Where" is the header.
+
+**2026-09-28, the ring as a layer** (Kevin: "when the touch ring runs, it clears the leds under it. we should restore them"). The ring wrote into the LEDs' own targets and marked them for its 20 ms decay, so an LED the cursor had lit - the comet behind a cursor that moved on, a painted one - was pulled down at the ring's pace where the ring passed. Now the ring is `ProbeLedFrame::ring`, a layer of its own over the LEDs at its own decay, composited at the output (`probeLedShown`: the LED or the ring, whichever is on top; `probeLedRgb` and the LEDs app read that), and the LEDs' levels follow the cursor's attack and decay alone. test_probeleds: the comet under a passing ring decays exactly as without it.
 
 **2026-09-28, one pixel at least, the error bar's share and the bell's shape** (Kevin: "we need to set a minimum of one pixel, and let's allow us to adjust the error range and falloff"). The LED nearest the cursor (within a row, `PROBELED_ONE_PIXEL_ROWS`) is always at the bell's peak, so a pin of a spot between two holes lights the nearer one and never nothing. `error width` is the fix's error bar's share of the width (0 none, 1 as it is, 2 twice; the wider of it and `spot` is drawn) - in place of the previous commit's `spot` scaling the bar, so the two are separate levers. `falloff` is the bell's shape, exp(-q^falloff / 2) with q the squared distance in sigmas: 1 a Gaussian, 3 nearly a disc, 0.3 a peak with a skirt (a powf per lit LED, skipped at 1). test_probeleds: the pin lights the nearer hole; error width 0 / 1 / 2 on a bar a row wide; the falloff's flat top and sharp edge, and its skirt.
 

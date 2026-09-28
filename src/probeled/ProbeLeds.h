@@ -258,7 +258,8 @@ struct ProbeLedFrame {
     float ringAgeS; // < 0: no ring running
     float ringAlong, ringAcrossMm;
     int ringHole; // the LED the point was over at the last ring (-1 = none): moving on to another, still down, rings again
-    uint8_t ringLit[ PROBELED_MAX ]; // 1 where the ring lit the LED: it goes dark at the ring's own pace, not the cursor's decay
+    float ring[ PROBELED_MAX ]; // the ring's own layer OVER the LEDs, at the ring's own decay (PROBELED_RING_DECAY_S): what it passes over is left as it was (2026-09-28: it lit the LEDs themselves and cut a comet where it passed)
+    uint8_t ringR, ringG, ringB; // its colour (the cursor's when it started)
     bool haveLast; // the cursor last frame (a tracked or coasting one), for the sweep
     float lastAlong, lastAcrossMm, lastTimeS;
 };
@@ -305,7 +306,9 @@ int ledLayoutNearest( const LedLayout* layout, float along, float acrossMm, floa
 void probeLedRender( const LedLayout* layout, const ProbeLedInput* in, const ProbeLedStyle* style, float dtS, ProbeLedFrame* frame, const ProbeLedPaint* paint = nullptr,
                      const ProbeLedBrush* brush = nullptr );
 
-// The 8-bit RGB to send for LED i (gamma 2.2 on the level).
+// LED i as shown: its level and colour, or the ring's where the ring is on top.
+void probeLedShown( const ProbeLedFrame* frame, int i, float* level, uint8_t* r, uint8_t* g, uint8_t* b );
+// The 8-bit RGB to send for LED i (gamma 2.2 on the level as shown).
 void probeLedRgb( const ProbeLedFrame* frame, int i, uint8_t* r, uint8_t* g, uint8_t* b );
 
 #endif // PROBELEDS_H

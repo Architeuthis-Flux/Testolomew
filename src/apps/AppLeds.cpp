@@ -43,8 +43,12 @@ static void drawLedScreen( ) {
         int x = x0 + (int)( ( layout.along[ i ] - 1.0f ) * cell );
         int y = yMid - (int)( layout.acrossMm[ i ] * pxPerMm );
         // The LCD is not an LED: no gamma, so the dim end of the bell shows.
-        float level = frame.level[ i ] > 1.0f ? 1.0f : frame.level[ i ];
-        uint8_t r = (uint8_t)( frame.r[ i ] * level ), g = (uint8_t)( frame.g[ i ] * level ), b = (uint8_t)( frame.b[ i ] * level );
+        float level;
+        uint8_t cr, cg, cb;
+        probeLedShown( &frame, i, &level, &cr, &cg, &cb ); // the LED, or the ring over it
+        if ( level > 1.0f )
+            level = 1.0f;
+        uint8_t r = (uint8_t)( cr * level ), g = (uint8_t)( cg * level ), b = (uint8_t)( cb * level );
         uint16_t colour = level > 0.02f ? RGB565( r, g, b ) : ( layout.kind[ i ] == PROBELED_RAIL ? RGB565( 24, 20, 20 ) : RGB565( 28, 32, 40 ) );
         fastFillRect( canvas, x, y - cell / 2 + 1, cell - 1, cell - 1, colour );
     }

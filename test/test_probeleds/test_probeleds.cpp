@@ -271,8 +271,11 @@ void test_looks( void ) {
         probeLedRender( &v6, &in, &style, 0.02f, &frame ); // 0.06 s: the ring is ~3 rows out (PROBELED_RING_ROWS_PER_S)
     int ringLit = 0, inside = 0;
     for ( int i = 0; i < frame.count; i++ ) {
-        ringLit += frame.target[ i ] > 0.05f && ( v6.row[ i ] == 11 || v6.row[ i ] == 17 );
-        inside += frame.level[ i ] > 0.3f * style.peak && ( v6.row[ i ] == 12 || v6.row[ i ] == 16 ) && v6.hole[ i ] == 3; // where the ring passed a frame ago
+        float shown;
+        uint8_t sr, sg, sb;
+        probeLedShown( &frame, i, &shown, &sr, &sg, &sb ); // the ring is a layer over the LEDs (2026-09-28)
+        ringLit += shown > 0.05f && ( v6.row[ i ] == 11 || v6.row[ i ] == 17 );
+        inside += shown > 0.3f * style.peak && ( v6.row[ i ] == 12 || v6.row[ i ] == 16 ) && v6.hole[ i ] == 3; // where the ring passed a frame ago
     }
     TEST_ASSERT_TRUE( ringLit > 0 );
     TEST_ASSERT_TRUE( inside == 0 ); // the ring's LEDs go dark at its own pace: a ring, not a filled circle
@@ -716,6 +719,34 @@ void test_one_pixel_at_least_and_the_falloff( void ) {
     TEST_ASSERT_TRUE( frame.target[ find( &v6, 20, 3 ) ] > 0.02f ); // the skirt reaches three sigma
 }
 
+// The ring passes over what the cursor lit and leaves it as it was (Kevin,
+// 2026-09-28: "when the touch ring runs, it clears the leds under it"): the
+// comet behind a cursor that moved on decays the same with the ring as
+// without, since the ring is a layer over the LEDs, not a change to them.
+void test_the_ring_leaves_what_was_under_it( void ) {
+    float withRing[ 2 ], without[ 2 ];
+    for ( int run = 0; run < 2; run++ ) {
+        probeLedClear( &frame, v6.count );
+        style.touchRing = run == 0;
+        ProbeLedInput lifted = at( 17.0f, 6.35f, 0.05f, 0.2f ); // lit a second at row 17, lifted
+        lifted.heightMm = 10.0f;
+        probeLedRender( &v6, &lifted, &style, 1.0f, &frame );
+        ProbeLedInput down = at( 20.0f, 6.35f, 0.05f, 0.2f ); // lands three rows on: a ring spreads from row 20, over row 17 at 0.08 s
+        down.heightMm = 0.0f;
+        int comet = find( &v6, 17, 3 );
+        for ( int k = 0; k < 5; k++ )
+            probeLedRender( &v6, &down, &style, 0.02f, &frame ); // 0.1 s: the ring has passed row 17
+        ( run == 0 ? withRing : without )[ 0 ] = frame.level[ comet ];
+        for ( int k = 0; k < 4; k++ )
+            probeLedRender( &v6, &down, &style, 0.02f, &frame ); // 0.18 s: the ring is over
+        ( run == 0 ? withRing : without )[ 1 ] = frame.level[ comet ];
+    }
+    TEST_ASSERT_TRUE( without[ 0 ] > 0.3f ); // the comet is still glowing at 0.1 s...
+    TEST_ASSERT_FLOAT_WITHIN( 0.001f, without[ 0 ], withRing[ 0 ] ); // ...the same under the ring
+    TEST_ASSERT_FLOAT_WITHIN( 0.001f, without[ 1 ], withRing[ 1 ] ); // ...and after it
+    style.touchRing = false;
+}
+
 // The touch ring rings when the point lands; sliding on to another hole
 // while down rings again only with "ring repeat" (2026-09-27: it always did).
 void test_touch_ring_repeats_only_when_asked( void ) {
@@ -762,5 +793,6 @@ int main( int argc, char** argv ) {
     RUN_TEST( test_spot_widens_with_height );
     RUN_TEST( test_one_pixel_at_least_and_the_falloff );
     RUN_TEST( test_touch_ring_repeats_only_when_asked );
+    RUN_TEST( test_the_ring_leaves_what_was_under_it );
     return UNITY_END( );
 }
