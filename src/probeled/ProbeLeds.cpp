@@ -456,6 +456,7 @@ void probeLedRender( const LedLayout* layout, const ProbeLedInput* in, const Pro
         // (unsure by default: a coin-toss row at half), and a coasting
         // track a little dimmer.
         schemeColour( style, in, frame->timeS, &r, &g, &b );
+        peak *= clamp01( in->presence ); // soft at the edge of presence (2026-09-28)
         // ...by the chosen data, SIGNED (2026-09-28): +1 doubles the peak at the
         // data's far end (a fast hand, a lifted probe), -1 takes it to nothing;
         // never past the full peak, which the LEDs cannot show.

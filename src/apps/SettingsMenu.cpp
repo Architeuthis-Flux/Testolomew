@@ -261,8 +261,8 @@ void settingsMenuBuild( Menu* m ) {
                  "The array's systematic error, mm, added to every fix's error bar. The tracker's gate and weights use it, and the LED spot's width." );
     menuAddNumber( m, tracking, "gate", &magLocator.track.gate, 2.0f, 8.0f, 0.5f, "sd",
                  "A fix further than this many error bars from the track counts for less; past 11 it is dropped. Lower: more fixes ignored on a jump. Tracker on only." ); // (to 10 until 2026-09-25: the drop line is 11.3, past 8 the soft zone is nothing)
-    menuAddNumber( m, tracking, "presence", &magLocator.presentMt, 0.02f, 0.20f, 0.01f, "mT",
-                 "The strongest reading, mT, above which a magnet is there - two TMAGs must read it. Lower reaches further out; too low and a sensor's zero drift passes as a magnet (the toggles on :load say)." ); // (0.04-0.20 on 2026-09-25: below the TMAGs' plain level the lever did nothing, presence needing two of them at 0.04 anyway; since 2026-09-26 the two TMAGs are asked for the lever's level, so below 0.04 it reaches further out - as far as the zeros' drift allows)
+    menuAddNumber( m, tracking, "presence", &magLocator.presentMt, 0.005f, 0.20f, 0.005f, "mT",
+                 "The strongest reading, mT, above which a magnet is there - two TMAGs must read it, or the MMC. Lower reaches further out; too low and a sensor's zero drift passes as a magnet (the toggles on :load say). The LEDs fade in over the band from half of this to one and a half times it, so the far edge is soft." ); // (0.04-0.20 on 2026-09-25: below the TMAGs' plain level the lever did nothing, presence needing two of them at 0.04 anyway; since 2026-09-26 the two TMAGs are asked for the lever's level, so below 0.04 it reaches further out - as far as the zeros' drift allows)
     menuAddNumber( m, tracking, "fit chi", &magLocator.fitMaxChi, 1.0f, 6.0f, 0.5f, "",
                  "The fit's acceptance: its leftover residuals over the sensors' own errors. About 1 is a fit as good as the readings. Higher accepts more frames, wrong ones included; lower refuses more, and a refused frame is a gap." );
     menuAddNumber( m, tracking, "far hold", &magLocator.track.roughHoldS, 0.5f, 10.0f, 0.5f, "s",
@@ -384,8 +384,8 @@ void settingsMenuBuild( Menu* m ) {
     menuAddAction( m, tools, "latest fix", 'l', runConsoleKey, false );
     menuAddInfo( m, tools, "sensors", sensorsInfo,
                  "How many sensors answer, and the frame rate. Info only." );
-    menuAddToggle( m, tools, "use MMC", &magArray.useMmc,
-                 "The MMC56x3 at the centre in the fit, or ignored. It is the far sensor, 30-50x quieter than a TMAG, but near the board its readings have been sketchy." ); // the MMC56x3 in the fit or ignored (MAG_USE_MMC_AT_BOOT: off)
+menuAddChoice( m, tools, "MMC", &magArray.mmcMode, magMmcModeNames, MAG_MMC_MODE_COUNT,
+                   "The MMC56x3 at the centre, 30-50x quieter than a TMAG. off: read and shown, ignored. far: in the fit only as the TMAGs' error bar opens up (from 8 mm, all in at 16) and out near the board, where its readings have been sketchy; its word counts for presence, so a far probe is met sooner. on: in throughout." ); // the MMC56x3 in the fit or ignored (MAG_USE_MMC_AT_BOOT: off)
     menuAddAction( m, tools, "array status", 'm', runConsoleKey, false );
     menuAddAction( m, tools, "bus check", 'b', runConsoleKey, false );
     menuAddAction( m, tools, "power-cycle", 'p', runConsoleKey, true );

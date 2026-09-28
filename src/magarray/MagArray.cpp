@@ -29,6 +29,8 @@
 #define MAG_BUS_FAULT_STREAK 3
 #define MAG_BUS_FAULT_RETRY_RUNS 8
 
+const char* const magMmcModeNames[ MAG_MMC_MODE_COUNT ] = { "off", "far", "on" };
+
 MagArray& magArray = MagArray::getInstance( );
 
 MagArray& MagArray::getInstance( ) {
@@ -105,12 +107,14 @@ static void onWeightVerb( int argc, char** argv, Stream* out ) {
 
 static void onMmcVerb( int argc, char** argv, Stream* out ) {
     if ( argc < 2 ) {
-        consoleErr( out, "usage: :mmc on|off (the MMC56x3 in or out of the fit; the menu's sensors/use MMC) | :mmc <sensor> [cfg <odrHz> <bw 0-3> <autoSR 0|1>]" );
+        consoleErr( out, "usage: :mmc on|far|off (the MMC56x3 in the fit throughout, far only, or out; the menu's tools/MMC) | :mmc <sensor> [cfg <odrHz> <bw 0-3> <autoSR 0|1>]" );
         return;
     }
-    if ( strcmp( argv[ 1 ], "on" ) == 0 || strcmp( argv[ 1 ], "off" ) == 0 ) {
-        magArray.useMmc = argv[ 1 ][ 1 ] == 'n';
-        consoleOk( out, magArray.useMmc ? "the MMC56x3 is in the fit (and presence, and the far regime)" : "the MMC56x3 is out: read and shown, ignored by the locator - the eight TMAG5273s as before" );
+    if ( strcmp( argv[ 1 ], "on" ) == 0 || strcmp( argv[ 1 ], "off" ) == 0 || strcmp( argv[ 1 ], "far" ) == 0 ) {
+        magArray.mmcMode = argv[ 1 ][ 1 ] == 'n' ? MAG_MMC_ON : ( argv[ 1 ][ 0 ] == 'f' ? MAG_MMC_FAR : MAG_MMC_OFF );
+        consoleOk( out, magArray.mmcMode == MAG_MMC_ON    ? "the MMC56x3 is in the fit throughout (and presence, and the far regime)"
+                        : magArray.mmcMode == MAG_MMC_FAR ? "the MMC56x3 is in far only: ramped into the fit as the TMAGs' bar opens up, its word for presence, out near the board"
+                                                          : "the MMC56x3 is out: read and shown, ignored by the locator - the eight TMAG5273s as before" );
         return;
     }
     int i = atoi( argv[ 1 ] );
@@ -1354,7 +1358,7 @@ int MagArray::enabledCount( ) const {
 void MagArray::useSimulatedFrames( ) {
     simulatedFrames = true;
     trustAllSensors = true;
-    useMmc = true; // the simulated MMC56x3 is perfect: the benches (pencil, soak) keep their numbers, the scenes say :mmc on|off themselves
+    mmcMode = MAG_MMC_ON; // the simulated MMC56x3 is perfect: the benches (pencil, soak) keep their numbers, the scenes say :mmc on|far|off themselves
     samplerOn = false;
     for ( int i = 0; i < MAG_SENSOR_COUNT; i++ ) {
         zeroKnown[ i ] = true;

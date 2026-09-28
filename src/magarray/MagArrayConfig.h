@@ -72,7 +72,11 @@ enum MagSensorType {
 // added that one" - off by default until its calibration close in (the
 // lumped gain 12 % off) and its bus (a missed frame or two every second)
 // are sorted.
-#define MAG_USE_MMC_AT_BOOT false
+// The MMC56x3 at boot: MAG_MMC_OFF (read and shown, ignored by the locator),
+// MAG_MMC_FAR (in the fit and presence only as the TMAGs' bar opens up - the
+// far sensor by design, its readings near the board sketchy: 2026-09-28,
+// Kevin), MAG_MMC_ON (in throughout). The menu's "MMC" on the tools page.
+#define MAG_MMC_MODE_AT_BOOT MAG_MMC_FAR
 
 // How much the fit trusts each sensor: weight = MAG_WEIGHT_REFERENCE_MT /
 // (the type's noise a frame), capped at MAG_WEIGHT_CAP - so a TMAG5273 is

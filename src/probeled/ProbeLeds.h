@@ -150,6 +150,7 @@ struct ProbeLedInput {
     float tiltDeg;  // the probe's lean from vertical (0 = straight up)...
     float aimDeg;   // ...and which way it leans, degrees round the board (0 = +x, along the rows)
     float speedMmS; // how fast the magnet is moving
+    float presence; // 0..1: how far the strongest reading is above the presence level - 0 at half the lever, 1 at one and a half times it; the peak scales by it, so the far edge fades rather than switches (2026-09-28)
 };
 
 enum ProbeLedScheme {

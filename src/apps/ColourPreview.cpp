@@ -51,6 +51,7 @@ static void wheel( float t, uint8_t* r, uint8_t* g, uint8_t* b ) {
 static void cursorAcross( float t, uint8_t* r, uint8_t* g, uint8_t* b ) {
     const ProbeLedStyle& s = probeLeds.style;
     ProbeLedInput in = { };
+    in.presence = 1.0f; // the preview shows the colours as within presence
     in.state = PROBELED_TRACKING;
     in.confidence = 1.0f;
     in.heightMm = s.liftFullMm; // lifted: all the colour (the height scheme runs the height itself)

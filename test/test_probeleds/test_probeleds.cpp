@@ -60,6 +60,7 @@ static ProbeLedInput at( float along, float acrossMm, float sigmaRows, float sig
     in.sigmaRows = sigmaRows;
     in.sigmaAcrossMm = sigmaAcrossMm;
     in.confidence = 1.0f;
+    in.presence = 1.0f; // well within presence (the edge fades the peak, 2026-09-28)
     return in;
 }
 
@@ -526,6 +527,20 @@ void test_sparkle_density_follows_the_chosen_data( void ) {
 // own until then): the same colour by height, the same peak, as wide as its
 // bar - held at the widest allowed - so a far fix at the peak is a broad
 // patch the chain's current budget dims as a whole. Nothing: dark.
+// The edge of presence is soft: the peak scales with how far the strongest
+// reading is above the lever (2026-09-28).
+void test_the_edge_of_presence_fades( void ) {
+    style.fullPeak = true;
+    ProbeLedInput in = at( 14.0f, 6.35f, 0.05f, 0.2f );
+    int i = find( &v6, 14, 3 );
+    in.presence = 0.5f;
+    probeLedRender( &v6, &in, &style, 1.0f, &frame );
+    TEST_ASSERT_FLOAT_WITHIN( 0.02f, 0.5f * style.peak, frame.target[ i ] );
+    in.presence = 0.0f;
+    probeLedRender( &v6, &in, &style, 1.0f, &frame );
+    TEST_ASSERT_TRUE( frame.target[ i ] < 0.01f );
+}
+
 void test_far_probe_is_drawn_like_any_other( void ) {
     style.fullPeak = true;
     ProbeLedInput in = at( 20.0f, 0.0f, 6.0f, 12.0f );
@@ -825,6 +840,7 @@ int main( int argc, char** argv ) {
     RUN_TEST( test_aim_scheme_colours_by_the_lean );
     RUN_TEST( test_brightness_follows_the_chosen_data );
     RUN_TEST( test_sparkle_density_follows_the_chosen_data );
+    RUN_TEST( test_the_edge_of_presence_fades );
     RUN_TEST( test_far_probe_is_drawn_like_any_other );
     RUN_TEST( test_pointed_tail_points_back_at_the_tip );
     RUN_TEST( test_leds_fade_rather_than_snap );

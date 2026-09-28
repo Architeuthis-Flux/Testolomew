@@ -82,6 +82,14 @@ struct MagBus {
 Vec3 magSensorToBoard( Vec3 reading, float rotationDeg, bool underside, bool zIntoTop = true );
 Vec3 magBoardToSensor( Vec3 field, float rotationDeg, bool underside, bool zIntoTop = true );
 
+enum MagMmcMode {
+    MAG_MMC_OFF,
+    MAG_MMC_FAR,
+    MAG_MMC_ON,
+    MAG_MMC_MODE_COUNT
+};
+extern const char* const magMmcModeNames[ MAG_MMC_MODE_COUNT ];
+
 class MagArray : public Service {
   public:
     static MagArray& getInstance( );
@@ -140,10 +148,13 @@ class MagArray : public Service {
     // fresh[], to the fit; everything else (the scene, `m`, `f`) sees it.
     bool usedInFit( int i ) const;
     bool trustAllSensors = false; // the host simulation: every simulated sensor is calibrated and zeroed
-    // The MMC56x3 in or out (MAG_USE_MMC_AT_BOOT; the menu's "sensors / use
-    // MMC"): out, it is read and shown but ignored by the locator entirely.
-    bool useMmc = MAG_USE_MMC_AT_BOOT;
-    bool ignored( int i ) const { return i >= 0 && i < MAG_SENSOR_COUNT && magSensorPlaces[ i ].type == MAG_MMC56X3 && !useMmc; }
+    // The MMC56x3: off, far or on (MAG_MMC_MODE_AT_BOOT; the menu's "MMC" on
+    // the tools page, :mmc on|far|off). Off, it is read and shown but ignored
+    // by the locator entirely; far, the locator ramps it into the fit as the
+    // TMAGs' bar opens up (MagLocator, MAGLOC_PRIOR_FROM_MM) and takes its
+    // word for presence; on, it is in throughout.
+    int mmcMode = MAG_MMC_MODE_AT_BOOT;
+    bool ignored( int i ) const { return i >= 0 && i < MAG_SENSOR_COUNT && magSensorPlaces[ i ].type == MAG_MMC56X3 && mmcMode == MAG_MMC_OFF; }
     bool saturated[ MAG_SENSOR_COUNT ] = { false }; // it read full scale in the latest frame
     float temperatureC[ MAG_SENSOR_COUNT ] = { 0 }; // die temperature of each sensor (TMAG5273 with the channel on)
     // How much the fit should trust each sensor, from its type's noise

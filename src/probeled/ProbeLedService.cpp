@@ -308,6 +308,12 @@ ServiceStatus ProbeLedService::service( ) {
         if ( in.aimDeg < 0.0f )
             in.aimDeg += 360.0f;
         in.speedMmS = sqrtf( track.velocity.x * track.velocity.x + track.velocity.y * track.velocity.y + track.velocity.z * track.velocity.z ); // 0 with the tracker off
+        // The edge of presence, soft: the strongest reading against the lever
+        // (0 at half of it, where the hysteresis lets go; 1 at one and a half
+        // times it), so a far probe fades rather than switches (2026-09-28).
+        float lever = magLocator.presentMt > 0.0f ? magLocator.presentMt : 0.02f;
+        in.presence = ( magLocator.fix.peakLevel - 0.5f * lever ) / lever;
+        in.presence = in.presence < 0.0f ? 0.0f : ( in.presence > 1.0f ? 1.0f : in.presence );
         if ( track.reachMm > 0.5f ) {
             Vec3 under = { tip.x, tip.y, magLocator.surfaceAt( tip.x, tip.y ) };
             RowPlace u = rowGridPlace( &grid, under );

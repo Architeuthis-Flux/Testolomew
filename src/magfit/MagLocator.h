@@ -588,6 +588,7 @@ class MagLocator : public Service {
         bool use[ MAGFIT_MAX_SENSORS ];      // may vote in the fit
         float alpha = 1.0f;                  // the smoothing this frame
         float weights[ MAGFIT_MAX_SENSORS ]; // each sensor's weight in the fit this frame
+        float far;                           // how open the direction is, 0..1, by the last accepted fix's 3D bar (MAGLOC_PRIOR_FROM_MM): the axis prior's weight, and the MMC's share in its far mode
         float held = 0.0f;                   // the strength held (0 = free)
         int plain = 0;                       // sensors reading plainly (above their plain level)
         bool hintFree = false;               // the free fit ran with no strength hint: the readings pinned it (a measurement)

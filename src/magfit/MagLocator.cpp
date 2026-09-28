@@ -607,6 +607,25 @@ ServiceStatus MagLocator::fitFrame( MagTrackInput* in ) {
     // (MagArray::frameWeights - the MMC56x3 counts for ~37 TMAGs where it
     // reads noise, for one close in).
     magArray.frameWeights( smooth, f.weights );
+    // How open the direction is (0 with the TMAGs' bar under MAGLOC_PRIOR_FROM_MM,
+    // 1 at twice it): the axis prior's weight, and - the MMC in its far mode -
+    // the MMC's share of the fit, ramped in as the TMAGs run out of reach and
+    // out of the fit near the board, where its readings have been sketchy
+    // (2026-09-28, Kevin: "use the mmc at far distances only").
+    {
+        float lastBar = fix.valid ? fix.errorMm : 2.0f * MAGLOC_PRIOR_FROM_MM;
+        f.far = ( lastBar - MAGLOC_PRIOR_FROM_MM ) / MAGLOC_PRIOR_FROM_MM;
+        f.far = f.far < 0.0f ? 0.0f : ( f.far > 1.0f ? 1.0f : f.far );
+        if ( magArray.mmcMode == MAG_MMC_FAR ) {
+            for ( int i = 0; i < magArray.sensorCount( ) && i < MAGFIT_MAX_SENSORS; i++ ) {
+                if ( magSensorPlaces[ i ].type != MAG_MMC56X3 )
+                    continue;
+                f.weights[ i ] *= f.far;
+                if ( f.far <= 0.0f )
+                    f.use[ i ] = false; // not even in the chi: near the board it is not a witness
+            }
+        }
+    }
     // The Z axis counts by its quietness, as far as the noise is the error: near
     // the magnet the error is the model's share of the field (MAG_MODEL_ERROR:
     // the table's gains and places, the dipole approximation), on every axis
@@ -627,7 +646,7 @@ ServiceStatus MagLocator::fitFrame( MagTrackInput* in ) {
     // the sensor that sees a far probe alone. Without it, one TMAG5273 above
     // the seen level is its stale zero after a boot, and this clause would
     // run the lattice on it every 400 ms until the absorb took it.)
-    f.enough = fix.seenBy + fix.faintBy >= MAGLOC_MIN_SENSORS || ( f.held > 0.0f && magArray.useMmc && fix.seenBy >= 1 );
+    f.enough = fix.seenBy + fix.faintBy >= MAGLOC_MIN_SENSORS || ( f.held > 0.0f && magArray.mmcMode != MAG_MMC_OFF && fix.seenBy >= 1 );
     ServiceStatus status;
     if ( !fix.present || !f.enough ) {
         if ( result.valid ) {
@@ -1052,9 +1071,7 @@ ServiceStatus MagLocator::runFit( MagTrackInput* in, FrameScratch& f ) {
     // the board: 8 mm), at twice that they do not (the MMC alone at 90 mm:
     // 18 mm; the TMAGs alone at 55 mm, at their noise floor: 14) and the
     // prior - the last near fix's pole, the lean the hand had - has its say.
-    float lastBar = wasTracking && fix.valid ? fix.errorMm : 2.0f * MAGLOC_PRIOR_FROM_MM;
-    float priorWeight = ( lastBar - MAGLOC_PRIOR_FROM_MM ) / MAGLOC_PRIOR_FROM_MM;
-    priorWeight = priorWeight < 0.0f ? 0.0f : ( priorWeight > 1.0f ? 1.0f : priorWeight );
+    float priorWeight = f.far;
     bool freeGood = false;
     if ( f.hintFree && f.good && result.coldStage == 0 && result.signal > 0.0f && result.strength > 0.0f ) {
         float freeMisfit = result.residual / result.signal;
