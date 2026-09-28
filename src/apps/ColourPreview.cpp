@@ -76,7 +76,11 @@ static void cursorAcross( float t, uint8_t* r, uint8_t* g, uint8_t* b ) {
 // The dimming by the chosen data: the peak at the near end, (1 - amount) of it at the far end.
 static void dimming( float t, uint8_t* r, uint8_t* g, uint8_t* b ) {
     const ProbeLedStyle& s = probeLeds.style;
-    float k = s.brightBy == PROBELED_DATA_NONE ? 1.0f : 1.0f - s.brightAmount * t;
+    float k = s.brightBy == PROBELED_DATA_NONE ? 1.0f : 1.0f + s.brightAmount * t; // signed (2026-09-28): + brighter toward the far end, - dimmer
+    if ( k > 1.0f )
+        k = 1.0f;
+    if ( k < 0.0f )
+        k = 0.0f;
     *r = *g = *b = (uint8_t)( 255.0f * s.peak * k );
 }
 

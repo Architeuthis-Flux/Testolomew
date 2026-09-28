@@ -324,8 +324,8 @@ void settingsMenuBuild( Menu* m ) {
                  "The height, mm, from which a wheel scheme's colour is all in. Below 1.5 mm the cursor is white, blended between." );  // white on the board below 1.5 mm, all the colour from here up
     menuAddChoice( m, colours, "bright by", &probeLeds.style.brightBy, probeLedDataNames, PROBELED_DATA_COUNT,
                  "What dims the cursor: unsure (how far the row is from certain), height, tilt, speed, or none." );
-    menuAddNumber( m, colours, "bright amount", &probeLeds.style.brightAmount, 0.0f, 1.0f, 0.05f, "",
-                 "How much the chosen data dims the cursor at its far end. 0.5 by unsure: a coin-toss row at half." );
+    menuAddNumber( m, colours, "bright amount", &probeLeds.style.brightAmount, -1.0f, 1.0f, 0.05f, "",
+                 "How much the chosen data changes the cursor at its far end, signed: +1 doubles the peak there (by speed: twice as bright when fast - never past full), -1 takes it to nothing. -0.5 by unsure: a coin-toss row at half." );
     menuAddChoice( m, colours, "sparkle by", &probeLeds.style.sparkleBy, probeLedDataNames, PROBELED_DATA_COUNT,
                  "What raises the sparkle's density from a tenth of the lever to all of it: height, unsure, tilt, speed, or none." );
     menuAddToggle( m, colours, "tail", &probeLeds.style.tail,

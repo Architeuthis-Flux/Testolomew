@@ -172,7 +172,7 @@ void probeLedDefaultStyle( ProbeLedStyle* s ) {
     s->hueStartDeg = 240.0f;            // (0)
     s->colourByMm = 2.5f;               // (6)
     s->brightBy = PROBELED_DATA_NONE;   // (sure)
-    s->brightAmount = 1.0f;             // (0.5: a coin-toss row at half)
+    s->brightAmount = 1.0f;             // signed since 2026-09-28: + brightens toward the data's far end, - dims (0.5 dimmed a coin-toss row by half until then; by "none" it is inert)
     s->sparkleBy = PROBELED_DATA_NONE;  // (height)
     s->fullPeak = true;
     s->bloom = 0.0f;
@@ -441,7 +441,13 @@ void probeLedRender( const LedLayout* layout, const ProbeLedInput* in, const Pro
         // (unsure by default: a coin-toss row at half), and a coasting
         // track a little dimmer.
         schemeColour( style, in, frame->timeS, &r, &g, &b );
-        peak *= 1.0f - clamp01( style->brightAmount ) * dataOf( style, in, style->brightBy );
+        // ...by the chosen data, SIGNED (2026-09-28): +1 doubles the peak at the
+        // data's far end (a fast hand, a lifted probe), -1 takes it to nothing;
+        // never past the full peak, which the LEDs cannot show.
+        float amount = style->brightAmount < -1.0f ? -1.0f : ( style->brightAmount > 1.0f ? 1.0f : style->brightAmount );
+        peak *= 1.0f + amount * dataOf( style, in, style->brightBy );
+        if ( peak > 1.0f )
+            peak = 1.0f;
         if ( in->state == PROBELED_COASTING )
             peak *= 0.7f;
         // The cursor keeps its total light (a wide bell is a dim one) down to a

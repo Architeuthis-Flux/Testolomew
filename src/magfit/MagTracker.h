@@ -51,24 +51,24 @@
 
 #include "Vec3.h"
 
-#define MAGTRACK_ACCEL_SIGMA 20000.0f     // mm/s^2: how jerky a hand's motion may be (process noise). 3000 lagged 20 ms; this lags 10 with the same rest jitter after the 1-Euro (tools/hostsim/pencil.cpp) (the bench's setting on 2026-09-27, taken as the default: 10000 until then)
+#define MAGTRACK_ACCEL_SIGMA 1000.0f     // mm/s^2: how jerky a hand's motion may be (process noise). 3000 lagged 20 ms; this lags 10 with the same rest jitter after the 1-Euro (tools/hostsim/pencil.cpp)
 #define MAGTRACK_ROUGH_ACCEL_SIGMA 2000.0f // mm/s^2: the process noise while ROUGH (far, 12 mm fixes: averaging beats following)
-#define MAGTRACK_SIGMA_FLOOR_MM 0.2f      // the array's systematic error, not in the fit's bar: sigma_R, the std of the fix's second differences over sqrt 6 (tools/fixstats.py), measured 0.16-0.19 mm at rest with the 4232 magnet (2026-09-19 capture) and scaled to the 1839 one; the bench protocol (knobs.md section 8) replaces it (0.3 until 2026-09-23) (the bench's setting on 2026-09-27, taken as the default: 0.4 until then)
-#define MAGTRACK_GATE 2.0f                // fixes further than this many sigmas from the track count for LESS (Huber: their variance grown by the square of the excess)... (the bench's setting on 2026-09-27, taken as the default: 4 until then)
+#define MAGTRACK_SIGMA_FLOOR_MM 0.4f      // the array's systematic error, not in the fit's bar: sigma_R, the std of the fix's second differences over sqrt 6 (tools/fixstats.py), measured 0.16-0.19 mm at rest with the 4232 magnet (2026-09-19 capture) and scaled to the 1839 one; the bench protocol (knobs.md section 8) replaces it (0.3 until 2026-09-23)
+#define MAGTRACK_GATE 4.0f                // fixes further than this many sigmas from the track count for LESS (Huber: their variance grown by the square of the excess)...
 #define MAGTRACK_GATE_DROP 11.3f          // ...and only past this many are dropped (sqrt 8 x the gate: a fix weighed to an eighth is worth keeping, beyond that it is another place)
 #define MAGTRACK_MAX_SPEED_MM_S 3000.0f   // faster than a hand moves over a desk
 #define MAGTRACK_REINIT_AFTER 3           // dropped fixes in a row that agree = the track was wrong
 #define MAGTRACK_REINIT_AGREE_MM 6.0f     // ...agree = within this of each other
 #define MAGTRACK_COAST_MS 400             // how long a track outlives its last fix
-#define MAGTRACK_ROUGH_HOLD_S 3.0f        // ...and how long a ROUGH one (the far glow) outlives its last rough fix (menu: far hold; 2.5 until 2026-09-23: a stale glow for two seconds after the probe had gone) (the bench's setting on 2026-09-27, taken as the default: 1.0 until then)
+#define MAGTRACK_ROUGH_HOLD_S 1.0f        // ...and how long a ROUGH one (the far glow) outlives its last rough fix (menu: far hold; 2.5 until 2026-09-23: a stale glow for two seconds after the probe had gone)
 #define MAGTRACK_ROUGH_SPREAD_MM_S 8.0f   // while it is held its bar widens this fast (the glow spreads and dims, honestly)
 #define MAGTRACK_COAST_TAU_S 0.15f        // velocity dies away with this time constant while coasting
-#define MAGTRACK_SHAFT_MIN_CUTOFF 3.6f    // Hz: the shaft direction's 1-Euro filter at rest (menu: shaft Hz) (the bench's setting on 2026-09-27, taken as the default: 1.0 until then)
-#define MAGTRACK_SHAFT_BETA 1.0f         // per unit/s of a component's change: how fast the cutoff opens as the pencil turns (menu: shaft beta) (the bench's setting on 2026-09-27, taken as the default: 10 until then)
-#define MAGTRACK_VIEW_MIN_CUTOFF 2.7f     // Hz: the 1-Euro filter on what the SCENE draws of the magnet (menu: view) (the bench's setting on 2026-09-27, taken as the default: 1.5 until then)
-#define MAGTRACK_VIEW_BETA 0.04f           // per mm/s (0.05 lagged 40 ms at writing speed; this 20, jitter at rest 0.025 mm - pencil.cpp) (the bench's setting on 2026-09-27, taken as the default: 0.5 until then)
+#define MAGTRACK_SHAFT_MIN_CUTOFF 1.0f    // Hz: the shaft direction's 1-Euro filter at rest (menu: shaft Hz)
+#define MAGTRACK_SHAFT_BETA 10.0f         // per unit/s of a component's change: how fast the cutoff opens as the pencil turns (menu: shaft beta)
+#define MAGTRACK_VIEW_MIN_CUTOFF 1.5f     // Hz: the 1-Euro filter on what the SCENE draws of the magnet (menu: view)
+#define MAGTRACK_VIEW_BETA 0.5f           // per mm/s (0.05 lagged 40 ms at writing speed; this 20, jitter at rest 0.025 mm - pencil.cpp)
 #define MAGTRACK_SHAFT_FLIP_DEG 45.0f     // a shaft swing bigger than this in one frame waits for confirmation
-#define MAGTRACK_MAX_REACH_MM 60.0f       // the pointer never reaches further from the tip than this (the bench's setting on 2026-09-27, taken as the default: 40 until then)
+#define MAGTRACK_MAX_REACH_MM 40.0f       // the pointer never reaches further from the tip than this
 // ...and never as if the probe were flatter than this: the reach is drop x
 // tan(tilt), and past 70 degrees the tangent runs away - at 84 degrees a
 // millimetre of drop and the shaft's 0.8 degree of jitter at rest put the
@@ -84,29 +84,18 @@
 // projection turned 0.8 deg of tilt jitter into 1.5 mm of cursor, and a tap
 // at an angle lit the row the shaft pointed at, not the one tapped.)
 #define MAGTRACK_CONTACT_MM 1.5f
-#define MAGTRACK_ONE_EURO_MIN_CUTOFF 3.2f // Hz: how much the cursor may jitter at rest (the bench's setting on 2026-09-27, taken as the default: 1.0 until then)
-#define MAGTRACK_ONE_EURO_BETA 0.12f       // per mm/s: how fast the cutoff opens with speed (pencil.cpp: 20 ms behind at writing speed, 0.02 mm jitter at rest) (the bench's setting on 2026-09-27, taken as the default: 0.5 until then)
+#define MAGTRACK_ONE_EURO_MIN_CUTOFF 1.0f // Hz: how much the cursor may jitter at rest
+#define MAGTRACK_ONE_EURO_BETA 0.5f       // per mm/s: how fast the cutoff opens with speed (pencil.cpp: 20 ms behind at writing speed, 0.02 mm jitter at rest)
 #define MAGTRACK_ONE_EURO_D_CUTOFF 1.0f   // Hz: smoothing of the speed estimate itself
 // The cursor's and the view's filters slow with the point's height above the
-// surface: their cutoffs (Hz) are divided by (1 + height / HZ_HALF) and their
-// betas by (1 + height / BETA_HALF), so at those heights each runs at half
-// the pace, at twice them a third (menu: Hz height, beta height; 0 = the
-// same at any height). A far fix is a noisy one - its bar grows with the
-// fourth power of the distance - and one lever at rest cannot serve both the
-// board and a hover; the beta's own lever is what makes it "responsive with
-// the probe close but very smooth at a distance" (Kevin, 2026-09-27): the
-// speed estimate's noise is what opens the filter at rest, and far out that
-// noise is all there is. The rough fix's own calmer filter (0.5 Hz, no beta)
-// went with these: continuous where that was a step at the 5 mm bar.
-// The point's HEIGHT above the surface has a 1-Euro of its own (menu: height
-// Hz / height beta; 2026-09-28, Kevin: "we should have the height on its own
-// smoothing setting"): the cursor's filter is x and y, and the height - what
-// the LEDs colour and size by, and the View shows - came straight from the
-// position's z, unfiltered. It starts at the cursor's levers.
-#define MAGTRACK_HEIGHT_MIN_CUTOFF 3.2f
-#define MAGTRACK_HEIGHT_BETA 0.12f
-#define MAGTRACK_HZ_HALF_MM 25.0f // (the bench's setting on 2026-09-27, taken as the default: 40 until then)
-#define MAGTRACK_BETA_HALF_MM 20.0f
+// surface: their cutoffs and betas are divided by (1 + height / this), so at
+// this height they run at half the pace, at twice it a third (menu: smooth
+// height; 0 = the same at any height). A far fix is a noisy one - its bar
+// grows with the fourth power of the distance - and one lever at rest cannot
+// serve both the board and a hover (Kevin, 2026-09-27: "better ways to scale
+// beta vs height"). The rough fix's own calmer filter (0.5 Hz, no beta) went
+// with it: this is continuous where that was a step at the 5 mm bar.
+#define MAGTRACK_SMOOTH_HALF_MM 40.0f
 
 enum MagTrackState {
     MAGTRACK_NONE,     // nothing tracked
@@ -156,7 +145,6 @@ struct MagTrack {
     Vec3 rawCursor;      // before the 1-Euro filter
     Vec3 viewPosition;   // the magnet for the scene: the position through its own 1-Euro filter (viewMinCutoff, viewBeta)
     Vec3 viewTip;        // ...and the point from it
-    float heightMm;      // the point's height above the surface, through its own 1-Euro (heightMinCutoff, heightBeta); tip.z - surfaceZ is the raw one; NEGATIVE below the believed surface (the surface setting is too high)
     float cursorSigmaMm; // about how far the cursor may be off, across the board
     float reachMm;       // how far the cursor sits from under the tip (0 in UNDER mode)
     uint32_t ageMs;      // since the last accepted proper fix
@@ -166,8 +154,7 @@ struct MagTrack {
     uint32_t accepted, dropped, reinits, coasted; // counters since reset
 
     // settings
-    bool enabled; // off = fixes pass straight through the Kalman, gate and coast (for comparing); what is shown reads the track either way (2026-09-27)
-    bool smooth;  // the cursor's, view's and shaft's 1-Euro filters; off = what is shown is the track's own output, and with the tracker off too that is the bare fix - RAW, for comparing (2026-09-27 evening: with the filters in both modes the tracker toggle changed nothing to see)
+    bool enabled; // off = fixes pass straight through the Kalman, gate and coast (for comparing); the cursor's, view's and shaft's 1-Euro filters still apply, and what is shown reads the track either way (2026-09-27)
     MagCursorMode cursorMode;
     float surfaceZ;    // the breadboard's surface, mm above the sensors
     float tipOffsetMm; // the point is this far down the shaft from the magnet
@@ -176,18 +163,15 @@ struct MagTrack {
     float gate;
     float maxReachMm;
     float oneEuroMinCutoff, oneEuroBeta;
-    float heightMinCutoff, heightBeta; // the height's own smoothing
-    float viewMinCutoff, viewBeta;     // the scene's smoothing of the magnet
+    float viewMinCutoff, viewBeta; // the scene's smoothing of the magnet
     float shaftMinCutoff, shaftBeta; // the shaft direction's own 1-Euro (a turn is followed at once, a resting shaft stays put)
-    float hzHalfMm;                // the height at which the cursor's and the view's Hz are halved (0 = the same at any height)...
-    float betaHalfMm;              // ...and their betas
+    float smoothHalfMm;            // the height at which the cursor's and the view's filters run at half the pace (0 = the same at any height)
     float roughHoldS;              // how long the far glow is held after its last rough fix
 
     // private-ish
     MagTrackAxis axis[ 3 ];
     OneEuroAxis euro[ 3 ];
     OneEuroAxis viewEuro[ 3 ];
-    OneEuroAxis heightEuro;
     OneEuroAxis shaftEuro[ 3 ];
     Vec3 roughSigma; // the bar the far glow is held at (the last rough fix's, spreading)
     int shaftSwings; // frames in a row the shaft wanted to swing far

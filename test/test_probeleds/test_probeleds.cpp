@@ -28,7 +28,7 @@ void setUp( void ) {
     style.liftFullMm = 15.0f;
     style.colourByMm = 6.0f;
     style.brightBy = PROBELED_DATA_SURE;
-    style.brightAmount = 0.5f;
+    style.brightAmount = -0.5f; // (signed since 2026-09-28: a toss-up row at half)
     style.sparkleBy = PROBELED_DATA_HEIGHT;
     style.spot = 1.0f;
     style.spotByHeight = 0.0f;
@@ -413,7 +413,7 @@ void test_brightness_follows_the_chosen_data( void ) {
     in.confidence = 0.0f;
     probeLedRender( &v6, &in, &style, 0.02f, &frame ); // the default: by unsure, half
     TEST_ASSERT_FLOAT_WITHIN( 0.02f, 0.5f * style.peak, frame.target[ brightest( &frame ) ] );
-    style.brightAmount = 1.0f;
+    style.brightAmount = -1.0f;
     probeLedRender( &v6, &in, &style, 0.02f, &frame );
     TEST_ASSERT_TRUE( frame.target[ brightest( &frame ) ] < 0.02f ); // a toss-up: dark
     in.confidence = 1.0f;
@@ -424,12 +424,12 @@ void test_brightness_follows_the_chosen_data( void ) {
     probeLedRender( &v6, &in, &style, 0.02f, &frame );
     TEST_ASSERT_FLOAT_WITHIN( 0.02f, style.peak, frame.target[ brightest( &frame ) ] ); // nothing dims it
     style.brightBy = PROBELED_DATA_TILT;
-    style.brightAmount = 0.5f;
+    style.brightAmount = -0.5f;
     in.tiltDeg = 60.0f; // the far end of the tilt scale
     probeLedRender( &v6, &in, &style, 0.02f, &frame );
     TEST_ASSERT_FLOAT_WITHIN( 0.02f, 0.5f * style.peak, frame.target[ brightest( &frame ) ] );
     style.brightBy = PROBELED_DATA_HEIGHT;
-    style.brightAmount = 1.0f;
+    style.brightAmount = -1.0f;
     in.heightMm = style.liftFullMm * 0.5f;
     probeLedRender( &v6, &in, &style, 0.02f, &frame );
     TEST_ASSERT_FLOAT_WITHIN( 0.02f, 0.5f * style.peak, frame.target[ brightest( &frame ) ] );
@@ -438,6 +438,20 @@ void test_brightness_follows_the_chosen_data( void ) {
     in.speedMmS = 400.0f; // past the scale's end: all of the amount
     probeLedRender( &v6, &in, &style, 0.02f, &frame );
     TEST_ASSERT_TRUE( frame.target[ brightest( &frame ) ] < 0.02f );
+    // Signed (2026-09-28): a positive amount brightens toward the far end -
+    // +1 by speed doubles a half peak when fast - and never past the full peak.
+    style.brightBy = PROBELED_DATA_SPEED;
+    style.brightAmount = 1.0f;
+    style.peak = 0.5f;
+    in.speedMmS = 0.0f;
+    probeLedRender( &v6, &in, &style, 0.02f, &frame );
+    TEST_ASSERT_FLOAT_WITHIN( 0.02f, 0.5f, frame.target[ brightest( &frame ) ] );
+    in.speedMmS = PROBELED_SPEED_FULL_MM_S;
+    probeLedRender( &v6, &in, &style, 0.02f, &frame );
+    TEST_ASSERT_FLOAT_WITHIN( 0.02f, 1.0f, frame.target[ brightest( &frame ) ] );
+    style.peak = 1.0f;
+    probeLedRender( &v6, &in, &style, 0.02f, &frame );
+    TEST_ASSERT_FLOAT_WITHIN( 0.02f, 1.0f, frame.target[ brightest( &frame ) ] ); // full is full
 }
 
 // ...and what the sparkle's density follows: by height (the default: few

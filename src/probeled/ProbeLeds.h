@@ -228,7 +228,7 @@ struct ProbeLedStyle {
     float hueStartDeg;  // where the wheel starts (0 red, 120 green, 240 blue)
     float colourByMm;   // the scheme's colour is all in from this height (white on the board below PROBELED_WHITE_BELOW_MM)
     int brightBy;       // ProbeLedData: what dims the cursor...
-    float brightAmount; // ...by this much at the data's far end (0.5 by unsure: a toss-up row at half)
+    float brightAmount; // ...by this much at the data's far end, SIGNED: +1 doubles the peak there (never past the full peak), -1 takes it to nothing (-0.5 by unsure: a toss-up row at half)
     int sparkleBy;      // ProbeLedData: what raises the sparkle's density from PROBELED_SPARKLE_FLOOR of the lever to all of it (nothing: all of it always)
     bool fullPeak;  // the brightest LED is always `peak`; else the bell keeps its total light and widens dimmer
     float bloom;    // 0..1, a wide soft halo round the cursor
