@@ -14,7 +14,7 @@ S = ../../src
 G = ../../.pio/libdeps/testolomew/Adafruit GFX Library
 B = ../../.pio/libdeps/testolomew/Adafruit BusIO
 CXX ?= g++
-CXXFLAGS ?= -std=c++11 -O1 -g -w -DARDUINO=10808 -MMD -MP
+CXXFLAGS ?= -std=c++11 -O1 -g -w -DARDUINO=10808 -DMAGLOC_BOOT_ZERO_CHECK=1 -MMD -MP # the boot zero check stays ON here (off in the firmware since 2026-09-28 evening) so boot.txt and bootprobe.txt keep testing it
 INC = -I . -I $(S) -I $(S)/common -I $(S)/jos -I $(S)/console -I $(S)/magarray -I $(S)/magfit -I $(S)/rowcount -I $(S)/display -I $(S)/probeled -I $(S)/ui -I $(S)/play -I $(S)/settings -I $(S)/apps -I $(S)/board -I "$(G)" -I "$(B)"
 
 # Every firmware source but the ones the stubs replace.

@@ -213,6 +213,19 @@
 // within 3.4 mm with the prior right, 25 mm off with it 40 degrees wrong.)
 #define MAGLOC_AXIS_PRIOR_MT 0.02f // ...only where the direction is open, by the free fit's own bar (2026-09-28): none under MAGLOC_PRIOR_FROM_MM of 3D bar (eight TMAGs at 40 mm above the board, 8 mm, pin it - and the prior bent that axis 11 degrees flat and the fix 5 mm low with no noise at all, the far aim cursor's wander), all of it from twice that (the MMC alone at 90 mm, 18 mm; the TMAGs alone at 55 mm, at their noise floor, 14: the lean the hand last had is the best there is)
 #define MAGLOC_PRIOR_FROM_MM 8.0f
+// The boot zero check (adoptBootZero): the saved zero is put back and then
+// judged against the first MAG_BASELINE_FRAMES of readings - their difference
+// adopted as the zero when no dipole explains it (drift since it was saved),
+// kept when one does (the probe lying near the board). OFF since 2026-09-28
+// evening (Kevin: "remove the boot calibration so you don't need me to move
+// the probe"): a probe 40 mm up reads 0.02-0.04 mT, which is not a dipole
+// the fit can name, and every reflash with it in place had the check eat it.
+// The saved zero is put back and kept; drift is the offset filter's
+// (keepZeros), the audit's and z's. 1 puts the check back; the host sim
+// builds with it on (its Makefile), so boot.txt and bootprobe.txt keep it honest.
+#ifndef MAGLOC_BOOT_ZERO_CHECK
+#define MAGLOC_BOOT_ZERO_CHECK 0
+#endif
 #define MAGLOC_FAR_BAR_TAU_S 0.25f // s: the fixes' bar is smoothed over this before it ramps the prior and the MMC's far share (a fix's own bar jitters +/-40 % 55 mm up, and the ramp flapped on it)
 // ...and how many iterations that refinement may spend a frame (the steady
 // load's "fit iters" when that is on): from the free fit's answer it needs

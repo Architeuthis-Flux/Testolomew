@@ -4,6 +4,8 @@ The firmware's modules run on a PC against stubs of what the chip provides (`Ard
 
 ## The simulator: `make sim`, `./sim <script> [-q]`
 
+The sim builds with `MAGLOC_BOOT_ZERO_CHECK=1` (its Makefile): the boot zero check is off in the firmware since 2026-09-28 evening, and `scenes/boot.txt` and `bootprobe.txt` are what keep it honest.
+
 `sim.cpp` boots the firmware through main.cpp's own `setup()` and then runs the real scheduler (`jOS.serviceAll()`) with the clock advancing 250 µs a pass, so every service ticks at its own period as on the board. A `WorldService` writes the dipole field of a simulated magnet into the array's frames (`MagArray::useSimulatedFrames()` tells the array the frames come from outside). The script is typed on the console exactly as on the board - letters, keys and the `:verbs` (`:help` lists them) - with a few directives for the world and for checks:
 
 | line | what it does |

@@ -481,8 +481,11 @@ void MagLocator::checkBaseline( ) {
         baselinePolluted = false; // a saved zero, checked when it was taken; never retaken behind the user's back...
         baselineRetakes = 0;
         retakeBaselineAtMs = 0;
-        // ...but checked against the live readings once they are in (adoptBootZero).
-        bootAdopting = true;
+        // ...but checked against the live readings once they are in (adoptBootZero) -
+        // unless the check is off (MAGLOC_BOOT_ZERO_CHECK): then it is put back and kept.
+        bootAdopting = MAGLOC_BOOT_ZERO_CHECK != 0;
+        if ( !bootAdopting && console.port( ) != nullptr )
+            console.port( )->println( "zero: the saved zero put back and kept (the boot check is off: MAGLOC_BOOT_ZERO_CHECK)" );
         bootAdoptFrames = 0;
         for ( int i = 0; i < MAGFIT_MAX_SENSORS; i++ ) {
             bootSum[ i ] = { 0, 0, 0 };
