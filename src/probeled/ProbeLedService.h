@@ -38,7 +38,7 @@
 #define PROBELED_PERIOD_US 20000       // 50 Hz
 #define PROBELED_STREAM_EVERY 2        // stream at 25 Hz
 #define PROBELED_RAW_HOLD_MS 250       // with the tracker off, the last raw fix's cursor stays (as coasting) this long after a frame with no fix: a fast hand's refused frames were dark ones (2026-09-26)
-#define PROBELED_STRIP_BRIGHTNESS 0.62f // the menu's "strip" lever; 1 = the LEDs as bright as they go (the bench's setting on 2026-09-27, taken as the default: 1.0 until then)
+#define PROBELED_STRIP_BRIGHTNESS 0.96f // the menu's "strip" lever; 1 = the LEDs as bright as they go (the bench's setting on 2026-09-27, taken as the default: 1.0 until then) (the bench's setting on 2026-09-28 evening, taken as the default: 0.62 until then)
 // The chain's current, kept under a budget: a frame that would draw more
 // than the budget is scaled down whole, so the picture keeps its shape and
 // the rail keeps its volts. The budget is the menu's "budget mA" (`stripMaxMa`,

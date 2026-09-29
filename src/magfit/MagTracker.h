@@ -52,9 +52,9 @@
 #include "TipModel.h"
 #include "Vec3.h"
 
-#define MAGTRACK_ACCEL_SIGMA 20000.0f     // mm/s^2: how jerky a hand's motion may be (process noise). 3000 lagged 20 ms; this lags 10 with the same rest jitter after the 1-Euro (tools/hostsim/pencil.cpp) (the bench's setting on 2026-09-27, taken as the default: 10000 until then)
+#define MAGTRACK_ACCEL_SIGMA 7750.0f     // mm/s^2: how jerky a hand's motion may be (process noise). 3000 lagged 20 ms; this lags 10 with the same rest jitter after the 1-Euro (tools/hostsim/pencil.cpp) (the bench's setting on 2026-09-27, taken as the default: 10000 until then) (the bench's setting on 2026-09-28 evening, taken as the default: 20000.0 until then)
 #define MAGTRACK_ROUGH_ACCEL_SIGMA 2000.0f // mm/s^2: the process noise while ROUGH (far, 12 mm fixes: averaging beats following)
-#define MAGTRACK_SIGMA_FLOOR_MM 0.2f      // the array's systematic error, not in the fit's bar: sigma_R, the std of the fix's second differences over sqrt 6 (tools/fixstats.py), measured 0.16-0.19 mm at rest with the 4232 magnet (2026-09-19 capture) and scaled to the 1839 one; the bench protocol (knobs.md section 8) replaces it (0.3 until 2026-09-23) (the bench's setting on 2026-09-27, taken as the default: 0.4 until then)
+#define MAGTRACK_SIGMA_FLOOR_MM 0.1f      // the array's systematic error, not in the fit's bar: sigma_R, the std of the fix's second differences over sqrt 6 (tools/fixstats.py), measured 0.16-0.19 mm at rest with the 4232 magnet (2026-09-19 capture) and scaled to the 1839 one; the bench protocol (knobs.md section 8) replaces it (0.3 until 2026-09-23) (the bench's setting on 2026-09-27, taken as the default: 0.4 until then) (the bench's setting on 2026-09-28 evening, taken as the default: 0.2 until then)
 #define MAGTRACK_GATE 2.0f                // fixes further than this many sigmas from the track count for LESS (Huber: their variance grown by the square of the excess)... (the bench's setting on 2026-09-27, taken as the default: 4 until then)
 #define MAGTRACK_GATE_DROP 11.3f          // ...and only past this many are dropped (sqrt 8 x the gate: a fix weighed to an eighth is worth keeping, beyond that it is another place)
 #define MAGTRACK_MAX_SPEED_MM_S 3000.0f   // faster than a hand moves over a desk
@@ -74,13 +74,13 @@
 // noisy axis is the shaft filter's to calm, keyed on the fit's own bar on
 // the axis (MAGTRACK_AXIS_SURE_RAD below).
 #define MAGTRACK_FAR_BAR_MM 5.0f
-#define MAGTRACK_ROUGH_HOLD_S 3.0f        // ...and how long a ROUGH one (the far glow) outlives its last rough fix (menu: far hold; 2.5 until 2026-09-23: a stale glow for two seconds after the probe had gone) (the bench's setting on 2026-09-27, taken as the default: 1.0 until then)
+#define MAGTRACK_ROUGH_HOLD_S 0.5f        // ...and how long a ROUGH one (the far glow) outlives its last rough fix (menu: far hold; 2.5 until 2026-09-23: a stale glow for two seconds after the probe had gone) (the bench's setting on 2026-09-27, taken as the default: 1.0 until then) (the bench's setting on 2026-09-28 evening, taken as the default: 3.0 until then)
 #define MAGTRACK_ROUGH_SPREAD_MM_S 8.0f   // while it is held its bar widens this fast (the glow spreads and dims, honestly)
 #define MAGTRACK_COAST_TAU_S 0.15f        // velocity dies away with this time constant while coasting
 #define MAGTRACK_SHAFT_MIN_CUTOFF 3.6f    // Hz: the shaft direction's 1-Euro filter at rest (menu: shaft Hz) (the bench's setting on 2026-09-27, taken as the default: 1.0 until then)
 #define MAGTRACK_SHAFT_BETA 1.0f         // per unit/s of a component's change: how fast the cutoff opens as the pencil turns (menu: shaft beta) (the bench's setting on 2026-09-27, taken as the default: 10 until then)
 #define MAGTRACK_VIEW_MIN_CUTOFF 2.7f     // Hz: the 1-Euro filter on what the SCENE draws of the magnet (menu: view) (the bench's setting on 2026-09-27, taken as the default: 1.5 until then)
-#define MAGTRACK_VIEW_BETA 0.04f           // per mm/s (0.05 lagged 40 ms at writing speed; this 20, jitter at rest 0.025 mm - pencil.cpp) (the bench's setting on 2026-09-27, taken as the default: 0.5 until then)
+#define MAGTRACK_VIEW_BETA 0.02f           // per mm/s (0.05 lagged 40 ms at writing speed; this 20, jitter at rest 0.025 mm - pencil.cpp) (the bench's setting on 2026-09-27, taken as the default: 0.5 until then) (the bench's setting on 2026-09-28 evening, taken as the default: 0.04 until then)
 // The shaft's filter is keyed on the fit's own bar on the axis (MagFitResult::
 // axisSigma, radians, smoothed over AXIS_SIGMA_TAU_S): its cutoff times
 // 1 / (1 + (sigma / AXIS_SURE_RAD)^4), its beta by the square of that. The
@@ -114,8 +114,8 @@
 // projection turned 0.8 deg of tilt jitter into 1.5 mm of cursor, and a tap
 // at an angle lit the row the shaft pointed at, not the one tapped.)
 #define MAGTRACK_CONTACT_MM 1.5f
-#define MAGTRACK_ONE_EURO_MIN_CUTOFF 3.2f // Hz: how much the cursor may jitter at rest (the bench's setting on 2026-09-27, taken as the default: 1.0 until then)
-#define MAGTRACK_ONE_EURO_BETA 0.12f       // per mm/s: how fast the cutoff opens with speed (pencil.cpp: 20 ms behind at writing speed, 0.02 mm jitter at rest) (the bench's setting on 2026-09-27, taken as the default: 0.5 until then)
+#define MAGTRACK_ONE_EURO_MIN_CUTOFF 4.9f // Hz: how much the cursor may jitter at rest (the bench's setting on 2026-09-27, taken as the default: 1.0 until then) (the bench's setting on 2026-09-28 evening, taken as the default: 3.2 until then)
+#define MAGTRACK_ONE_EURO_BETA 0.26f       // per mm/s: how fast the cutoff opens with speed (pencil.cpp: 20 ms behind at writing speed, 0.02 mm jitter at rest) (the bench's setting on 2026-09-27, taken as the default: 0.5 until then) (the bench's setting on 2026-09-28 evening, taken as the default: 0.12 until then)
 #define MAGTRACK_ONE_EURO_D_CUTOFF 1.0f   // Hz: smoothing of the speed estimate itself
 // The cursor's, the height's and the view's filters slow with the point's
 // height above the surface: their cutoffs (Hz) are divided by
@@ -135,10 +135,10 @@
 // smoothing setting"): the cursor's filter is x and y, and the height - what
 // the LEDs colour and size by, and the View shows - came straight from the
 // position's z, unfiltered. It starts at the cursor's levers.
-#define MAGTRACK_HEIGHT_MIN_CUTOFF 3.2f
-#define MAGTRACK_HEIGHT_BETA 0.12f
+#define MAGTRACK_HEIGHT_MIN_CUTOFF 2.7f // (the bench's setting on 2026-09-28 evening, taken as the default: 3.2 until then)
+#define MAGTRACK_HEIGHT_BETA 0.22f // (the bench's setting on 2026-09-28 evening, taken as the default: 0.12 until then)
 #define MAGTRACK_HZ_HALF_MM 25.0f // (the bench's setting on 2026-09-27, taken as the default: 40 until then)
-#define MAGTRACK_BETA_HALF_MM 20.0f
+#define MAGTRACK_BETA_HALF_MM 15.0f // (the bench's setting on 2026-09-28 evening, taken as the default: 20.0 until then)
 
 enum MagTrackState {
     MAGTRACK_NONE,     // nothing tracked

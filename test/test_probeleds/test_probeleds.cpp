@@ -30,6 +30,7 @@ void setUp( void ) {
     style.brightBy = PROBELED_DATA_SURE;
     style.brightAmount = -0.5f; // (signed since 2026-09-28: a toss-up row at half)
     style.sparkleBy = PROBELED_DATA_HEIGHT;
+    style.peak = 1.0f; // (0.65 since 2026-09-28 evening's defaults)
     style.spot = 1.0f;
     style.spotByHeight = 0.0f;
     style.decayS = 0.12f;

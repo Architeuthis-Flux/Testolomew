@@ -76,7 +76,7 @@ enum MagSensorType {
 // MAG_MMC_FAR (in the fit and presence only as the TMAGs' bar opens up - the
 // far sensor by design, its readings near the board sketchy: 2026-09-28,
 // Kevin), MAG_MMC_ON (in throughout). The menu's "MMC" on the tools page.
-#define MAG_MMC_MODE_AT_BOOT MAG_MMC_FAR
+#define MAG_MMC_MODE_AT_BOOT MAG_MMC_OFF // (Kevin's setting on 2026-09-28 evening, taken as the default: far for that afternoon)
 
 // How much the fit trusts each sensor: weight = MAG_WEIGHT_REFERENCE_MT /
 // (the type's noise a frame), capped at MAG_WEIGHT_CAP - so a TMAG5273 is

@@ -142,7 +142,7 @@
 // - converged or not while tracking, one resumable slice of the cold start
 // while hunting - so the V5F's work, and its supply current, is the same
 // every 10 ms rather than a burst now and then. Kevin's idea, 2026-09-20.
-#define MAGLOC_STEADY_ITERATIONS 2 // the default of "fit iters" (~0.85 ms each on the CH32H417). tools/hostsim/pencil.cpp: 2 a frame tracks exactly as the natural caps do (error, lag and jitter to the last digit); at 1 it loses 0.1 % of frames. More only makes the pulse the supply shows bigger (2026-09-20).
+#define MAGLOC_STEADY_ITERATIONS 4 // the default of "fit iters" (~0.85 ms each on the CH32H417). tools/hostsim/pencil.cpp: 2 a frame tracks exactly as the natural caps do (error, lag and jitter to the last digit); at 1 it loses 0.1 % of frames. More only makes the pulse the supply shows bigger (2026-09-20). (the bench's setting on 2026-09-28 evening, taken as the default: 2 until then)
 
 
 // Worst residual/signal ratio still called a fix (see magFitSolve). Far from
@@ -274,7 +274,7 @@
 // The shaft is turned to point up (a probe is not held upside down), and the
 // point is MAGLOC_TIP_OFFSET_MM down it from the magnet's centre. Both can be
 // typed: t<mm> and T<degrees>.
-#define MAGLOC_TIP_OFFSET_MM 0.0f
+#define MAGLOC_TIP_OFFSET_MM 6.7f // (the bench's setting on 2026-09-28 evening, taken as the default: 0.0 until then)
 #define MAGLOC_MAGNET_ANGLE_DEG 0.0f
 
 // Where the probe POINTS: carry the point on down the shaft to the breadboard's
@@ -285,7 +285,7 @@
 // (`c`) sets it from the height the point rests at; `S` types it. On the
 // bench the breadboard sits 17.5 mm over the sensors; on V6 the surface is
 // 7.1 mm above the base PCB (plus wherever the sensors sit below that).
-#define MAGLOC_BOARD_Z_MM 14.5f // (the bench's setting on 2026-09-27, taken as the default: 17.5 until then)
+#define MAGLOC_BOARD_Z_MM 9.7f // (the bench's setting on 2026-09-27, taken as the default: 17.5 until then) (the bench's setting on 2026-09-28 evening, taken as the default: 14.5 until then)
 
 // A fix goes to the tracker as a ROUGH one ("somewhere about here", the wide
 // glow on the LEDs, no row counted) rather than a proper one when its error

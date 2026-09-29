@@ -456,6 +456,8 @@ static bool directive( const std::vector<std::string>& w, int lineNo ) {
         magLocator.fitMaxChi = 2.0f;
         magLocator.speedJitterK = 0.4f;
         magLocator.boardZ = 17.5f;
+        magLocator.tipOffsetMm = 0.0f;    // (6.7 since 2026-09-28 evening's defaults: the bench probe's, from its lean calibration)
+        magLocator.steadyIterations = 2;  // (4 since then)
         world.surfaceZ = 17.5f;
         world.slopeX = world.slopeY = 0.0f;
         magLocator.track.accelSigma = 10000.0f;
