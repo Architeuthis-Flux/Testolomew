@@ -39,7 +39,7 @@ static void textAt( GFXcanvas16* c, int x, int y, int size, uint16_t color, cons
     fastText( c, x, y, size, color, text );
 }
 
-// The drawing over the board from above: every hole a dot, the painted
+// The drawing over the board from above: every hole (and rail LED) a dot, the painted
 // ones squares in their colour at their level (as the LEDs have them), the
 // brush's ring round the point as hollow squares in the paint colour, the
 // point itself a cross. The map is the LED screen's: 7 px a row.
@@ -53,8 +53,9 @@ void drawBoardMap( GFXcanvas16* into, bool brushRing ) {
     const ProbeLedFrame& frame = probeLeds.frame;
     const ProbeLedBrush& brush = probeLeds.brush;
     for ( int i = 0; i < layout.count; i++ ) {
-        if ( layout.kind[ i ] != PROBELED_HOLE )
-            continue;
+        // Every LED, the rails' too (2026-09-28, Kevin: "we need to show the
+        // top and bottom rails on the screen in draw mode"): a dot each,
+        // where the layout has it - the V5's four rails beyond the holes.
         int x, y;
         PlayService::tracePlace( layout.along[ i ], layout.acrossMm[ i ], &x, &y );
         float painted = play.paint.level[ i ];
