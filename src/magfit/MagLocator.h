@@ -261,6 +261,7 @@
 #define MAGLOC_LEARN_MAX_MISFIT 0.10f
 #define MAGLOC_LEARN_MIN_SENSORS 4 // (5 until 2026-09-23: with the 1839 magnet five sensors read it plainly only over the middle rows, and the ring starved)
 #define MAGLOC_STRENGTH_MAX_ERROR_MM 3.0f
+#define MAGLOC_LEARN_MAX_HEIGHT_MM 30.0f // ...and no higher above the surface than this: the strength is the near fixes' to teach (2026-09-28 late evening: a lucky far frame at 40 mm taught 3620 for a 3280 magnet)
 #define MAGLOC_STRENGTH_RING 32
 #define MAGLOC_STRENGTH_MIN_SAMPLES 16
 #define MAGLOC_STRENGTH_MAX_SPREAD 0.10f

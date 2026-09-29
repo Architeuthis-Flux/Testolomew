@@ -1107,7 +1107,9 @@ ServiceStatus MagLocator::runFit( MagTrackInput* in, FrameScratch& f ) {
     if ( f.hintFree && f.good && result.coldStage == 0 && result.signal > 0.0f && result.strength > 0.0f ) {
         float freeMisfit = result.residual / result.signal;
         float freeErr = sqrtf( result.sigma.x * result.sigma.x + result.sigma.y * result.sigma.y + result.sigma.z * result.sigma.z );
-        if ( freeMisfit < MAGLOC_LEARN_MAX_MISFIT && freeErr < MAGLOC_STRENGTH_MAX_ERROR_MM ) {
+        // ...and only NEAR the board (MAGLOC_LEARN_MAX_HEIGHT_MM above the surface there; 2026-09-28 late evening: one lucky far frame 40 mm up - four sensors plain, the misfit under a tenth, the bar under 3 mm - relearned the bench's 3280 magnet as 3620, and every far fit after it sat 10 % high and was refused).
+        float learnHeight = result.position.z - surfaceAt( result.position.x, result.position.y );
+        if ( freeMisfit < MAGLOC_LEARN_MAX_MISFIT && freeErr < MAGLOC_STRENGTH_MAX_ERROR_MM && learnHeight < MAGLOC_LEARN_MAX_HEIGHT_MM ) {
             measureStrength( result.strength, result.position );
             f.held = knownStrength; // this frame's refinement holds what was just learned
             freeGood = true;
