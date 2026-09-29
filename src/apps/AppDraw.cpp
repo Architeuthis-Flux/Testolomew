@@ -7,7 +7,7 @@
 // bottom right with the paint's settings beside it.
 //
 // Controls: the joystick moves the wheel's marker (hue round, saturation
-// out; held against the rim it runs round it to where the stick points);
+// out; against the rim the stick's tilt cycles the hue until it is let go);
 // the joystick's press clicks draw/erase; the nav stick's up/down set
 // the paint's brightness, left/right the brush; the nav press held clears
 // the drawing.
@@ -212,6 +212,8 @@ void drawDraw( GFXcanvas16* into ) {
 void drawTick( float dtS, float joyX, float joyY ) {
     if ( play.mode == PLAY_PAINT && ( joyX != 0.0f || joyY != 0.0f ) ) {
         play.movePicker( joyX * PLAY_PICK_PER_S * dtS, joyY * PLAY_PICK_PER_S * dtS );
+    } else {
+        play.releasePicker( );
     }
 }
 

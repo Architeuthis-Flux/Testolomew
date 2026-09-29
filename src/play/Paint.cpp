@@ -40,34 +40,53 @@ void paintStrokeEnd( PaintStroke* stroke ) {
     stroke->down = false;
 }
 
-void paintPickerMove( float* hueDeg, float* sat, float dx, float dy ) {
+static void paintPickerWrap( float* hueDeg ) {
+    while ( *hueDeg < 0.0f )
+        *hueDeg += 360.0f;
+    while ( *hueDeg >= 359.5f ) // the menu item (and so the saved value) runs 0-359
+        *hueDeg -= 360.0f;
+    if ( *hueDeg < 0.0f )
+        *hueDeg = 0.0f;
+}
+
+void paintPickerMove( float* hueDeg, float* sat, int* cycling, float dx, float dy ) {
+    float d = sqrtf( dx * dx + dy * dy );
+    if ( *cycling != 0 ) {
+        // Round the rim at the stick's tilt, whichever way it points.
+        *hueDeg += ( *cycling > 0 ? d : -d ) * ( 180.0f / 3.14159265f );
+        *sat = 1.0f;
+        paintPickerWrap( hueDeg );
+        return;
+    }
     float rad = *hueDeg * ( 3.14159265f / 180.0f );
     float x = *sat * cosf( rad ) + dx, y = *sat * sinf( rad ) + dy;
     float r = sqrtf( x * x + y * y );
     if ( r > 1.0f ) {
-        // Against the rim: what would have gone further out goes round it
-        // instead, toward where the stick points, and no further than that.
-        float at = atan2f( y, x ), want = atan2f( dy, dx );
-        float diff = want - at;
-        while ( diff > 3.14159265f )
-            diff -= 2.0f * 3.14159265f;
-        while ( diff < -3.14159265f )
-            diff += 2.0f * 3.14159265f;
-        float step = r - 1.0f; // radii beyond the rim = radians round it
-        if ( step > fabsf( diff ) )
-            step = fabsf( diff );
-        at += diff > 0.0f ? step : -step;
-        x = cosf( at );
-        y = sinf( at );
+        // Against the rim. The push in the marker's own frame: out along it
+        // and round it; not inward, so the cycle starts - the way a sideways
+        // push says, anticlockwise for one straight out - and this frame's
+        // travel is the whole tilt, round.
+        float cs = cosf( rad ), sn = sinf( rad );
+        float radial = dx * cs + dy * sn, tangential = -dx * sn + dy * cs;
+        if ( radial >= 0.0f && d > 0.0f ) {
+            *cycling = fabsf( tangential ) > 0.5f * d ? ( tangential > 0.0f ? 1 : -1 ) : 1;
+            *hueDeg += ( *cycling > 0 ? d : -d ) * ( 180.0f / 3.14159265f );
+            *sat = 1.0f;
+            paintPickerWrap( hueDeg );
+            return;
+        }
+        x /= r;
+        y /= r;
         r = 1.0f;
     }
     *sat = r;
     if ( r > 0.02f ) // at the centre the hue is whatever it was
         *hueDeg = atan2f( y, x ) * ( 180.0f / 3.14159265f );
-    if ( *hueDeg < 0.0f )
-        *hueDeg += 360.0f;
-    if ( *hueDeg >= 359.5f ) // the menu item (and so the saved value) runs 0-359
-        *hueDeg = 0.0f;
+    paintPickerWrap( hueDeg );
+}
+
+void paintPickerRelease( int* cycling ) {
+    *cycling = 0;
 }
 
 void paintClear( ProbeLedPaint* paint, PaintStroke* stroke ) {

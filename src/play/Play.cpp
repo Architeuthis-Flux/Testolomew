@@ -87,7 +87,7 @@ void PlayService::clearPaint( ) {
 }
 
 void PlayService::movePicker( float dx, float dy ) {
-    paintPickerMove( &paintHue, &paintSat, dx, dy ); // (Paint.cpp: against the rim it runs round it to where the stick points)
+    paintPickerMove( &paintHue, &paintSat, &pickerCycling, dx, dy ); // (Paint.cpp: against the rim the stick's tilt cycles the hue until it is let go)
 }
 
 // The target LED back to the paint that was under it.

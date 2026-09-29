@@ -92,6 +92,8 @@ class PlayService : public Service {
     // (x = sat cos hue, y = sat sin hue, y up), so moving it picks the colour.
     void paintColour( uint8_t* r, uint8_t* g, uint8_t* b ) const { playHsvToRgb( paintHue, paintSat, r, g, b ); }
     void movePicker( float dx, float dy );
+    void releasePicker( ) { pickerCycling = 0; } // the stick let go: the next push is read afresh
+    int pickerCycling = 0;                        // the marker running round the rim: +1 anticlockwise, -1 clockwise, 0 not
     void setPaintBright( float level ); // the brush's, for the next strokes; what is painted keeps its level
     // Board place -> draw screen pixel: the map the draw screen plots the LEDs on.
     static void tracePlace( float along, float acrossMm, int* x, int* y );

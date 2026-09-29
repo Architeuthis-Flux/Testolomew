@@ -58,11 +58,17 @@ void paintClear( ProbeLedPaint* paint, PaintStroke* stroke );
 
 // The colour wheel's marker moved by (dx, dy) in radii (the joystick's tilt
 // times the pick speed and the frame): hue round, saturation out, the rim at
-// 1. Against the rim the move's excess beyond it becomes travel ROUND the
-// rim toward where the stick points (2026-09-28, Kevin: "moving the analog
-// stick up against the edge of the color wheel, it keeps moving around the
-// edge"), so a stick held out to any side takes the marker round to that
-// hue and stops there; at the centre the hue is whatever it was.
-void paintPickerMove( float* hueDeg, float* sat, float dx, float dy );
+// 1; at the centre the hue is whatever it was. Reaching the rim with a push
+// that is not inward starts a CYCLE (*cycling: +1 anticlockwise, -1
+// clockwise - a sideways push sets the way, straight out goes
+// anticlockwise), and while it runs the stick's tilt is the marker's pace
+// round the rim and its direction is not looked at, so a stick held out
+// keeps the hue turning (2026-09-28, Kevin: "moving the analog stick up
+// against the edge of the color wheel, it keeps moving around the edge ...
+// pushing it straight out should cycle around the ring"). The caller clears
+// *cycling when the stick is let go (paintPickerRelease); the next push is
+// read afresh, and one inward brings the marker in.
+void paintPickerMove( float* hueDeg, float* sat, int* cycling, float dx, float dy );
+void paintPickerRelease( int* cycling );
 
 #endif // PAINT_H

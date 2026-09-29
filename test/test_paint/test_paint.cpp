@@ -124,29 +124,45 @@ void test_size_zero_paints_one_led( void ) {
     TEST_ASSERT_EQUAL( 1, painted );
 }
 
-// The colour wheel's marker against the rim (2026-09-28): a stick held out
-// to a side takes the marker round the rim to that hue and stops there;
-// inside the wheel a move is the plain move.
-void test_picker_runs_round_the_rim_to_where_the_stick_points( void ) {
+// The colour wheel's marker against the rim (2026-09-28): a push that is not
+// inward starts a cycle round the rim at the stick's tilt - straight out
+// anticlockwise, sideways the way it points - that runs until the stick is
+// let go; a fresh push inward brings the marker in; inside the wheel a move
+// is the plain move.
+void test_picker_cycles_round_the_rim_until_the_stick_is_let_go( void ) {
     float hue = 0.0f, sat = 1.0f; // at the rim, on the right
-    for ( int i = 0; i < 200; i++ ) // the stick held straight up, 4 radii a second, 100 Hz: two seconds
-        paintPickerMove( &hue, &sat, 0.0f, 0.04f );
-    TEST_ASSERT_FLOAT_WITHIN( 1.0f, 90.0f, hue ); // round to the top, and no further
+    int cycling = 0;
+    for ( int i = 0; i < 100; i++ ) // straight out (to the right), 4 radii a second at 100 Hz: a second
+        paintPickerMove( &hue, &sat, &cycling, 0.04f, 0.0f );
+    TEST_ASSERT_EQUAL( 1, cycling );
+    TEST_ASSERT_FLOAT_WITHIN( 2.0f, 229.2f, hue ); // 4 radians anticlockwise, still going
     TEST_ASSERT_FLOAT_WITHIN( 0.001f, 1.0f, sat );
-    for ( int i = 0; i < 200; i++ ) // held down-left: the shorter way round, to 225
-        paintPickerMove( &hue, &sat, -0.04f, -0.04f );
-    TEST_ASSERT_FLOAT_WITHIN( 1.0f, 225.0f, hue );
-    TEST_ASSERT_FLOAT_WITHIN( 0.001f, 1.0f, sat );
-    // Pushed straight out at the rim where it already is: nothing moves.
-    hue = 225.0f;
-    paintPickerMove( &hue, &sat, -0.04f, -0.04f );
-    TEST_ASSERT_FLOAT_WITHIN( 0.5f, 225.0f, hue );
-    // Inside: the plain move, in from the rim.
+    for ( int i = 0; i < 100; i++ ) // the stick still held, now pointing anywhere: it keeps turning
+        paintPickerMove( &hue, &sat, &cycling, -0.02f, -0.03f );
+    TEST_ASSERT_EQUAL( 1, cycling );
+    TEST_ASSERT_FLOAT_WITHIN( 2.0f, fmodf( 229.2f + 206.6f, 360.0f ), hue );
+    paintPickerRelease( &cycling ); // let go: a fresh push, this one inward, brings it in
+    TEST_ASSERT_EQUAL( 0, cycling );
+    float rad = hue * ( 3.14159265f / 180.0f );
+    paintPickerMove( &hue, &sat, &cycling, -0.5f * cosf( rad ), -0.5f * sinf( rad ) );
+    TEST_ASSERT_EQUAL( 0, cycling );
+    TEST_ASSERT_FLOAT_WITHIN( 0.01f, 0.5f, sat );
+    // A sideways push at the rim sets the way: from the right, pushed down, clockwise.
     hue = 0.0f;
     sat = 1.0f;
-    paintPickerMove( &hue, &sat, -0.5f, 0.0f );
-    TEST_ASSERT_FLOAT_WITHIN( 0.01f, 0.5f, sat );
-    TEST_ASSERT_FLOAT_WITHIN( 0.5f, 0.0f, hue );
+    cycling = 0;
+    for ( int i = 0; i < 50; i++ )
+        paintPickerMove( &hue, &sat, &cycling, 0.0f, -0.04f );
+    TEST_ASSERT_EQUAL( -1, cycling );
+    TEST_ASSERT_FLOAT_WITHIN( 2.0f, 360.0f - 114.6f, hue );
+    // Inside: the plain move.
+    hue = 0.0f;
+    sat = 0.5f;
+    cycling = 0;
+    paintPickerMove( &hue, &sat, &cycling, 0.0f, 0.2f );
+    TEST_ASSERT_EQUAL( 0, cycling );
+    TEST_ASSERT_FLOAT_WITHIN( 0.01f, sqrtf( 0.29f ), sat );
+    TEST_ASSERT_FLOAT_WITHIN( 0.5f, 21.8f, hue );
 }
 
 int main( int argc, char** argv ) {
@@ -159,6 +175,6 @@ int main( int argc, char** argv ) {
     RUN_TEST( test_a_new_stroke_overwrites_an_old_centre );
     RUN_TEST( test_erase_clears_and_the_target_is_skipped );
     RUN_TEST( test_size_zero_paints_one_led );
-    RUN_TEST( test_picker_runs_round_the_rim_to_where_the_stick_points );
+    RUN_TEST( test_picker_cycles_round_the_rim_until_the_stick_is_let_go );
     return UNITY_END( );
 }
