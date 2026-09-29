@@ -45,6 +45,8 @@ void magTrackInit( MagTrack* t, float surfaceZ, float tipOffsetMm ) {
     t->hzHalfMm = MAGTRACK_HZ_HALF_MM;
     t->betaHalfMm = MAGTRACK_BETA_HALF_MM;
     t->roughHoldS = MAGTRACK_ROUGH_HOLD_S;
+    t->restLock = MAGTRACK_REST_LOCK != 0;
+    t->restBandSigma = MAGTRACK_REST_BAND_SIGMA;
     magTrackReset( t );
 }
 
@@ -57,6 +59,11 @@ void magTrackReset( MagTrack* t ) {
     t->haveShaft = false;
     t->axisSigma = 0.0f;
     t->shaftVar = 0.0f;
+    t->atRest = false;
+    t->restWeight = 1.0f;
+    t->restVar = 1.0f;
+    t->restSpeedVar = 100.0f;
+    t->restLive = false;
     t->lastDropped = false;
     t->lastGate = 0.0f;
     for ( int a = 0; a < 3; a++ ) {
@@ -200,6 +207,57 @@ static void heightSlowing( const MagTrack* t, float* kHz, float* kBeta ) {
     *kBeta = 1.0f / ( 1.0f + bz * bz );
 }
 
+// The rest lock (MagTracker.h, MAGTRACK_REST_*): an adaptive gain on the
+// cursor's x and y, after the 1-Euro.
+static void restLockFrame( MagTrack* t, float dtS ) {
+    if ( !t->restLock ) {
+        t->atRest = false;
+        t->restWeight = 1.0f;
+        t->restLive = false;
+        return;
+    }
+    Vec3 euro = t->cursor;
+    if ( !t->restLive ) {
+        t->restAnchor = euro;
+        t->restLive = true;
+        t->restWeight = 1.0f;
+        t->atRest = false;
+        return;
+    }
+    float sigma = sqrtf( t->restVar > 0.0f ? t->restVar : 0.0f );
+    float band = t->restBandSigma * sigma;
+    band = band < MAGTRACK_REST_BAND_MIN_MM ? MAGTRACK_REST_BAND_MIN_MM : ( band > MAGTRACK_REST_BAND_MAX_MM ? MAGTRACK_REST_BAND_MAX_MM : band );
+    // The excursion of the smoothed cursor from where the shown one was, and
+    // the gain it earns: a tenth at a third of a band, nine tenths at three.
+    float ex = euro.x - t->restAnchor.x, ey = euro.y - t->restAnchor.y;
+    float e2 = ex * ex + ey * ey;
+    float w = e2 / ( e2 + band * band );
+    // ...and from the smoothed cursor's own speed (the 1-Euro's estimate):
+    // a hand crossing a band in MAGTRACK_REST_CROSS_S is moving, whatever the
+    // excursion says yet, and the cursor follows in full - the stiction at a
+    // moderate pace goes, and a rest's jitter speed is well under that.
+    float vx = t->euro[ 0 ].dx, vy = t->euro[ 1 ].dx;
+    float v2 = vx * vx + vy * vy, v0 = band / MAGTRACK_REST_CROSS_S;
+    float vRest = t->restBandSigma * sqrtf( t->restSpeedVar > 0.0f ? t->restSpeedVar : 0.0f ); // the speed estimate's own noise at rest (a 1-Euro's is a per-frame derivative at 1 Hz: 2 mm/s of it on the pencil bench), sigmas of it
+    if ( vRest > v0 )
+        v0 = vRest;
+    float wv = v2 / ( v2 + v0 * v0 );
+    if ( wv > w )
+        w = wv;
+    t->restAnchor.x += w * ex;
+    t->restAnchor.y += w * ey;
+    t->cursor.x = t->restAnchor.x;
+    t->cursor.y = t->restAnchor.y;
+    // The scatter at rest: the excursions on the frames the lock holds.
+    if ( w < 0.5f ) {
+        float av = dtS / ( MAGTRACK_REST_VAR_TAU_S + dtS );
+        t->restVar += av * ( e2 - t->restVar );
+        t->restSpeedVar += av * ( v2 - t->restSpeedVar );
+    }
+    t->restWeight = w;
+    t->atRest = w < 0.5f;
+}
+
 static void finishFrame( MagTrack* t, float dtS, bool roughHeld ) {
     t->position = { t->axis[ 0 ].p, t->axis[ 1 ].p, t->axis[ 2 ].p };
     t->velocity = { t->axis[ 0 ].v, t->axis[ 1 ].v, t->axis[ 2 ].v };
@@ -257,6 +315,8 @@ static void finishFrame( MagTrack* t, float dtS, bool roughHeld ) {
         t->cursor = t->rawCursor;
         t->viewPosition = t->position;
         t->heightMm = height;
+        t->atRest = false;
+        t->restLive = false;
         for ( int a = 0; a < 3; a++ ) {
             OneEuroAxis e = { false, 0.0f, 0.0f };
             t->euro[ a ] = e;
@@ -270,6 +330,7 @@ static void finishFrame( MagTrack* t, float dtS, bool roughHeld ) {
         t->cursor.x = oneEuro( &t->euro[ 0 ], t->rawCursor.x, dtS, cursorCutoff, cursorBeta );
         t->cursor.y = oneEuro( &t->euro[ 1 ], t->rawCursor.y, dtS, cursorCutoff, cursorBeta );
         t->cursor.z = t->rawCursor.z;
+        restLockFrame( t, dtS );
         // What the scene draws: the same magnet through a filter of its own, so
         // the picture can be calmer than the track without slowing the cursor.
         t->viewPosition.x = oneEuro( &t->viewEuro[ 0 ], t->position.x, dtS, viewCutoff, viewBeta );

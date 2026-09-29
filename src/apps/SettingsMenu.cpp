@@ -253,6 +253,10 @@ void settingsMenuBuild( Menu* m ) {
                  "The height above the surface, mm, at which the cursor's, the height's and the scene's Hz are halved - a smooth gradient, flat at the board: hardly any change below a third of it, half at it, a fifth at twice it. A far fix is a noisy one. 0: the same at any height." ); // the cursor's and view's Hz halved at this height (0 = the same at any height)...
     menuAddNumber( m, tracking, "beta halved at", &magLocator.track.betaHalfMm, 0.0f, 150.0f, 5.0f, "mm",
                  "The height, mm, at which the cursor's, the height's and the scene's beta is halved - the same smooth gradient: flat at the board, a fifth at twice it. Low: responsive close to the board, very smooth far up. 0: the same at any height." ); // ...and their betas: responsive close, smooth far
+    menuAddToggle( m, tracking, "rest lock", &magLocator.track.restLock,
+                 "Holds the cursor still while the probe rests: a soft dead zone about a slow average, so at rest a tenth of the jitter gets through, and a real move past the band is followed at once with no jump. A slow creep is followed a band behind." );
+    menuAddNumber( m, tracking, "rest band", &magLocator.track.restBandSigma, 1.0f, 6.0f, 0.5f, "sd",
+                 "The rest lock's band, in standard deviations of the scatter it measures at rest (0.3 mm at the least, 12 at most): wider holds through more tremor and needs a bigger move before it follows." );
     menuAddNumber( m, tracking, "shaft Hz", &magLocator.track.shaftMinCutoff, 0.1f, 5.0f, 0.1f, "",
                  "The shaft direction's own filter at rest, Hz. The aim cursor and the tail follow the shaft; lower is calmer and later." );
     menuAddNumber( m, tracking, "shaft beta", &magLocator.track.shaftBeta, 0.0f, 10.0f, 0.25f, "",

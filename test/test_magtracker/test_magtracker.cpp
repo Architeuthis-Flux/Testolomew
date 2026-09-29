@@ -37,6 +37,7 @@ static void referenceLevers( MagTrack* t ) {
     t->shaftBeta = 10.0f;
     t->hzHalfMm = 40.0f;
     t->betaHalfMm = 20.0f;
+    t->restLock = false; // (on since 2026-09-28 evening: these tests are of the filters underneath it)
 }
 
 void setUp( void ) {
@@ -664,6 +665,73 @@ void test_a_swing_is_believed_only_from_a_sharp_axis( void ) {
     }
 }
 
+// The rest lock (2026-09-28 evening): a still probe's noisy fixes leave the
+// cursor all but still once the lock is holding; a jump is followed at once
+// with no state to let go of; a slow creep is followed smoothly, never in
+// steps; the lever off, the 1-Euro's jitter is back.
+void test_rest_lock_is_still_at_rest_and_lets_go_on_a_move( void ) {
+    track.cursorMode = MAGCURSOR_UNDER;
+    track.restLock = true;
+    srand( 11 );
+    Vec3 p = { 30.0f, 20.0f, 17.5f + 20.0f };
+    for ( int i = 0; i < 200; i++ ) { // 2 s still
+        MagTrackInput in = noisyFixAt( p, 0.5f );
+        magTrackUpdate( &track, DT, &in );
+    }
+    TEST_ASSERT_TRUE_MESSAGE( track.atRest, "still for two seconds: the lock is holding" );
+    Vec3 was = track.cursor;
+    float worst = 0.0f;
+    for ( int i = 0; i < 100; i++ ) {
+        MagTrackInput in = noisyFixAt( p, 0.5f );
+        magTrackUpdate( &track, DT, &in );
+        float step = fabsf( track.cursor.x - was.x ) + fabsf( track.cursor.y - was.y );
+        worst = step > worst ? step : worst;
+        was = track.cursor;
+    }
+    char msg[ 96 ];
+    snprintf( msg, sizeof( msg ), "at rest the cursor's biggest frame step is %.3f mm (0.1 allowed, and under half the lever-off figure below)", worst );
+    TEST_ASSERT_TRUE_MESSAGE( worst < 0.1f, msg );
+    float lockedWorst = worst;
+    // A 20 mm jump: within 100 ms the cursor is within 3 mm of the new place.
+    Vec3 q = { 50.0f, 20.0f, p.z };
+    for ( int i = 0; i < 10; i++ ) {
+        MagTrackInput in = noisyFixAt( q, 0.5f );
+        magTrackUpdate( &track, DT, &in );
+    }
+    snprintf( msg, sizeof( msg ), "100 ms after a 20 mm jump the cursor is at x %.1f (47 or more wanted)", track.cursor.x );
+    TEST_ASSERT_TRUE_MESSAGE( track.cursor.x > 47.0f, msg );
+    // A creep at 1 mm/s for two seconds: followed, and no step bigger than 0.3 mm.
+    for ( int i = 0; i < 100; i++ ) {
+        MagTrackInput in = noisyFixAt( q, 0.5f );
+        magTrackUpdate( &track, DT, &in );
+    }
+    TEST_ASSERT_TRUE( track.atRest );
+    was = track.cursor;
+    worst = 0.0f;
+    for ( int i = 0; i < 200; i++ ) {
+        Vec3 c = { q.x + 0.01f * i, q.y, q.z };
+        MagTrackInput in = noisyFixAt( c, 0.5f );
+        magTrackUpdate( &track, DT, &in );
+        float step = fabsf( track.cursor.x - was.x ) + fabsf( track.cursor.y - was.y );
+        worst = step > worst ? step : worst;
+        was = track.cursor;
+    }
+    snprintf( msg, sizeof( msg ), "creeping 1 mm/s: the cursor at x %.1f (51 or more wanted), biggest step %.2f mm (0.3 allowed)", track.cursor.x, worst );
+    TEST_ASSERT_TRUE_MESSAGE( track.cursor.x > 51.0f && worst < 0.3f, msg );
+    // The lever off: the cursor jitters with the 1-Euro again.
+    track.restLock = false;
+    was = track.cursor;
+    worst = 0.0f;
+    for ( int i = 0; i < 100; i++ ) {
+        MagTrackInput in = noisyFixAt( q, 0.5f );
+        magTrackUpdate( &track, DT, &in );
+        float step = fabsf( track.cursor.x - was.x ) + fabsf( track.cursor.y - was.y );
+        worst = step > worst ? step : worst;
+        was = track.cursor;
+    }
+    TEST_ASSERT_TRUE( !track.atRest && worst > 2.0f * lockedWorst );
+}
+
 int main( int argc, char** argv ) {
     (void)argc;
     (void)argv;
@@ -682,5 +750,6 @@ int main( int argc, char** argv ) {
     RUN_TEST( test_height_has_its_own_filter );
     RUN_TEST( test_a_noisy_far_axis_does_not_swing_the_aim_cursor );
     RUN_TEST( test_a_swing_is_believed_only_from_a_sharp_axis );
+    RUN_TEST( test_rest_lock_is_still_at_rest_and_lets_go_on_a_move );
     return UNITY_END( );
 }

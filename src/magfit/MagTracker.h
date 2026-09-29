@@ -135,6 +135,30 @@
 // smoothing setting"): the cursor's filter is x and y, and the height - what
 // the LEDs colour and size by, and the View shows - came straight from the
 // position's z, unfiltered. It starts at the cursor's levers.
+// The REST LOCK (2026-09-28 evening, Kevin: "it's still a bit shaky ... a way
+// that makes it both solid and responsive"): an adaptive gain on the cursor
+// after the 1-Euro. Each frame the shown cursor moves toward the smoothed
+// one by w of the excursion e between them, w = e^2 / (e^2 + band^2): at
+// rest (e about a sigma, the band REST_BAND sigmas of the scatter the lock
+// measures at rest itself, MAGTRACK_REST_VAR_TAU_S, floored and capped) a
+// tenth of the jitter gets through - solid - and a real move (e past the
+// band) has w near 1 within a band or two of travel - responsive, no state
+// to let go of, no jump; the gain also comes from the 1-Euro's own speed
+// estimate (a band in MAGTRACK_REST_CROSS_S, half; faster, more), so a
+// moderate pace is followed in full and only a creep slower than that is
+// followed a fraction of a band behind. The band sizes itself to the board's noise and the hand's tremor
+// near and far. (The mouse world's stationary-jitter cure, PixArt's US
+// 11,995,255 - average while still, release the whole movement when it
+// starts - was tried as a hard lock first: three frames to let go and a
+// jump at every stroke's start cost 20-30 ms of lag on the pencil bench; a
+// fourth-power knee cost 70 ms, the gain collapsing between bursts.)
+// Levers: rest lock (on), rest band (sigmas).
+#define MAGTRACK_REST_LOCK 1
+#define MAGTRACK_REST_BAND_SIGMA 3.0f
+#define MAGTRACK_REST_VAR_TAU_S 2.0f   // the scatter measured at rest, its memory
+#define MAGTRACK_REST_CROSS_S 0.1f     // a smoothed cursor crossing a band in this long is moving: the gain from its speed is a half there
+#define MAGTRACK_REST_BAND_MIN_MM 0.3f
+#define MAGTRACK_REST_BAND_MAX_MM 12.0f
 #define MAGTRACK_HEIGHT_MIN_CUTOFF 2.7f // (the bench's setting on 2026-09-28 evening, taken as the default: 3.2 until then)
 #define MAGTRACK_HEIGHT_BETA 0.22f // (the bench's setting on 2026-09-28 evening, taken as the default: 0.12 until then)
 #define MAGTRACK_HZ_HALF_MM 25.0f // (the bench's setting on 2026-09-27, taken as the default: 40 until then)
@@ -216,6 +240,8 @@ struct MagTrack {
     float hzHalfMm;                // the height at which the cursor's and the view's Hz are halved (0 = the same at any height)...
     float betaHalfMm;              // ...and their betas
     float roughHoldS;              // how long the far glow is held after its last rough fix
+    bool restLock;                 // the rest lock (above)
+    float restBandSigma;           // ...its band, in sigmas of the scatter measured at rest
 
     // private-ish
     MagTrackAxis axis[ 3 ];
@@ -229,6 +255,12 @@ struct MagTrack {
     Vec3 droppedAt[ MAGTRACK_REINIT_AFTER ];
     bool haveShaft;
     float axisSigma; // the fixes' axis bar, smoothed (radians): what keys the shaft filter
+    bool atRest;       // the rest lock is holding (its weight under a half)
+    float restWeight;  // ...that weight, w: 0 held, 1 following
+    Vec3 restAnchor;   // the shown cursor of the last frame (what the gain moves)
+    float restVar;     // the smoothed cursor's scatter about the anchor at rest, mm^2 (the band is sigmas of its root)
+    float restSpeedVar; // ...and its speed estimate's scatter at rest, (mm/s)^2: the speed route's own band
+    bool restLive;
     float shaftVar;  // what the filtered shaft may still be off by, squared (radians^2): the cursor's bar
     Vec3 lastFixSigma; // the last accepted proper fix's bar (floored)
     bool hadProperFix; // this track has had a proper fix (else it is rough from birth)
