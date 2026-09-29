@@ -2,11 +2,17 @@
 
 The test bed for Jumperless V6 ideas: a [nanoCH32H417](https://github.com/wuxx/nanoCH32H417) dev board (WCH CH32H417, the coprocessor planned for V6), PlatformIO, and firmware laid out like [JumperlOS](https://github.com/Architeuthis-Flux/JumperlOS) so that whatever works here can be carried over.
 
+https://github.com/user-attachments/assets/b5ab7e08-0d18-4ef3-8981-44c797199041
+
+
 First experiment: **locating a magnet in 3D with a 4×2 array of TMAG5273 Hall sensors** (plus, since 2026-09-21, an MMC5633NJL AMR magnetometer at the centre of the same array - the sensor table mixes types), as a way to track a cable-free probe, and showing it on the board's LCD.
 
 ![The 3D view, rendered on the host from simulated sensor readings](docs/magview-simulated.png)
 
 *The LCD view (fixed camera and top-down) of the bench array, rendered on a PC from simulated noisy sensor readings through the real fit and drawing code. The purple ellipse under the magnet is the fix's own 2-σ error bar.*
+
+
+
 
 ![Every screen, rendered on the host from a simulated probe](docs/screens-simulated.png)
 
@@ -15,6 +21,11 @@ First experiment: **locating a magnet in 3D with a 4×2 array of TMAG5273 Hall s
 - `docs/wireless-probe-sensing.md` is everything learned so far about wireless probe sensing: the survey of methods, the numbers, the magnetometer design and its first-run checklist, and the CH32H417 toolchain notes.
 - `docs/magnetometer-fusion-prior-art.md` is the prior-art study behind the tracker: the TMAG5273 datasheet read closely (registers, noise, timing, the CRC errata, what the driver should set), magnet tracking with sensor arrays and the estimators used, closed-form and far-field estimation, motion filtering, pointing, LED and on-screen display, and a recommended architecture.
 - `docs/ratio-ladder-poc-spec.md` is the spec for the other prototype (capacitive ratio ladder on V5 hardware).
+
+<img width="2151" height="1420" alt="wigmag-4" src="https://github.com/user-attachments/assets/074f6740-b9fd-4bcb-a2a2-3e98e2c62226" />
+
+<img width="2115" height="1397" alt="wigmag-3" src="https://github.com/user-attachments/assets/81c24f7b-e94e-432f-bc8e-3b0fabd47ab6" />
+
 
 ## Build and run
 
