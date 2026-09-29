@@ -12,7 +12,8 @@
 # reset inside it restored the default as measured).
 @run 3000
 s
-@expect "strength=3480 unconfirmed"
+@expect "strength=4240 measured"
+# (2026-09-28 late evening: :strength holds AND saves - "strength=3480 unconfirmed", the compiled default still in the record, until then; 4232 rounds to the record's 20s)
 
 @seed 7
 

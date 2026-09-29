@@ -1766,6 +1766,8 @@ void MagLocator::holdStrength( float strength ) {
     knownStrength = strength;
     strengthTaken = true;
     strengthIsMeasured = true;
+    strengthSaved = roundf( strength / 20.0f ) * 20.0f; // ...and the settings keep it (2026-09-28 late evening: :strength 3280 held it for the session and the boot brought the old 3620 back)
+    strengthSavedMeasured = true;
 }
 
 // K: never hold it (the free fit's strength is what the readings say, and
