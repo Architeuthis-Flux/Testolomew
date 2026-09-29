@@ -569,6 +569,101 @@ void test_height_has_its_own_filter( void ) {
     TEST_ASSERT_FLOAT_WITHIN( 0.05f, -2.5f, track.heightMm );
 }
 
+// A probe held still 55 mm up at a 30 degree lean, on the bench's levers,
+// its fixes at the noise floor and at the pace the field smoothing makes
+// them fresh (20 Hz): the position +/-10 mm and the axis +/-16 degrees a
+// fix, which the aim projection (55 mm / cos^2 of 30 degrees: 73 mm a
+// radian) would turn into +/-20 mm of cursor on top of the position's
+// share. The shaft's filter keyed on the fit's own axis bar averages it
+// away: the tilt it reports is steady to a couple of degrees, the cursor
+// scatters no more than it does with the axis sharp, and the cursor's bar
+// carries the shaft's share (at least 3 degrees over the projection).
+static float hoverCursorScatter( bool noisyAxis, float* tiltSd, float* bar ) {
+    magTrackInit( &track, 17.5f, 0.0f );
+    track.cursorMode = MAGCURSOR_POINTED;
+    track.accelSigma = 20000.0f;
+    track.sigmaFloorMm = 0.2f;
+    track.gate = 2.0f;
+    track.oneEuroMinCutoff = 3.2f;
+    track.oneEuroBeta = 0.12f;
+    track.shaftMinCutoff = 3.6f;
+    track.shaftBeta = 1.0f;
+    track.hzHalfMm = 25.0f;
+    track.betaHalfMm = 20.0f;
+    const float dt = 0.05f;
+    float lean = 30.0f * (float)M_PI / 180.0f;
+    Vec3 shaft = { sinf( lean ), 0.0f, cosf( lean ) };
+    Vec3 p = { 30.0f, 20.0f, 17.5f + 55.0f };
+    float sx = 0.0f, sxx = 0.0f, st = 0.0f, stt = 0.0f;
+    int n = 0;
+    srand( 7 );
+    for ( int i = 0; i < 400; i++ ) { // 20 s
+        MagTrackInput in = noisyFixAt( p, 10.0f );
+        float jitter = noisyAxis ? 0.28f : 0.0f;
+        in.shaft = { shaft.x + gaussian( jitter ), shaft.y + gaussian( jitter ), shaft.z + gaussian( jitter ) };
+        in.axisSigma = noisyAxis ? 0.44f : 0.0f; // what the fit reports there (25 degrees: the linearised bar under the truth once the fit is nonlinear)
+        magTrackUpdate( &track, dt, &in );
+        if ( i >= 100 ) {
+            n++;
+            sx += track.cursor.x;
+            sxx += track.cursor.x * track.cursor.x;
+            st += track.tiltDeg;
+            stt += track.tiltDeg * track.tiltDeg;
+        }
+    }
+    float mean = sx / n, tMean = st / n;
+    *tiltSd = sqrtf( stt / n - tMean * tMean );
+    *bar = track.cursorSigmaMm;
+    return sqrtf( sxx / n - mean * mean );
+}
+
+void test_a_noisy_far_axis_does_not_swing_the_aim_cursor( void ) {
+    float sharpTilt, sharpBar, noisyTilt, noisyBar;
+    float sharp = hoverCursorScatter( false, &sharpTilt, &sharpBar );
+    float noisy = hoverCursorScatter( true, &noisyTilt, &noisyBar );
+    char msg[ 160 ];
+    snprintf( msg, sizeof( msg ), "the tilt reads +/- %.1f degrees with the axis noisy (3 allowed; %.1f sharp)", noisyTilt, sharpTilt );
+    TEST_ASSERT_TRUE_MESSAGE( noisyTilt < 3.0f, msg );
+    snprintf( msg, sizeof( msg ), "the cursor scatters %.1f mm along with the axis noisy, %.1f with it sharp (the position's share alone)", noisy, sharp );
+    TEST_ASSERT_TRUE_MESSAGE( noisy < 1.3f * sharp + 1.0f, msg );
+    // The bar: the position's share and at least 3 degrees over the 73 mm
+    // projection (the filtered axis is within that; right after a snap it
+    // carries the fix's whole bar).
+    snprintf( msg, sizeof( msg ), "the cursor's bar %.1f mm with the axis noisy, %.1f sharp: the position's 10 and the shaft's 3 degrees over 73 mm", noisyBar, sharpBar );
+    TEST_ASSERT_TRUE_MESSAGE( noisyBar >= sharpBar - 0.01f && sharpBar > 13.0f && noisyBar < sharpBar + 30.0f, msg );
+}
+
+// A far fix whose POSITION bar is sharp but whose axis is not (the bench 40 mm
+// up: bars under 5 mm on fixes whose axis was +/-12 degrees, swinging past 45
+// on noise) must not snap the shaft on three swings running; the same swings
+// on fixes sharp in their axis too are believed, as before.
+void test_a_swing_is_believed_only_from_a_sharp_axis( void ) {
+    for ( int sharpAxis = 0; sharpAxis < 2; sharpAxis++ ) {
+        magTrackInit( &track, 17.5f, 0.0f );
+        referenceLevers( &track );
+        float axisSigma = sharpAxis ? 0.02f : 0.4f;
+        Vec3 p = { 30.0f, 20.0f, 60.0f };
+        for ( int i = 0; i < 50; i++ ) {
+            MagTrackInput in = fixAt( p, 3.0f );
+            in.axisSigma = axisSigma;
+            magTrackUpdate( &track, DT, &in );
+        }
+        TEST_ASSERT_FLOAT_WITHIN( 0.01f, 1.0f, track.shaft.z );
+        Vec3 swung = { sinf( 1.0f ), 0.0f, cosf( 1.0f ) }; // 57 degrees over, every frame
+        for ( int i = 0; i < 5; i++ ) {
+            MagTrackInput in = fixAt( p, 3.0f );
+            in.shaft = swung;
+            in.axisSigma = axisSigma;
+            magTrackUpdate( &track, DT, &in );
+        }
+        if ( sharpAxis ) {
+            TEST_ASSERT_TRUE_MESSAGE( track.shaft.z < 0.6f, "three swings running on fixes sharp in their axis are believed" );
+        } else {
+            TEST_ASSERT_TRUE_MESSAGE( track.shaft.z > 0.95f, "fixes sharp in position but not in axis do not snap the shaft" );
+        }
+    }
+}
+
 int main( int argc, char** argv ) {
     (void)argc;
     (void)argv;
@@ -585,5 +680,7 @@ int main( int argc, char** argv ) {
     RUN_TEST( test_whole_chain_on_a_simulated_hand );
     RUN_TEST( test_smoothing_slows_with_height );
     RUN_TEST( test_height_has_its_own_filter );
+    RUN_TEST( test_a_noisy_far_axis_does_not_swing_the_aim_cursor );
+    RUN_TEST( test_a_swing_is_believed_only_from_a_sharp_axis );
     return UNITY_END( );
 }

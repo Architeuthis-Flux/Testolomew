@@ -63,6 +63,7 @@ struct MagFitResult {
     float residual; // RMS misfit per axis, mT
     float signal;   // RMS reading per axis, mT (residual/signal = fit quality)
     Vec3 sigma;     // 1-sigma error bar on position, mm, per axis (see below)
+    float axisSigma; // 1-sigma error on the moment's DIRECTION, radians, from the same covariance (the known-strength fit's; 0 = not computed)
     int iterations;
     // A cold start in slices (magFitSolveStep): 0 = none under way, 1 = the
     // lattice's point is to be refined, k >= 2 = the seeds from seed k-2 are

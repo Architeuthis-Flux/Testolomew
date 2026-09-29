@@ -71,7 +71,8 @@
 // (the fit's next far answer comes at the cold start's pace). The shaft is
 // NOT leaned toward vertical with it (it was, for three hours: the aim
 // cursor then turned back under the tip as the probe rose): a far fix's
-// noisy axis is the shaft filter's and the halved-at slowing's to calm.
+// noisy axis is the shaft filter's to calm, keyed on the fit's own bar on
+// the axis (MAGTRACK_AXIS_SURE_RAD below).
 #define MAGTRACK_FAR_BAR_MM 5.0f
 #define MAGTRACK_ROUGH_HOLD_S 3.0f        // ...and how long a ROUGH one (the far glow) outlives its last rough fix (menu: far hold; 2.5 until 2026-09-23: a stale glow for two seconds after the probe had gone) (the bench's setting on 2026-09-27, taken as the default: 1.0 until then)
 #define MAGTRACK_ROUGH_SPREAD_MM_S 8.0f   // while it is held its bar widens this fast (the glow spreads and dims, honestly)
@@ -80,6 +81,22 @@
 #define MAGTRACK_SHAFT_BETA 1.0f         // per unit/s of a component's change: how fast the cutoff opens as the pencil turns (menu: shaft beta) (the bench's setting on 2026-09-27, taken as the default: 10 until then)
 #define MAGTRACK_VIEW_MIN_CUTOFF 2.7f     // Hz: the 1-Euro filter on what the SCENE draws of the magnet (menu: view) (the bench's setting on 2026-09-27, taken as the default: 1.5 until then)
 #define MAGTRACK_VIEW_BETA 0.04f           // per mm/s (0.05 lagged 40 ms at writing speed; this 20, jitter at rest 0.025 mm - pencil.cpp) (the bench's setting on 2026-09-27, taken as the default: 0.5 until then)
+// The shaft's filter is keyed on the fit's own bar on the axis (MagFitResult::
+// axisSigma, radians, smoothed over AXIS_SIGMA_TAU_S): its cutoff times
+// 1 / (1 + (sigma / AXIS_SURE_RAD)^4), its beta by the square of that. The
+// fit's bar is what it is - over the truth near the board, where the noise
+// floor rules it (the sim at a 30 degree lean, the bench's noise: 4 degrees
+// reported for 1.7 of scatter at 15 mm, 8 for 3.6 at 25, 15 for 7 at 35),
+// under it far up, where the fit goes nonlinear (23 for 13 at 45, 25 for 29
+// at 55) - so the curve is steep and its knee sits where the fit pins the
+// axis: at the lever to 25 mm, a sixth at 35, a thirtieth at 45 and 55 -
+// which leaves the filtered axis within about 2 degrees at every height,
+// as much averaging as each height needs and no more. (2026-09-28 evening:
+// keyed on the height it ran at 0.6 Hz 55 mm up, where a fix's axis is
+// +/-16 degrees of tilt and the aim projection makes 73 mm a radian of it,
+// and the cursor danced 40 rows with the probe held still.)
+#define MAGTRACK_AXIS_SURE_RAD 0.17f      // radians (10 degrees) of the fit's reported axis bar: the knee of the shaft filter's slowing
+#define MAGTRACK_AXIS_SIGMA_TAU_S 0.25f   // s: the fit's axis bar is smoothed over this before it keys the filter (a fix's bar jitters +/-40 %)
 #define MAGTRACK_SHAFT_FLIP_DEG 45.0f     // a shaft swing bigger than this in one frame waits for confirmation
 #define MAGTRACK_MAX_REACH_MM 0.0f        // the pointer never reaches further from the tip than this - 0 = no cap, the aim runs to wherever the shaft meets the surface, off the board too (2026-09-28, Kevin: "keep aim going to infinite distance" - at 60 the cursor froze at 40 mm of height on a 55 degree lean; 40 until 2026-09-27, 60 the bench's setting after)
 // ...and never as if the probe were flatter than this: the reach is drop x
@@ -145,6 +162,7 @@ struct MagTrackInput {
     float alpha;   // the field smoothing that made it (1 = none): fixes are correlated by 1/alpha frames
     Vec3 shaft;    // unit vector up the shaft (only with a proper fix)
     bool haveShaft;
+    float axisSigma; // the fit's 1-sigma on the shaft's direction, radians (0 = sharp: the sim's probe, the tests)
 };
 
 // The 1-Euro filter, one axis.
@@ -210,6 +228,8 @@ struct MagTrack {
     int droppedRun;  // dropped fixes in a row
     Vec3 droppedAt[ MAGTRACK_REINIT_AFTER ];
     bool haveShaft;
+    float axisSigma; // the fixes' axis bar, smoothed (radians): what keys the shaft filter
+    float shaftVar;  // what the filtered shaft may still be off by, squared (radians^2): the cursor's bar
     Vec3 lastFixSigma; // the last accepted proper fix's bar (floored)
     bool hadProperFix; // this track has had a proper fix (else it is rough from birth)
 };

@@ -547,6 +547,21 @@ void test_chi_is_one_for_a_fit_as_good_as_the_readings( void ) {
     TEST_ASSERT_TRUE( chiFewer > 0.5f && chiFewer < 1.5f );
 }
 
+// The known-strength fit's bar on the axis (radians): a magnet near the
+// array pins its direction to a degree or so, one far up at the noise does
+// not - and the tracker's shaft filter and the cursor's bar go by it.
+void test_a_far_fit_reports_a_wider_axis( void ) {
+    Vec3 moment = tiltedMoment( N52_6X3_MOMENT, 30.0f, 0.0f );
+    Vec3 fields[ SENSOR_COUNT ];
+    MagFitResult near = { }, far = { };
+    makeFields( { 30, 10, 15 }, moment, 0.012f, fields );
+    TEST_ASSERT_TRUE( magFitSolveKnownStrength( sensors, fields, nullptr, SENSOR_COUNT, 0.25f, N52_6X3_MOMENT, &near ) );
+    makeFields( { 30, 10, 70 }, moment, 0.012f, fields );
+    TEST_ASSERT_TRUE( magFitSolveKnownStrength( sensors, fields, nullptr, SENSOR_COUNT, 0.5f, N52_6X3_MOMENT, &far ) );
+    TEST_ASSERT_TRUE_MESSAGE( near.axisSigma > 0.0f && near.axisSigma < 0.05f, "a near axis is pinned within 3 degrees" );
+    TEST_ASSERT_TRUE_MESSAGE( far.axisSigma > 3.0f * near.axisSigma, "a far axis is many times wider" );
+}
+
 int main( void ) {
     UNITY_BEGIN( );
     RUN_TEST( test_forward_model_on_axis );
@@ -564,5 +579,6 @@ int main( void ) {
     RUN_TEST( test_chi_is_one_for_a_fit_as_good_as_the_readings );
     RUN_TEST( test_far_probe_needs_the_held_strength_and_the_quiet_sensor );
     RUN_TEST( test_strength_hint_keeps_the_lattice_off_the_weak_magnet_near );
+    RUN_TEST( test_a_far_fit_reports_a_wider_axis );
     return UNITY_END( );
 }

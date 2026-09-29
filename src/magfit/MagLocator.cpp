@@ -46,7 +46,7 @@ static void onUnpollute( Stream* out ) {
 static void onStream( Stream* out ) {
     magLocator.streaming = !magLocator.streaming;
     if ( magLocator.streaming ) {
-        out->println( "fix,t_ms,present,valid,x,y,z,tip_x,tip_y,tip_z,axis_x,axis_y,axis_z,tilt_deg,strength,residual_mT,fit_us,misfit,seen_by,sigma_x,sigma_y,sigma_z,faint_by,raw_x,raw_y,raw_z,track_state,track_x,track_y,track_z,track_sx,track_sy,track_sz,cursor_x,cursor_y,cursor_z,gate,dropped,chi" );
+        out->println( "fix,t_ms,present,valid,x,y,z,tip_x,tip_y,tip_z,axis_x,axis_y,axis_z,tilt_deg,strength,residual_mT,fit_us,misfit,seen_by,sigma_x,sigma_y,sigma_z,faint_by,raw_x,raw_y,raw_z,track_state,track_x,track_y,track_z,track_sx,track_sy,track_sz,cursor_x,cursor_y,cursor_z,gate,dropped,chi,axis_sigma_deg" );
     }
 }
 
@@ -242,6 +242,7 @@ ServiceStatus MagLocator::simFrame( MagTrackInput* in ) {
     fix.sigma = { sim.sigmaMm, sim.sigmaMm, sim.sigmaMm };
     fix.errorXyMm = sqrtf( 2.0f ) * sim.sigmaMm;
     fix.errorMm = sqrtf( 3.0f ) * sim.sigmaMm;
+    fix.axisSigmaRad = 0.0f;
     fix.peakMt = 1.0f;
     fix.seenBy = magArray.sensorCount( );
     fix.faintBy = 0;
@@ -612,9 +613,24 @@ ServiceStatus MagLocator::fitFrame( MagTrackInput* in ) {
     // the MMC's share of the fit, ramped in as the TMAGs run out of reach and
     // out of the fit near the board, where its readings have been sketchy
     // (2026-09-28, Kevin: "use the mmc at far distances only").
+    // ...on the fixes' bar SMOOTHED over MAGLOC_FAR_BAR_TAU_S: a fix's own
+    // bar jitters +/-40 % 55 mm up, and a ramp keyed on it flapped the MMC
+    // and the prior in and out frame by frame - the sim's 55 mm hover danced
+    // +/-10 rows in far mode against +/-6 with the MMC on (2026-09-28 evening).
     {
-        float lastBar = fix.valid ? fix.errorMm : 2.0f * MAGLOC_PRIOR_FROM_MM;
-        f.far = ( lastBar - MAGLOC_PRIOR_FROM_MM ) / MAGLOC_PRIOR_FROM_MM;
+        if ( fix.valid ) {
+            if ( farBarLive ) {
+                float dt = MAG_FRAME_PERIOD_US * 1e-6f, a = dt / ( MAGLOC_FAR_BAR_TAU_S + dt );
+                farBar += a * ( fix.errorMm - farBar );
+            } else {
+                farBar = fix.errorMm;
+                farBarLive = true;
+            }
+        } else {
+            farBar = 2.0f * MAGLOC_PRIOR_FROM_MM;
+            farBarLive = false;
+        }
+        f.far = ( farBar - MAGLOC_PRIOR_FROM_MM ) / MAGLOC_PRIOR_FROM_MM;
         f.far = f.far < 0.0f ? 0.0f : ( f.far > 1.0f ? 1.0f : f.far );
         if ( magArray.mmcMode == MAG_MMC_FAR ) {
             for ( int i = 0; i < magArray.sensorCount( ) && i < MAGFIT_MAX_SENSORS; i++ ) {
@@ -1107,6 +1123,7 @@ ServiceStatus MagLocator::runFit( MagTrackInput* in, FrameScratch& f ) {
     fix.sigma = sigma;
     fix.errorXyMm = sqrtf( sigma.x * sigma.x + sigma.y * sigma.y );
     fix.errorMm = sqrtf( fix.errorXyMm * fix.errorXyMm + sigma.z * sigma.z );
+    fix.axisSigmaRad = result.axisSigma;
     // The acceptance. The footprint is the TMAG5273s' bounding box: a fix
     // beyond it by MAGLOC_OUTSIDE_MM is the mirror-basin case unless enough
     // sensors see the magnet plainly.
@@ -1282,6 +1299,7 @@ ServiceStatus MagLocator::publishFix( MagTrackInput* in, const FrameScratch& f )
     in->position = fix.rawMagnet;
     in->sigma = fix.sigma;
     in->shaft = fix.shaft;
+    in->axisSigma = fix.axisSigmaRad; // ...with the fit's own bar on it: the shaft filter's key (2026-09-28 evening)
     in->haveShaft = true; // the shaft as the fit gives it, far or near: its own filter and its slowing with height take a far fix's noise (2026-09-28 afternoon: leaned toward vertical by the bar for three hours, which turned the aim cursor BACK under the tip as the probe rose - the "jump at 40 mm")
 
     Stream* out = console.port( );
@@ -1916,13 +1934,13 @@ void MagLocator::keepStrengthRecord( uint32_t nowMs ) {
 
 void MagLocator::printFixCsv( Stream* out ) const {
     char line[ 440 ];
-    snprintf( line, sizeof( line ), "fix,%lu,%d,%d,%.2f,%.2f,%.2f,%.2f,%.2f,%.2f,%.3f,%.3f,%.3f,%.1f,%.0f,%.3f,%lu,%.3f,%d,%.2f,%.2f,%.2f,%d,%.2f,%.2f,%.2f,%d,%.2f,%.2f,%.2f,%.2f,%.2f,%.2f,%.2f,%.2f,%.2f,%.1f,%lu,%.2f",
+    snprintf( line, sizeof( line ), "fix,%lu,%d,%d,%.2f,%.2f,%.2f,%.2f,%.2f,%.2f,%.3f,%.3f,%.3f,%.1f,%.0f,%.3f,%lu,%.3f,%d,%.2f,%.2f,%.2f,%d,%.2f,%.2f,%.2f,%d,%.2f,%.2f,%.2f,%.2f,%.2f,%.2f,%.2f,%.2f,%.2f,%.1f,%lu,%.2f,%.1f",
               (unsigned long)millis( ), fix.present, fix.valid, fix.magnet.x, fix.magnet.y, fix.magnet.z,
               fix.tip.x, fix.tip.y, fix.tip.z, fix.axis.x, fix.axis.y, fix.axis.z,
               fix.tiltDeg, fix.strength, fix.residual, (unsigned long)fix.fitUs, fix.misfit, fix.seenBy, fix.sigma.x, fix.sigma.y, fix.sigma.z,
               fix.faintBy, fix.rawMagnet.x, fix.rawMagnet.y, fix.rawMagnet.z,
               (int)track.state, track.position.x, track.position.y, track.position.z, track.sigma.x, track.sigma.y, track.sigma.z,
-              track.cursor.x, track.cursor.y, track.cursor.z, track.lastGate, (unsigned long)track.dropped, fix.chi );
+              track.cursor.x, track.cursor.y, track.cursor.z, track.lastGate, (unsigned long)track.dropped, fix.chi, fix.axisSigmaRad * 180.0f / (float)M_PI );
     out->println( line );
 }
 

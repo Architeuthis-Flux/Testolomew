@@ -30,7 +30,13 @@
 // magnet two sensor pitches away is not much more than that, so the fields
 // are smoothed before anything looks at them - heavily when the strongest
 // reading is weak, not at all once it passes MAGLOC_FAST_MT, so a strong magnet
-// still tracks without lag. Smoothed noise is about 0.005 mT.
+// still tracks without lag. Smoothed noise is about 0.005 mT. (A deeper
+// floor is the far probe's cure - its noise is the sensors', and only
+// averaging longer helps: at 0.03 the sim's fix 45 mm up scattered +/-2.4 mm
+// and +/-5 degrees for 0.08's +/-4 and +/-8, at a 0.33 s lag far up - but
+// tried on 2026-09-28 evening the bench-like session's zero audit then took
+// three gains for off that were not, and it went back to 0.08 until that is
+// understood.)
 #define MAGLOC_FAST_MT 2.0f        // strongest reading at which smoothing is off
 #define MAGLOC_SLOWEST_ALPHA 0.08f // smoothing at the weak end (~0.12 s time constant at 100 Hz)
 // ...and off again while the probe MOVES: smoothed fields lag, and a fix
@@ -207,6 +213,7 @@
 // within 3.4 mm with the prior right, 25 mm off with it 40 degrees wrong.)
 #define MAGLOC_AXIS_PRIOR_MT 0.02f // ...only where the direction is open, by the free fit's own bar (2026-09-28): none under MAGLOC_PRIOR_FROM_MM of 3D bar (eight TMAGs at 40 mm above the board, 8 mm, pin it - and the prior bent that axis 11 degrees flat and the fix 5 mm low with no noise at all, the far aim cursor's wander), all of it from twice that (the MMC alone at 90 mm, 18 mm; the TMAGs alone at 55 mm, at their noise floor, 14: the lean the hand last had is the best there is)
 #define MAGLOC_PRIOR_FROM_MM 8.0f
+#define MAGLOC_FAR_BAR_TAU_S 0.25f // s: the fixes' bar is smoothed over this before it ramps the prior and the MMC's far share (a fix's own bar jitters +/-40 % 55 mm up, and the ramp flapped on it)
 // ...and how many iterations that refinement may spend a frame (the steady
 // load's "fit iters" when that is on): from the free fit's answer it needs
 // two or three, and a frame's fit must not run long (the supply shows it).
@@ -392,6 +399,7 @@ struct MagProbeFix {
     Vec3 sigma;      // 1-sigma error bar on the magnet position, mm, per axis (from the fit itself)
     float errorXyMm; // ...across the board: sqrt(sx^2 + sy^2)
     float errorMm;   // ...and in all three axes together
+    float axisSigmaRad; // ...and on the axis's direction, radians (the known-strength fit's; 0 = the sim's probe)
     float peakMt;    // strongest (smoothed) reading
     float peakLevel; // ...in TMAG-equivalent units (a quiet type's reading scaled up by its noise ratio): what presence is judged by
     int seenBy;      // sensors reading above MAGLOC_SEEN_MT
@@ -504,6 +512,8 @@ class MagLocator : public Service {
     Vec3 lastGoodAxis = { MAGLOC_REFERENCE_AX, MAGLOC_REFERENCE_AY, MAGLOC_REFERENCE_AZ };
     float lastGoodStrength = MAGLOC_REFERENCE_STRENGTH;
     bool haveLastGood = true;
+    float farBar = 2.0f * MAGLOC_PRIOR_FROM_MM; // the accepted fixes' 3D bar, smoothed (MAGLOC_FAR_BAR_TAU_S): what the axis prior and the MMC's far share are ramped by
+    bool farBarLive = false;                  // ...seeded by the first fix after none
     bool baselineCorrected = false; // Y has been applied to the zero in use (a new zero clears it)
     void unpolluteBaseline( Stream* out );
     int provisionalGoodFixes = 0; // good fixes running, toward settling a provisional zero

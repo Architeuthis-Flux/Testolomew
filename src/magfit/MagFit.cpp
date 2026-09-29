@@ -503,6 +503,7 @@ bool magFitCoarse( const Vec3* sensors, const Vec3* fields, const bool* use, int
     result->valid = false;
     result->iterations = 0;
     result->sigma = { 999.0f, 999.0f, 999.0f };
+    result->axisSigma = 0.0f;
     if ( count > MAGFIT_MAX_SENSORS ) {
         count = MAGFIT_MAX_SENSORS;
     }
@@ -570,6 +571,7 @@ bool magFitSolveStep( const Vec3* sensors, const Vec3* fields, const bool* use, 
     result->valid = false;
     result->iterations = 0;
     result->sigma = { 999.0f, 999.0f, 999.0f };
+    result->axisSigma = 0.0f;
 
     if ( count > MAGFIT_MAX_SENSORS ) {
         count = MAGFIT_MAX_SENSORS;
@@ -959,19 +961,49 @@ bool magFitRefineKnownStrength( const Vec3* sensors, const Vec3* fields, const b
         if ( variance < MAGFIT_NOISE_FLOOR_MT * MAGFIT_NOISE_FLOOR_MT ) {
             variance = MAGFIT_NOISE_FLOOR_MT * MAGFIT_NOISE_FLOOR_MT;
         }
+        // The diagonal of the inverse, one column at a time: the three
+        // position bars, and - the direction's three components together,
+        // held to unit length by the strength row, so the two that are free
+        // are the angle - the axis's bar in radians (what the tracker's shaft
+        // filter and the cursor's bar go by: a near fix pins it to a degree,
+        // 55 mm up at the noise it is 16).
         float* out[ 3 ] = { &result->sigma.x, &result->sigma.y, &result->sigma.z };
-        for ( int axis = 0; axis < 3; axis++ ) {
-            float a[ MAGFIT_MAX_PARAMS ][ MAGFIT_MAX_PARAMS ] = { { 0 } };
-            float unit[ MAGFIT_MAX_PARAMS ] = { 0 };
-            for ( int r = 0; r < rows; r++ ) {
-                for ( int i = 0; i < KNOWN_PARAMS; i++ ) {
-                    for ( int j = 0; j < KNOWN_PARAMS; j++ )
-                        a[ i ][ j ] += jac[ r ][ i ] * jac[ r ][ j ];
-                }
+        float jtj[ MAGFIT_MAX_PARAMS ][ MAGFIT_MAX_PARAMS ] = { { 0 } };
+        for ( int r = 0; r < rows; r++ ) {
+            for ( int i = 0; i < KNOWN_PARAMS; i++ ) {
+                for ( int j = 0; j < KNOWN_PARAMS; j++ )
+                    jtj[ i ][ j ] += jac[ r ][ i ] * jac[ r ][ j ];
             }
-            unit[ axis ] = 1.0f;
-            *out[ axis ] = ( magFitSolveLinear( a, unit, KNOWN_PARAMS ) && unit[ axis ] > 0 ) ? sqrtf( variance * unit[ axis ] ) : 999.0f;
         }
+        float dirCov[ 3 ][ 3 ] = { { 0 } }; // the direction block of the covariance
+        bool axisOk = true;
+        for ( int k = 0; k < KNOWN_PARAMS; k++ ) {
+            float a[ MAGFIT_MAX_PARAMS ][ MAGFIT_MAX_PARAMS ];
+            float unit[ MAGFIT_MAX_PARAMS ] = { 0 };
+            for ( int i = 0; i < KNOWN_PARAMS; i++ )
+                for ( int j = 0; j < KNOWN_PARAMS; j++ )
+                    a[ i ][ j ] = jtj[ i ][ j ];
+            unit[ k ] = 1.0f;
+            bool ok = magFitSolveLinear( a, unit, KNOWN_PARAMS ) && unit[ k ] > 0; // unit is now the inverse's column k
+            if ( k < 3 ) {
+                *out[ k ] = ok ? sqrtf( variance * unit[ k ] ) : 999.0f;
+            } else if ( ok ) {
+                for ( int j = 3; j < KNOWN_PARAMS; j++ )
+                    dirCov[ k - 3 ][ j - 3 ] = variance * unit[ j ];
+            } else {
+                axisOk = false;
+            }
+        }
+        // ...less its share along the direction itself (the strength row holds
+        // the length, softly: what it leaves is not angle).
+        float len = sqrtf( q[ 3 ] * q[ 3 ] + q[ 4 ] * q[ 4 ] + q[ 5 ] * q[ 5 ] );
+        float v[ 3 ] = { q[ 3 ] / ( len > 1e-6f ? len : 1.0f ), q[ 4 ] / ( len > 1e-6f ? len : 1.0f ), q[ 5 ] / ( len > 1e-6f ? len : 1.0f ) };
+        float trace = dirCov[ 0 ][ 0 ] + dirCov[ 1 ][ 1 ] + dirCov[ 2 ][ 2 ], along = 0.0f;
+        for ( int i = 0; i < 3; i++ )
+            for ( int j = 0; j < 3; j++ )
+                along += v[ i ] * dirCov[ i ][ j ] * v[ j ];
+        float axisVar = trace - along;
+        result->axisSigma = axisOk ? sqrtf( axisVar > 0.0f ? axisVar : 0.0f ) : (float)M_PI;
     }
 
     result->position = { q[ 0 ], q[ 1 ], q[ 2 ] };

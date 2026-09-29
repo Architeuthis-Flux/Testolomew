@@ -55,6 +55,8 @@ void magTrackReset( MagTrack* t ) {
     t->droppedRun = 0;
     t->shaftSwings = 0;
     t->haveShaft = false;
+    t->axisSigma = 0.0f;
+    t->shaftVar = 0.0f;
     t->lastDropped = false;
     t->lastGate = 0.0f;
     for ( int a = 0; a < 3; a++ ) {
@@ -187,9 +189,10 @@ static void startTrack( MagTrack* t, const MagTrackInput* in, const float r[ 3 ]
 // a smooth gradient, flat at the board and easing through the halving
 // height - 1 / (1 + (lift / half)^2) - on the SMOOTHED height of the last
 // frame, so the factors never jump with a noisy fix. For the cursor's, the
-// height's, the view's and the shaft's filters alike (2026-09-28 afternoon:
-// the shaft's ran unscaled, 3.6 Hz on the bench, and far up its noisy axis
-// times the drop was the aim cursor going "spazzy").
+// height's and the view's filters; the shaft's is keyed on the fit's own
+// bar on the axis instead (MAGTRACK_AXIS_SURE_RAD: 2026-09-28 evening -
+// slowed with the height it still ran at 0.6 Hz 55 mm up, where a fix's
+// axis is +/-16 degrees, and the aim cursor danced 40 rows).
 static void heightSlowing( const MagTrack* t, float* kHz, float* kBeta ) {
     float lift = t->heightMm > 0.0f ? t->heightMm : 0.0f;
     float hz = t->hzHalfMm > 0.0f ? lift / t->hzHalfMm : 0.0f, bz = t->betaHalfMm > 0.0f ? lift / t->betaHalfMm : 0.0f;
@@ -274,10 +277,20 @@ static void finishFrame( MagTrack* t, float dtS, bool roughHeld ) {
         t->viewPosition.z = oneEuro( &t->viewEuro[ 2 ], t->position.z, dtS, viewCutoff, viewBeta );
     }
     t->viewTip = tipModelPoint( &t->tipModel, t->tipOffsetMm, t->viewPosition, t->shaft );
-    // The cursor's bar: the track's, plus what a few degrees of shaft error do
-    // over the reach, plus the tip offset's share of the same.
+    // The cursor's bar: the track's, plus what the shaft's remaining error
+    // (the filter's, TRACK_ANGLE_SIGMA at the least) does over the aim
+    // projection - a radian of tilt moves the cursor by the drop over the
+    // cosine squared of the tilt, 73 mm at 55 mm and 30 degrees - plus the
+    // tip offset's share of the same angle.
     float xy = sqrtf( t->sigma.x * t->sigma.x + t->sigma.y * t->sigma.y );
-    t->cursorSigmaMm = xy + TRACK_ANGLE_SIGMA * ( t->reachMm + t->tipOffsetMm );
+    float angle = sqrtf( t->shaftVar );
+    angle = angle > TRACK_ANGLE_SIGMA ? angle : TRACK_ANGLE_SIGMA;
+    float gain = t->tipOffsetMm;
+    if ( t->cursorMode == MAGCURSOR_POINTED && height > MAGTRACK_CONTACT_MM ) {
+        float cz = t->shaft.z > 0.0872f ? t->shaft.z : 0.0872f; // no flatter than the pointer's 85 degrees
+        gain += height / ( cz * cz );
+    }
+    t->cursorSigmaMm = xy + angle * gain;
 }
 
 void magTrackUpdate( MagTrack* t, float dtS, const MagTrackInput* in ) {
@@ -482,10 +495,20 @@ void magTrackUpdate( MagTrack* t, float dtS, const MagTrackInput* in ) {
     // persist to be believed (one frame's wild direction is a glitch).
     if ( in->valid && in->haveShaft && !t->lastDropped ) {
         Vec3 s = normalised( in->shaft );
+        // The fit's own bar on the axis (radians), smoothed over
+        // MAGTRACK_AXIS_SIGMA_TAU_S: what the filter is keyed on.
+        float sigma = in->axisSigma > 0.0f ? in->axisSigma : 0.0f;
+        if ( !t->haveShaft ) {
+            t->axisSigma = sigma;
+        } else {
+            float a = dtS / ( MAGTRACK_AXIS_SIGMA_TAU_S + dtS );
+            t->axisSigma += a * ( sigma - t->axisSigma );
+        }
         if ( !t->haveShaft ) {
             t->shaft = s;
             t->haveShaft = true;
             t->shaftSwings = 0;
+            t->shaftVar = sigma * sigma;
             for ( int a = 0; a < 3; a++ ) {
                 OneEuroAxis e = { false, 0.0f, 0.0f };
                 t->shaftEuro[ a ] = e;
@@ -499,26 +522,46 @@ void magTrackUpdate( MagTrack* t, float dtS, const MagTrackInput* in ) {
             // snapped the shaft and emptied its filter (2026-09-28 afternoon).
             float bar = in->sigma.x > in->sigma.y ? in->sigma.x : in->sigma.y;
             bar = bar > in->sigma.z ? bar : in->sigma.z;
-            bool sharp = bar < MAGTRACK_FAR_BAR_MM;
+            // ...sharp in its AXIS too (2026-09-28 evening, the bench 40 mm
+            // up: a fix's position bar dipped under 5 mm often enough while
+            // its axis was +/-12 degrees a fix, swinging past 45 on noise,
+            // and three such in a row snapped the shaft 30 degrees).
+            bool sharp = bar < MAGTRACK_FAR_BAR_MM && sigma < MAGTRACK_AXIS_SURE_RAD;
             if ( sharp && swingDeg > MAGTRACK_SHAFT_FLIP_DEG && ++t->shaftSwings < TRACK_SHAFT_CONFIRM ) {
                 // wait
             } else {
                 if ( ( sharp && t->shaftSwings >= TRACK_SHAFT_CONFIRM ) || !t->smooth ) {
                     t->shaft = s; // it meant it
+                    t->shaftVar = sigma * sigma;
                     for ( int a = 0; a < 3; a++ ) {
                         OneEuroAxis e = { false, 0.0f, 0.0f };
                         t->shaftEuro[ a ] = e;
                     }
                 } else {
-                    // The shaft's filter slows with the height like the
-                    // cursor's - its beta by the square: a far axis's noise
-                    // reads as speed, and beta opened the filter on it (at
-                    // 40 mm the raw 9 degrees of jitter came through whole).
-                    float kHz, kBeta;
-                    heightSlowing( t, &kHz, &kBeta );
-                    float cutoff = t->shaftMinCutoff * kHz, beta = t->shaftBeta * kBeta * kBeta;
+                    // The shaft's filter is keyed on the axis's bar
+                    // (MAGTRACK_AXIS_SURE_RAD, a fourth power: at the lever
+                    // where the fit pins the axis, a thirtieth 45 mm up) -
+                    // its beta by the square of that, since a far
+                    // axis's noise reads as speed and beta opened the filter
+                    // on it. (2026-09-28 evening: keyed on the height it ran
+                    // at 0.6 Hz 55 mm up, where a fix's axis is +/-16
+                    // degrees, and the aim cursor danced 40 rows with the
+                    // probe held still.)
+                    float k = t->axisSigma / MAGTRACK_AXIS_SURE_RAD;
+                    k *= k;
+                    float kAxis = 1.0f / ( 1.0f + k * k );
+                    float cutoff = t->shaftMinCutoff * kAxis, beta = t->shaftBeta * kAxis * kAxis;
                     Vec3 m = { oneEuro( &t->shaftEuro[ 0 ], s.x, dtS, cutoff, beta ), oneEuro( &t->shaftEuro[ 1 ], s.y, dtS, cutoff, beta ), oneEuro( &t->shaftEuro[ 2 ], s.z, dtS, cutoff, beta ) };
                     t->shaft = normalised( m );
+                    // What the filtered shaft may still be off by: the
+                    // filter's own variance recursion on the fixes' bar - an
+                    // EMA keeps (1 - a)^2 of its error and takes a^2 of this
+                    // fix's - at the widest of the three components' pace.
+                    float speed = fabsf( t->shaftEuro[ 0 ].dx );
+                    for ( int a = 1; a < 3; a++ )
+                        speed = maxf( speed, fabsf( t->shaftEuro[ a ].dx ) );
+                    float a = oneEuroAlpha( cutoff + beta * speed, dtS );
+                    t->shaftVar = ( 1.0f - a ) * ( 1.0f - a ) * t->shaftVar + a * a * sigma * sigma;
                 }
                 t->shaftSwings = 0;
             }
