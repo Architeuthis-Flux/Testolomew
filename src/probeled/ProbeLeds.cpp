@@ -165,6 +165,7 @@ void probeLedDefaultStyle( ProbeLedStyle* s ) {
     s->minSigmaAcrossMm = 0.9f;
     s->spot = 0.2f;         // (1.0; 0.9 to 2026-09-28 evening)
     s->spotByHeight = 3.7f; // (0; 3.5 to 2026-09-28 evening)
+    s->spotBySpeed = 0.0f;  // (new on 2026-09-28 evening, off)
     s->errorWidth = 1.0f;   // the bar as it is
     s->falloff = 1.1f;      // (1, a Gaussian, to 2026-09-28 evening)
     s->liftFullMm = 116.0f; // (15; 60 to 2026-09-28 evening)
@@ -481,7 +482,12 @@ void probeLedRender( const LedLayout* layout, const ProbeLedInput* in, const Pro
         float lift = in->heightMm > 0.0f ? in->heightMm / PROBELED_SPOT_HEIGHT_MM : 0.0f;
         if ( lift > PROBELED_SPOT_HEIGHT_MAX )
             lift = PROBELED_SPOT_HEIGHT_MAX;
-        float grow = ( style->spot > 0.0f ? style->spot : 1.0f ) * ( 1.0f + style->spotByHeight * lift );
+        // ...and "spot by speed" by that much per PROBELED_SPOT_SPEED_MM_S of
+        // the magnet's speed (a comet's head: wide on the move, a pin at rest).
+        float pace = in->speedMmS > 0.0f ? in->speedMmS / PROBELED_SPOT_SPEED_MM_S : 0.0f;
+        if ( pace > PROBELED_SPOT_SPEED_MAX )
+            pace = PROBELED_SPOT_SPEED_MAX;
+        float grow = ( style->spot > 0.0f ? style->spot : 1.0f ) * ( 1.0f + style->spotByHeight * lift + style->spotBySpeed * pace );
         float minRows = style->minSigmaRows * grow, minAcross = style->minSigmaAcrossMm * grow;
         // ...and the fix's error bar, by "error width", is the other floor.
         float barRows = in->sigmaRows * style->errorWidth, barAcross = in->sigmaAcrossMm * style->errorWidth;

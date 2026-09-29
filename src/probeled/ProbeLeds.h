@@ -220,6 +220,8 @@ extern const char* const probeLedOnBoardNames[ PROBELED_ONBOARD_COUNT ];
 #define PROBELED_MAX_SIGMA_ACROSS_MM 7.0f
 #define PROBELED_TOUCH_MM 2.0f     // the point is "on the board" below this (as the paint's touch, 2026-09-19)
 #define PROBELED_SPOT_HEIGHT_MM 10.0f // "spot by height" counts the point's lift in these (up to PROBELED_SPOT_HEIGHT_MAX of them)
+#define PROBELED_SPOT_SPEED_MM_S 100.0f // "spot by speed" counts the magnet's speed in these (up to PROBELED_SPOT_SPEED_MAX of them: writing speed is about 2)
+#define PROBELED_SPOT_SPEED_MAX 4.0f
 #define PROBELED_ONE_PIXEL_ROWS 1.0f  // the LED nearest the cursor (within this) is always lit at the bell's peak: a pin between two holes lights the nearer one, never nothing (2026-09-28)
 #define PROBELED_SPOT_HEIGHT_MAX 6.0f
 #define PROBELED_SWEEP_S 0.25f     // a cursor seen this recently is swept to the new one (a fast hand's refused frames are a few; a cold start across the board is a jump)
@@ -241,6 +243,7 @@ struct ProbeLedStyle {
     float errorWidth;   // the fix's error bar times this is the other floor of the width: 0 = the bar is not shown, the spot is "spot" wide whatever the fit knows; 1 = the bar as it is; 2 = twice (the menu's "error width", 2026-09-28)
     float falloff;      // the bell's shape: 1 a Gaussian; higher a flatter top and a sharper edge (3 near a disc); lower a peaked centre with a wide skirt (the menu's "falloff", 2026-09-28)
     float spotByHeight; // ...and this much wider again per PROBELED_SPOT_HEIGHT_MM of the point's lift (the menu's "spot by height": 0 = the same size at any height, 1 = twice as wide 10 mm up and three times at 20 - a flashlight's cone, the peak kept; over the colours page's height scale until 2026-09-28, 60 mm on the bench: nothing to see at working heights)
+    float spotBySpeed;  // ...and this much wider again per PROBELED_SPOT_SPEED_MM_S of the magnet's speed (the menu's "spot by speed", 2026-09-28: 0 = the same size at any speed, 1 = twice as wide at 100 mm/s, three times at 200 - a comet's head, the peak kept; the track's velocity, so 0 with the tracker off)
     float liftFullMm;      // the height scale: where the height's wheel ends (and classic's colour is all "lift"), mm
     float attackS, decayS; // per-LED smoothing time constants
     // The looks.

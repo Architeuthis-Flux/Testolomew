@@ -33,6 +33,7 @@ void setUp( void ) {
     style.peak = 1.0f; // (0.65 since 2026-09-28 evening's defaults)
     style.spot = 1.0f;
     style.spotByHeight = 0.0f;
+    style.spotBySpeed = 0.0f;
     style.decayS = 0.12f;
     style.touchRing = false;
     style.tailLength = 0.5f;
@@ -826,6 +827,37 @@ void test_touch_ring_repeats_only_when_asked( void ) {
     TEST_ASSERT_TRUE( frame.ringAgeS >= 0.0f ); // asked to: it rings again
 }
 
+// "spot by speed" (2026-09-28): the spot grows with the magnet's speed, per
+// 100 mm/s, the peak kept; at 0 the speed changes nothing, and a still
+// probe is the narrow spot whatever the lever.
+void test_spot_grows_with_speed( void ) {
+    ProbeLedInput still = at( 14.0f, 6.35f, 0.05f, 0.2f );
+    still.speedMmS = 0.0f;
+    ProbeLedInput fast = still;
+    fast.speedMmS = 200.0f;
+    probeLedRender( &v6, &still, &style, 1.0f, &frame );
+    int litStill = 0;
+    for ( int i = 0; i < frame.count; i++ )
+        litStill += frame.target[ i ] > 0.1f;
+    probeLedRender( &v6, &fast, &style, 1.0f, &frame );
+    int litFast = 0;
+    for ( int i = 0; i < frame.count; i++ )
+        litFast += frame.target[ i ] > 0.1f;
+    TEST_ASSERT_EQUAL( litStill, litFast ); // the lever at 0: the speed changes nothing
+    style.spotBySpeed = 2.0f; // five times as wide at 200 mm/s
+    probeLedRender( &v6, &fast, &style, 1.0f, &frame );
+    litFast = 0;
+    for ( int i = 0; i < frame.count; i++ )
+        litFast += frame.target[ i ] > 0.1f;
+    TEST_ASSERT_TRUE( litFast > 3 * litStill );
+    TEST_ASSERT_FLOAT_WITHIN( 0.02f, style.peak, frame.target[ brightest( &frame ) ] ); // a wider spot, not a dimmer one
+    probeLedRender( &v6, &still, &style, 1.0f, &frame ); // at rest: the narrow spot again
+    int litBack = 0;
+    for ( int i = 0; i < frame.count; i++ )
+        litBack += frame.target[ i ] > 0.1f;
+    TEST_ASSERT_EQUAL( litStill, litBack );
+}
+
 int main( int argc, char** argv ) {
     (void)argc;
     (void)argv;
@@ -850,5 +882,6 @@ int main( int argc, char** argv ) {
     RUN_TEST( test_one_pixel_at_least_and_the_falloff );
     RUN_TEST( test_touch_ring_repeats_only_when_asked );
     RUN_TEST( test_the_ring_leaves_what_was_under_it );
+    RUN_TEST( test_spot_grows_with_speed );
     return UNITY_END( );
 }
