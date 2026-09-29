@@ -625,16 +625,22 @@ ServiceStatus MagLocator::fitFrame( MagTrackInput* in ) {
             if ( farBarLive ) {
                 float dt = MAG_FRAME_PERIOD_US * 1e-6f, a = dt / ( MAGLOC_FAR_BAR_TAU_S + dt );
                 farBar += a * ( fix.errorMm - farBar );
+                farAxis += a * ( fix.axisSigmaRad - farAxis );
             } else {
                 farBar = fix.errorMm;
+                farAxis = fix.axisSigmaRad;
                 farBarLive = true;
             }
         } else {
             farBar = 2.0f * MAGLOC_PRIOR_FROM_MM;
+            farAxis = 2.0f * MAGLOC_PRIOR_FROM_RAD;
             farBarLive = false;
         }
         f.far = ( farBar - MAGLOC_PRIOR_FROM_MM ) / MAGLOC_PRIOR_FROM_MM;
         f.far = f.far < 0.0f ? 0.0f : ( f.far > 1.0f ? 1.0f : f.far );
+        // The axis prior's weight: by the fit's bar on the axis (MAGLOC_PRIOR_FROM_RAD).
+        f.farAxis = ( farAxis - MAGLOC_PRIOR_FROM_RAD ) / MAGLOC_PRIOR_FROM_RAD;
+        f.farAxis = f.farAxis < 0.0f ? 0.0f : ( f.farAxis > 1.0f ? 1.0f : f.farAxis );
         if ( magArray.mmcMode == MAG_MMC_FAR ) {
             for ( int i = 0; i < magArray.sensorCount( ) && i < MAGFIT_MAX_SENSORS; i++ ) {
                 if ( magSensorPlaces[ i ].type != MAG_MMC56X3 )
@@ -1090,7 +1096,7 @@ ServiceStatus MagLocator::runFit( MagTrackInput* in, FrameScratch& f ) {
     // the board: 8 mm), at twice that they do not (the MMC alone at 90 mm:
     // 18 mm; the TMAGs alone at 55 mm, at their noise floor: 14) and the
     // prior - the last near fix's pole, the lean the hand had - has its say.
-    float priorWeight = f.far;
+    float priorWeight = f.farAxis; // (f.far, the position bar's ramp, until 2026-09-28 evening: see MAGLOC_PRIOR_FROM_RAD)
     bool freeGood = false;
     if ( f.hintFree && f.good && result.coldStage == 0 && result.signal > 0.0f && result.strength > 0.0f ) {
         float freeMisfit = result.residual / result.signal;

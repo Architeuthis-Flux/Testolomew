@@ -211,8 +211,20 @@
 // of direction - about a TMAG's smoothed noise, so it only ever decides
 // what the readings leave open. (The sim: a probe 90 mm up comes back
 // within 3.4 mm with the prior right, 25 mm off with it 40 degrees wrong.)
-#define MAGLOC_AXIS_PRIOR_MT 0.02f // ...only where the direction is open, by the free fit's own bar (2026-09-28): none under MAGLOC_PRIOR_FROM_MM of 3D bar (eight TMAGs at 40 mm above the board, 8 mm, pin it - and the prior bent that axis 11 degrees flat and the fix 5 mm low with no noise at all, the far aim cursor's wander), all of it from twice that (the MMC alone at 90 mm, 18 mm; the TMAGs alone at 55 mm, at their noise floor, 14: the lean the hand last had is the best there is)
+#define MAGLOC_AXIS_PRIOR_MT 0.02f // ...only where the direction is open: by the fit's own bar on the AXIS since 2026-09-28 evening (MAGLOC_PRIOR_FROM_RAD below; that afternoon by the position bar, MAGLOC_PRIOR_FROM_MM, which the MMC's far share still goes by)
 #define MAGLOC_PRIOR_FROM_MM 8.0f
+// ...that was the position bar's say (2026-09-28 afternoon); since the evening
+// the prior is ramped by the fit's own bar on the AXIS (MagFitResult::
+// axisSigma, smoothed over MAGLOC_FAR_BAR_TAU_S): none under this, all of it
+// from twice it. Near the board the fit reports 4-8 degrees and pins the
+// axis itself; 40 mm up it reports 18-23 (the sim and the bench alike) and
+// the bench's fit there sat in the position-against-tilt valley - x 6 mm and
+// 60 degrees for a centred probe at 10, the aim cursor 100 mm out - which is
+// what the prior (the last NEAR fix's pole: the lean the hand lifted with)
+// breaks. The afternoon's sim case that switched it off under an 8 mm bar
+// had no near fix first, so its prior pulled toward the compiled-in
+// reference axis at 41 degrees - not a bent axis, a stale target.
+#define MAGLOC_PRIOR_FROM_RAD 0.17f // radians (10 degrees)
 // The boot zero check (adoptBootZero): the saved zero is put back and then
 // judged against the first MAG_BASELINE_FRAMES of readings - their difference
 // adopted as the zero when no dipole explains it (drift since it was saved),
@@ -525,7 +537,8 @@ class MagLocator : public Service {
     Vec3 lastGoodAxis = { MAGLOC_REFERENCE_AX, MAGLOC_REFERENCE_AY, MAGLOC_REFERENCE_AZ };
     float lastGoodStrength = MAGLOC_REFERENCE_STRENGTH;
     bool haveLastGood = true;
-    float farBar = 2.0f * MAGLOC_PRIOR_FROM_MM; // the accepted fixes' 3D bar, smoothed (MAGLOC_FAR_BAR_TAU_S): what the axis prior and the MMC's far share are ramped by
+    float farBar = 2.0f * MAGLOC_PRIOR_FROM_MM; // the accepted fixes' 3D bar, smoothed (MAGLOC_FAR_BAR_TAU_S): what the MMC's far share is ramped by
+    float farAxis = 2.0f * MAGLOC_PRIOR_FROM_RAD; // ...and their AXIS bar, smoothed the same: what the axis prior is ramped by
     bool farBarLive = false;                  // ...seeded by the first fix after none
     bool baselineCorrected = false; // Y has been applied to the zero in use (a new zero clears it)
     void unpolluteBaseline( Stream* out );
@@ -612,6 +625,7 @@ class MagLocator : public Service {
         float alpha = 1.0f;                  // the smoothing this frame
         float weights[ MAGFIT_MAX_SENSORS ]; // each sensor's weight in the fit this frame
         float far;                           // how open the direction is, 0..1, by the last accepted fix's 3D bar (MAGLOC_PRIOR_FROM_MM): the axis prior's weight, and the MMC's share in its far mode
+        float farAxis; // ...and the axis prior's, 0..1, by the fixes' smoothed AXIS bar (MAGLOC_PRIOR_FROM_RAD)
         float held = 0.0f;                   // the strength held (0 = free)
         int plain = 0;                       // sensors reading plainly (above their plain level)
         bool hintFree = false;               // the free fit ran with no strength hint: the readings pinned it (a measurement)
