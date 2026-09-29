@@ -87,21 +87,7 @@ void PlayService::clearPaint( ) {
 }
 
 void PlayService::movePicker( float dx, float dy ) {
-    float rad = paintHue * ( 3.14159265f / 180.0f );
-    float x = paintSat * cosf( rad ) + dx, y = paintSat * sinf( rad ) + dy;
-    float r = sqrtf( x * x + y * y );
-    if ( r > 1.0f ) { // the rim: no further out
-        x /= r;
-        y /= r;
-        r = 1.0f;
-    }
-    paintSat = r;
-    if ( r > 0.02f ) // at the centre the hue is whatever it was
-        paintHue = atan2f( y, x ) * ( 180.0f / 3.14159265f );
-    if ( paintHue < 0.0f )
-        paintHue += 360.0f;
-    if ( paintHue >= 359.5f ) // the menu item (and so the saved value) runs 0-359
-        paintHue = 0.0f;
+    paintPickerMove( &paintHue, &paintSat, dx, dy ); // (Paint.cpp: against the rim it runs round it to where the stick points)
 }
 
 // The target LED back to the paint that was under it.
@@ -220,6 +206,14 @@ ServiceStatus PlayService::service( ) {
             probeLeds.brush.level = paintBright > 0.15f ? paintBright : 0.15f;
             paintColour( &probeLeds.brush.r, &probeLeds.brush.g, &probeLeds.brush.b );
         }
+        // The ring fades out as the point comes down (PLAY_RING_FADE_MM above
+        // the touch height to nothing at it), so what is under it - the paint
+        // there, what the stroke is about to lay over - is seen (2026-09-28,
+        // Kevin: "make the outline of the brush dim to 0 as we get closer").
+        float lift = probeLeds.input.heightMm - touchMm;
+        float k = lift / PLAY_RING_FADE_MM;
+        k = k < 0.0f ? 0.0f : ( k > 1.0f ? 1.0f : k );
+        probeLeds.brush.level *= k;
     }
     if ( mode == PLAY_OFF ) {
         wasTouching = false;

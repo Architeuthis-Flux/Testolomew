@@ -123,7 +123,7 @@ The one-shot things (2026-09-25; the magnet, sensors and rows pages until then),
 | mode *(mode)* | off / paint / target (`y0`/`y1`/`y2`). The Draw app turns paint on when you go to it and off when you leave, the Target app likewise; the drawing stays in RAM and shows again on return | off |
 | hue / sat | the brush colour: degrees round the wheel, and 0 (white centre) to 1 (rim). The draw screen's wheel sets them with the joystick | 0 / 1.0 |
 | paint bright | the brush's level, 5 % steps; nav up/down in the Draw app. The brush's only: what is painted keeps the level it got | 0.5 |
-| brush | 0-3 rows around the LED under the point, with a soft edge. **Newest wins** (`src/play/Paint.h`): a stroke paints over what was there, colour and level; within a stroke the centre beats an earlier edge and an edge never dims a centre; nav left/right in the Draw app | 0 |
+| brush | 0-3 rows around the LED under the point, with a soft edge. Its ring on the LEDs fades out over the last `PLAY_RING_FADE_MM` (8) of lift above the touch height, so what is under the brush shows as it comes down (2026-09-28). The colour wheel's marker, held against the rim with the joystick, runs round the rim to where the stick points and stops there (2026-09-28: it stopped at the rim). **Newest wins** (`src/play/Paint.h`): a stroke paints over what was there, colour and level; within a stroke the centre beats an earlier edge and an edge never dims a centre; nav left/right in the Draw app | 0 |
 | touch | the height (mm above the surface) below which the point paints, with 0.7 mm of hysteresis; also in the Draw app | 2.0 |
 | clear | wipes the paint (`W`; the nav press held in the Draw app does too) | - |
 | target | info: the target game's tally (`w` prints it) | - |

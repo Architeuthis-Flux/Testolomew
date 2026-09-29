@@ -56,4 +56,13 @@ void paintDab( ProbeLedPaint* paint, PaintStroke* stroke, const LedLayout* layou
 // Wipe the paint and the stroke.
 void paintClear( ProbeLedPaint* paint, PaintStroke* stroke );
 
+// The colour wheel's marker moved by (dx, dy) in radii (the joystick's tilt
+// times the pick speed and the frame): hue round, saturation out, the rim at
+// 1. Against the rim the move's excess beyond it becomes travel ROUND the
+// rim toward where the stick points (2026-09-28, Kevin: "moving the analog
+// stick up against the edge of the color wheel, it keeps moving around the
+// edge"), so a stick held out to any side takes the marker round to that
+// hue and stops there; at the centre the hue is whatever it was.
+void paintPickerMove( float* hueDeg, float* sat, float dx, float dy );
+
 #endif // PAINT_H

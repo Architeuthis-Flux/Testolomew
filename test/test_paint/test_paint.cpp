@@ -124,6 +124,31 @@ void test_size_zero_paints_one_led( void ) {
     TEST_ASSERT_EQUAL( 1, painted );
 }
 
+// The colour wheel's marker against the rim (2026-09-28): a stick held out
+// to a side takes the marker round the rim to that hue and stops there;
+// inside the wheel a move is the plain move.
+void test_picker_runs_round_the_rim_to_where_the_stick_points( void ) {
+    float hue = 0.0f, sat = 1.0f; // at the rim, on the right
+    for ( int i = 0; i < 200; i++ ) // the stick held straight up, 4 radii a second, 100 Hz: two seconds
+        paintPickerMove( &hue, &sat, 0.0f, 0.04f );
+    TEST_ASSERT_FLOAT_WITHIN( 1.0f, 90.0f, hue ); // round to the top, and no further
+    TEST_ASSERT_FLOAT_WITHIN( 0.001f, 1.0f, sat );
+    for ( int i = 0; i < 200; i++ ) // held down-left: the shorter way round, to 225
+        paintPickerMove( &hue, &sat, -0.04f, -0.04f );
+    TEST_ASSERT_FLOAT_WITHIN( 1.0f, 225.0f, hue );
+    TEST_ASSERT_FLOAT_WITHIN( 0.001f, 1.0f, sat );
+    // Pushed straight out at the rim where it already is: nothing moves.
+    hue = 225.0f;
+    paintPickerMove( &hue, &sat, -0.04f, -0.04f );
+    TEST_ASSERT_FLOAT_WITHIN( 0.5f, 225.0f, hue );
+    // Inside: the plain move, in from the rim.
+    hue = 0.0f;
+    sat = 1.0f;
+    paintPickerMove( &hue, &sat, -0.5f, 0.0f );
+    TEST_ASSERT_FLOAT_WITHIN( 0.01f, 0.5f, sat );
+    TEST_ASSERT_FLOAT_WITHIN( 0.5f, 0.0f, hue );
+}
+
 int main( int argc, char** argv ) {
     (void)argc;
     (void)argv;
@@ -134,5 +159,6 @@ int main( int argc, char** argv ) {
     RUN_TEST( test_a_new_stroke_overwrites_an_old_centre );
     RUN_TEST( test_erase_clears_and_the_target_is_skipped );
     RUN_TEST( test_size_zero_paints_one_led );
+    RUN_TEST( test_picker_runs_round_the_rim_to_where_the_stick_points );
     return UNITY_END( );
 }

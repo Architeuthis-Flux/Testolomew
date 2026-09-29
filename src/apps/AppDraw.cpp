@@ -7,7 +7,8 @@
 // bottom right with the paint's settings beside it.
 //
 // Controls: the joystick moves the wheel's marker (hue round, saturation
-// out); the joystick's press clicks draw/erase; the nav stick's up/down set
+// out; held against the rim it runs round it to where the stick points);
+// the joystick's press clicks draw/erase; the nav stick's up/down set
 // the paint's brightness, left/right the brush; the nav press held clears
 // the drawing.
 #include <Adafruit_GFX.h>

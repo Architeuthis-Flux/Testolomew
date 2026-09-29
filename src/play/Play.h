@@ -43,6 +43,7 @@
 #define PLAY_PERIOD_US 10000
 #define PLAY_TOUCH_MM 2.0f        // the point is on the board below this height (the default; the menu's "touch mm", saved). 2026-09-19: 1 mm missed touches toward the middle of the board
 #define PLAY_TOUCH_RELEASE_MM 0.7f // ...and stays "on" until this much higher: no flicker at the line
+#define PLAY_RING_FADE_MM 8.0f     // the brush's ring on the LEDs fades from full this far above the touch height to nothing at it (2026-09-28): what is under the brush shows as it comes down
 #define PLAY_WITHIN_ROWS 1.0f // a hole is "under" the point within this (a whole pitch: a point 2 mm into the channel still paints hole 1, 2026-09-19)
 #define PLAY_TRACE_W 240
 #define PLAY_TRACE_H 240

@@ -40,6 +40,36 @@ void paintStrokeEnd( PaintStroke* stroke ) {
     stroke->down = false;
 }
 
+void paintPickerMove( float* hueDeg, float* sat, float dx, float dy ) {
+    float rad = *hueDeg * ( 3.14159265f / 180.0f );
+    float x = *sat * cosf( rad ) + dx, y = *sat * sinf( rad ) + dy;
+    float r = sqrtf( x * x + y * y );
+    if ( r > 1.0f ) {
+        // Against the rim: what would have gone further out goes round it
+        // instead, toward where the stick points, and no further than that.
+        float at = atan2f( y, x ), want = atan2f( dy, dx );
+        float diff = want - at;
+        while ( diff > 3.14159265f )
+            diff -= 2.0f * 3.14159265f;
+        while ( diff < -3.14159265f )
+            diff += 2.0f * 3.14159265f;
+        float step = r - 1.0f; // radii beyond the rim = radians round it
+        if ( step > fabsf( diff ) )
+            step = fabsf( diff );
+        at += diff > 0.0f ? step : -step;
+        x = cosf( at );
+        y = sinf( at );
+        r = 1.0f;
+    }
+    *sat = r;
+    if ( r > 0.02f ) // at the centre the hue is whatever it was
+        *hueDeg = atan2f( y, x ) * ( 180.0f / 3.14159265f );
+    if ( *hueDeg < 0.0f )
+        *hueDeg += 360.0f;
+    if ( *hueDeg >= 359.5f ) // the menu item (and so the saved value) runs 0-359
+        *hueDeg = 0.0f;
+}
+
 void paintClear( ProbeLedPaint* paint, PaintStroke* stroke ) {
     probeLedPaintClear( paint );
     stroke->down = false;
