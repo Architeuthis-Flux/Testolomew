@@ -846,6 +846,7 @@ void MagArray::applyGainTrim( int i, Vec3 divideBy ) {
     raw[ i ] = { raw[ i ].x / divideBy.x, raw[ i ].y / divideBy.y, raw[ i ].z / divideBy.z };
     field[ i ] = { raw[ i ].x - baseline[ i ].x, raw[ i ].y - baseline[ i ].y, raw[ i ].z - baseline[ i ].z };
     zeroedAt++; // the settings keep the trim with the zero
+    zeroNote = "the audit's gain trim";
 }
 
 void MagArray::startBaseline( ) {
@@ -871,6 +872,7 @@ void MagArray::startBaselineFor( const bool* which ) {
         baselineLeft = 0;
         baselineCount++;
         zeroedAt++;
+        zeroNote = "cleared (simulated frames)";
         return;
     }
     bool every = true;
@@ -924,6 +926,7 @@ void MagArray::restoreBaseline( const Vec3* list, const bool* have, int count, c
     baselineLeft = 0; // whatever zeroing was under way is off: this one is used
     baselineCount++;
     zeroedAt++; // it counts as a zero taken (the settings keep serialising it)
+    zeroNote = "put back (restoreBaseline)";
     baselineRestored = true;
     if ( missing > 0 && !simulatedFrames ) {
         startBaselineFor( rest );
@@ -969,6 +972,7 @@ void MagArray::settleProvisionalZero( int i, Vec3 magnetFieldAtSensor, bool take
     }
     zeroProvisional[ i ] = false;
     zeroedAt++; // the settings keep the settled zero
+    zeroNote = "a provisional zero settled";
     Stream* out = console.port( );
     if ( out != nullptr ) {
         char line[ 160 ];
@@ -995,6 +999,7 @@ bool MagArray::settleDriftedZeros( float thresholdMt ) {
     }
     if ( moved ) {
         zeroedAt++; // the settings serialise it
+        zeroNote = "drifted zeros settled";
     }
     return moved;
 }
@@ -1005,6 +1010,8 @@ void MagArray::shiftBaseline( int i, Vec3 by ) {
     }
     baseline[ i ] = { baseline[ i ].x - by.x, baseline[ i ].y - by.y, baseline[ i ].z - by.z };
     zeroed[ i ] = baseline[ i ];
+    zeroedAt++;
+    zeroNote = "shifted: Y, the audit's zero, or a provisional settle (the live baseline sealed into the saved zero)";
 }
 
 void MagArray::setBaseline( int i, Vec3 zero ) {
@@ -1275,6 +1282,7 @@ void MagArray::publishFrame( ) {
         }
         baselineCount++;
         zeroedAt++;
+        zeroNote = partialZeroing ? "a zeroing of some sensors completed (a recovered sensor, a retake of the unread)" : "a zeroing completed (z, a retake, boot with nothing saved)";
         partialZeroing = false;
         if ( unread > 0 ) {
             startBaselineFor( again );
@@ -1471,6 +1479,11 @@ void MagArray::printStatus( Stream* out ) const {
     snprintf( line, sizeof( line ), "MagArray: %d of %d sensors on %d bus%s, frame %lu (%.1f reads averaged per frame), baseline %s, VIO rail %s",
               sensorsOk( ), MAG_SENSOR_COUNT, buses, buses == 1 ? "" : "es", (unsigned long)frameCount, samplesPerFrame, baselineReady( ) ? "set" : "averaging",
               boardVioIs3V3( ) ? "3.3 V" : "NOT 3.3 V - sensors cannot run" );
+    {
+        char zl[ 200 ];
+        snprintf( zl, sizeof( zl ), "the saved zero has been written %lu times since boot, last: %s", (unsigned long)zeroedAt, zeroNote );
+        out->println( zl );
+    }
     out->println( line );
     for ( int b = 0; b < buses; b++ ) {
         const MagBus& bus = busTable[ b ];

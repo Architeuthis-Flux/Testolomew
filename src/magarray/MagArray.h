@@ -191,6 +191,7 @@ class MagArray : public Service {
     // baseline (a magnet that was there while it zeroed, MagLocator's Y).
     Vec3 zeroed[ MAG_SENSOR_COUNT ];
     uint32_t zeroedAt = 0;
+    const char* zeroNote = "never"; // what last wrote the saved zero (m prints it with the count: 2026-09-28 evening a saved zero moved by a third of a far probe's field over two hours and nothing on the console said what wrote it)
     bool baselineRestored = false; // the baseline in use came from the settings (not to be retaken as "polluted": it was checked when taken)
     // A sensor's zero is PROVISIONAL when it was taken from live frames
     // while the others' came from a saved or compiled zero - a sensor added

@@ -957,11 +957,17 @@ void MagLocator::keepZeros( const FrameScratch& f ) {
         bool follow;
         bool presentLately = lastPresentMs != 0 && now - lastPresentMs < (uint32_t)( MAG_OFFSET_HOLDOFF_S * 1000.0f );
         bool explained = fix.present && f.explained;
-        if ( ( f.quiet[ i ] && !explained ) || ( !fix.present && !presentLately ) ) {
+        if ( ( f.quiet[ i ] && !fix.present ) || ( !fix.present && !presentLately ) ) {
             // Not the magnet's reading: the drift. (A quiet sensor under a fix
             // the array explains holds too: its small share of the magnet is
             // real, and followed it went into its zero and was put back by
-            // the audit every window, a flash write each - 2026-09-24.)
+            // the audit every window, a flash write each - 2026-09-24. And a
+            // quiet sensor with the probe PRESENT holds on the refused frames
+            // as well, 2026-09-28 evening: a far probe is quiet at every
+            // sensor, its fit is refused on a fifth of its frames at the
+            // misfit's limit, and followed on those its field leaked into the
+            // zeros over two hours - then sealed into the saved zero the
+            // moment presence flickered off.)
             follow = true;
             unexplainedSinceMs[ i ] = 0;
         } else if ( magArray.ignored( i ) || explained ) {
@@ -1235,7 +1241,11 @@ ServiceStatus MagLocator::publishFix( MagTrackInput* in, const FrameScratch& f )
     float inv = result.strength > 0.0f ? 1.0f / result.strength : 0.0f;
     Vec3 pole = { result.moment.x * inv, result.moment.y * inv, result.moment.z * inv };
     fix.axis = pole;
-    if ( fix.misfit < MAGLOC_LEARN_MAX_MISFIT && fix.seenBy >= MAGLOC_LEARN_MIN_SENSORS ) {
+    if ( fix.misfit < MAGLOC_LEARN_MAX_MISFIT && fix.seenBy >= MAGLOC_LEARN_MIN_SENSORS && fix.axisSigmaRad < MAGLOC_PRIOR_FROM_RAD ) {
+        // (...and only a fix sharp in its AXIS, 2026-09-28 evening: this is
+        // the axis prior's target, the lean the hand lifted with, and one
+        // lucky far frame - four sensors plain, the misfit under a tenth -
+        // moved it to a far fix's own noisy axis, which the prior then held.)
         // Remembered for Y (and the settings): the track's smoothed position
         // when there is one, and only once it has moved a third of a
         // millimetre (or the pole a few degrees) from what is remembered,
